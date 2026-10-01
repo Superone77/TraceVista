@@ -160,3 +160,8 @@ pnpm-lock.yaml                    固定前端依赖及完整性
 保留四层缩放、状态树、原文卡片和证据结构。
 
 来源和许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 7. 协作流程
+
+新改动在独立分支开发，通过 PR 提交给维护者审批后合入 `main`。
+运行 `pnpm setup:hooks` 可安装本机防误推钩子，详见 [分支流程](docs/BRANCHES.md)。
