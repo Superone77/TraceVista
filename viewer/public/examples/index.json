@@ -1,0 +1,4 @@
+[
+  {"id":"pi-infra-r1","title":"Pi Infra Harness · LoRA · 20261001-r1","file":"pi-infra-r1.agent-state.json","description":"真实轨迹：DeepSeek Flash，4 次提交，含退步、回退后修改与最终选择。"},
+  {"id":"parser","title":"通用结构示例 · 配置解析器","file":"parser.agent-state.json","description":"合成数据：展示 Skill、review、知识读写、任务与测量等七类记录。"}
+]

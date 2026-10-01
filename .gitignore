@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.work/
+**/local-data/
+.env
+.env.*
+**/auth.json
+**/credentials.json
+__pycache__/
+*.pyc
+*.tsbuildinfo
+.DS_Store

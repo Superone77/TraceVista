@@ -1,0 +1,1370 @@
+{
+  "format": "coding-agent-state-trajectory",
+  "version": 1,
+  "title": "修复配置解析器 · 通用结构示例",
+  "subtitle": "合成数据 · 展示假设、参数试验、三种技能加载、审查与任务记录",
+  "scope": "只跟踪 parser.ts 的版本。测试结果作为证据保留，不作为代码状态变化。",
+  "notes": [
+    "这是人为编写的格式与交互示例，不是真实执行或真实性能结果。",
+    "探索结构与执行顺序分别保留；串行尝试也能形成备选分支。",
+    "本例完整展示七类观察记录。真实导出允许缺项，但必须说明标注范围。"
+  ],
+  "states": [
+    {
+      "id": "s0",
+      "title": "空配置触发异常",
+      "summary": "解析器直接读取首个字段，缺少空值处理。",
+      "snapshot": {
+        "parser.ts": "version-0"
+      },
+      "events": [
+        "e0"
+      ]
+    },
+    {
+      "id": "s1",
+      "title": "空值保护已加入",
+      "summary": "补丁已写入；独立审查确认回归测试通过。",
+      "snapshot": {
+        "parser.ts": "version-1"
+      },
+      "events": [
+        "e4",
+        "e5"
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "id": "investigate",
+      "state": "s0",
+      "title": "复现并定位异常",
+      "status": "attempted",
+      "events": [
+        "e0",
+        "e1",
+        "e2",
+        "e3"
+      ]
+    },
+    {
+      "id": "patch",
+      "state": "s0",
+      "title": "增加空配置保护",
+      "status": "retained",
+      "events": [
+        "e4"
+      ]
+    },
+    {
+      "id": "review",
+      "state": "s1",
+      "title": "独立回归审查",
+      "status": "attempted",
+      "events": [
+        "e5"
+      ]
+    },
+    {
+      "id": "x-context",
+      "state": "s1",
+      "title": "补充证据与维护记录",
+      "summary": "审查提出补充材料，代码没有改变；随后记录测试与提交结果。",
+      "status": "attempted",
+      "events": [
+        "x-review-request"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "a0",
+      "state": "s0",
+      "branch": "investigate",
+      "title": "阅读解析入口",
+      "summary": "检查 parser.ts 的字段访问路径。",
+      "behavior": "Explore",
+      "actor": "main",
+      "outcome": "success",
+      "events": [
+        "e0"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "a1",
+      "state": "s0",
+      "branch": "investigate",
+      "title": "制定复现步骤",
+      "summary": "先测试空对象，再决定补丁位置。",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "e1"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "a2",
+      "state": "s0",
+      "branch": "investigate",
+      "title": "执行最小复现",
+      "summary": "复现命令退出码 1；代码未改变。",
+      "behavior": "Execute",
+      "actor": "main",
+      "outcome": "failed",
+      "events": [
+        "e2"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "a3",
+      "state": "s0",
+      "branch": "investigate",
+      "title": "分析异常堆栈",
+      "summary": "确认异常来自缺少空值判断。",
+      "behavior": "Diagnose",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "e3"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "a4",
+      "state": "s0",
+      "branch": "patch",
+      "title": "写入保护条件",
+      "summary": "成功修改 parser.ts；产生下一代码状态。",
+      "behavior": "Edit",
+      "actor": "main",
+      "outcome": "success",
+      "events": [
+        "e4"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "a5",
+      "state": "s1",
+      "branch": "review",
+      "title": "运行回归测试",
+      "summary": "审查者确认空配置和已有用例均通过。",
+      "behavior": "Verify",
+      "actor": "reviewer",
+      "outcome": "success",
+      "events": [
+        "e5"
+      ],
+      "classification_reason": "合成示例中显式给出目的"
+    },
+    {
+      "id": "x-alternative-action",
+      "state": "s0",
+      "branch": "investigate",
+      "title": "alternative",
+      "summary": "先检查入口保护方案，发现无法覆盖其他调用方；随后改为在字段读取处保护。",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-alternative"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-parameter-trial-action",
+      "state": "s0",
+      "branch": "patch",
+      "title": "parameter-trial",
+      "summary": "在假设 B 下对比 emptyPolicy=default 和 emptyPolicy=error；选择 default，保留既有契约。",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-parameter-trial"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-skill-native-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "skill-native",
+      "summary": "Skill({\"skill\":\"boundary-check\"}) -> instruction body loaded; version not reported.",
+      "behavior": "Explore",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-skill-native"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-skill-guide-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "skill-guide",
+      "summary": "workflow guide regression-check -> guide: regression-check, revision 2.1; instruction body returned.",
+      "behavior": "Explore",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-skill-guide"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-skill-read-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "skill-read",
+      "summary": "read_file .skills/review-evidence/SKILL.md -> name: review-evidence; instruction body returned; version not reported.",
+      "behavior": "Explore",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-skill-read"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-review-request-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "review-request",
+      "summary": "Request: parser version-1 + tests 12/12 + evidence.md. Review code identity: version-1.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-review-request"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-review-feedback-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "review-feedback",
+      "summary": "Reviewer: REVISE. Add the exact reproduction command and environment; no code defect identified.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-review-feedback"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-review-material-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "review-material",
+      "summary": "Before parser.ts identity=version-1; edit evidence.md with repro command; after parser.ts identity=version-1.",
+      "behavior": "Edit",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-review-material"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-review-recheck-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "review-recheck",
+      "summary": "Re-review of updated evidence.md and parser.ts version-1: PASS.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-review-recheck"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-knowledge-write-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "knowledge-write",
+      "summary": "Write knowledge/empty-config.md: guard before reading the first element.",
+      "behavior": "Edit",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-knowledge-write"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-knowledge-read-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "knowledge-read",
+      "summary": "Next check reads knowledge/empty-config.md and applies its boundary-case checklist.",
+      "behavior": "Explore",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-knowledge-read"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-todo-add-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "todo-add",
+      "summary": "TODO boundary-tests: add; priority=high; reason=补齐边界测试",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-todo-add"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-todo-priority-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "todo-priority",
+      "summary": "TODO boundary-tests: reprioritize; priority=high; reason=先处理回归风险",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-todo-priority"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-todo-done-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "todo-done",
+      "summary": "TODO boundary-tests: complete; priority=high; reason=测试通过并记录",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-todo-done"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-todo-external-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "todo-external",
+      "summary": "TODO external: fail; reason=外部测试服务无响应",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-todo-external"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-todo-rewrite-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "todo-rewrite",
+      "summary": "TODO rewrite: stop; reason=完整重写范围超出本次修复",
+      "behavior": "Plan",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-todo-rewrite"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-development_score-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "development_score",
+      "summary": "Synthetic development_score: throughput_ratio=1.12 ×; protocol=开发机固定输入一次测量; baseline=version-0",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-development_score"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-independent_score-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "independent_score",
+      "summary": "Synthetic independent_score: throughput_ratio=1.08 ×; protocol=独立进程固定输入五次中位数; baseline=version-0",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-independent_score"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-local_timing-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "local_timing",
+      "summary": "Synthetic local_timing: parse_latency=0.04 ms; protocol=只计 parser 调用; baseline=version-0",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-local_timing"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-end_to_end_timing-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "end_to_end_timing",
+      "summary": "Synthetic end_to_end_timing: request_latency=2.1 ms; protocol=包括读取、解析和响应序列化; baseline=version-0",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-end_to_end_timing"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-correctness-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "correctness",
+      "summary": "12 passed, 0 failed on parser version-1.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-correctness"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-performance-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "performance",
+      "summary": "Measurement is insufficient for a statistically supported performance conclusion.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-performance"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    },
+    {
+      "id": "x-submission-action",
+      "state": "s1",
+      "branch": "x-context",
+      "title": "submission",
+      "summary": "Submission accepted; final code identity=version-1.",
+      "behavior": "Verify",
+      "actor": "main",
+      "outcome": "observed",
+      "events": [
+        "x-submission"
+      ],
+      "secondary": [],
+      "classification_reason": "合成示例中显式给出目的",
+      "classification_basis": "analyst",
+      "t_min": null
+    }
+  ],
+  "transitions": [
+    {
+      "source": "s0",
+      "target": "s1",
+      "action": "a4",
+      "label": "成功应用补丁",
+      "changes": [
+        {
+          "component": "parser.ts",
+          "before": "version-0",
+          "after": "version-1",
+          "basis": "补丁工具返回成功及差异",
+          "events": [
+            "e4"
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "source": "a3",
+      "target": "a4",
+      "kind": "informs",
+      "evidence": "诊断结论决定补丁位置",
+      "events": [
+        "e3",
+        "e4"
+      ]
+    },
+    {
+      "source": "a4",
+      "target": "a5",
+      "kind": "review_request",
+      "evidence": "补丁交给独立审查者",
+      "events": [
+        "e4",
+        "e5"
+      ]
+    }
+  ],
+  "timeline": {
+    "sources": [],
+    "timeline": [
+      {
+        "id": "e0",
+        "kind": "tool",
+        "actor": "main",
+        "tool": "read_file",
+        "text": "const first = config.fields[0];\nreturn first.name;"
+      },
+      {
+        "id": "e1",
+        "kind": "message",
+        "actor": "main",
+        "text": "用空配置复现，检查异常位置，再增加保护条件。"
+      },
+      {
+        "id": "e2",
+        "kind": "tool_result",
+        "actor": "main",
+        "tool": "shell",
+        "text": "node repro.mjs\nTypeError: Cannot read properties of undefined\nexit_code: 1"
+      },
+      {
+        "id": "e3",
+        "kind": "message",
+        "actor": "main",
+        "text": "fields 为空时，first 是 undefined。需要在读取 name 前返回默认值。"
+      },
+      {
+        "id": "e4",
+        "kind": "tool_result",
+        "actor": "main",
+        "tool": "apply_patch",
+        "text": "+ if (!first) return DEFAULT_CONFIG;\nPatch applied successfully.\nparser.ts: version-0 -> version-1"
+      },
+      {
+        "id": "e5",
+        "kind": "review",
+        "actor": "reviewer",
+        "tool": "shell",
+        "text": "npm test\n12 passed, 0 failed.\nReview: boundary cases covered."
+      },
+      {
+        "id": "x-alternative",
+        "kind": "record",
+        "text": "先检查入口保护方案，发现无法覆盖其他调用方；随后改为在字段读取处保护。",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-parameter-trial",
+        "kind": "record",
+        "text": "在假设 B 下对比 emptyPolicy=default 和 emptyPolicy=error；选择 default，保留既有契约。",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-skill-native",
+        "kind": "record",
+        "text": "Skill({\"skill\":\"boundary-check\"}) -> instruction body loaded; version not reported.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-skill-guide",
+        "kind": "record",
+        "text": "workflow guide regression-check -> guide: regression-check, revision 2.1; instruction body returned.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-skill-read",
+        "kind": "record",
+        "text": "read_file .skills/review-evidence/SKILL.md -> name: review-evidence; instruction body returned; version not reported.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-review-request",
+        "kind": "record",
+        "text": "Request: parser version-1 + tests 12/12 + evidence.md. Review code identity: version-1.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-review-feedback",
+        "kind": "record",
+        "text": "Reviewer: REVISE. Add the exact reproduction command and environment; no code defect identified.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-review-material",
+        "kind": "record",
+        "text": "Before parser.ts identity=version-1; edit evidence.md with repro command; after parser.ts identity=version-1.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-review-recheck",
+        "kind": "record",
+        "text": "Re-review of updated evidence.md and parser.ts version-1: PASS.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-knowledge-write",
+        "kind": "record",
+        "text": "Write knowledge/empty-config.md: guard before reading the first element.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-knowledge-read",
+        "kind": "record",
+        "text": "Next check reads knowledge/empty-config.md and applies its boundary-case checklist.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-todo-add",
+        "kind": "record",
+        "text": "TODO boundary-tests: add; priority=high; reason=补齐边界测试",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-todo-priority",
+        "kind": "record",
+        "text": "TODO boundary-tests: reprioritize; priority=high; reason=先处理回归风险",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-todo-done",
+        "kind": "record",
+        "text": "TODO boundary-tests: complete; priority=high; reason=测试通过并记录",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-todo-external",
+        "kind": "record",
+        "text": "TODO external: fail; reason=外部测试服务无响应",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-todo-rewrite",
+        "kind": "record",
+        "text": "TODO rewrite: stop; reason=完整重写范围超出本次修复",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-development_score",
+        "kind": "record",
+        "text": "Synthetic development_score: throughput_ratio=1.12 ×; protocol=开发机固定输入一次测量; baseline=version-0",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-independent_score",
+        "kind": "record",
+        "text": "Synthetic independent_score: throughput_ratio=1.08 ×; protocol=独立进程固定输入五次中位数; baseline=version-0",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-local_timing",
+        "kind": "record",
+        "text": "Synthetic local_timing: parse_latency=0.04 ms; protocol=只计 parser 调用; baseline=version-0",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-end_to_end_timing",
+        "kind": "record",
+        "text": "Synthetic end_to_end_timing: request_latency=2.1 ms; protocol=包括读取、解析和响应序列化; baseline=version-0",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-correctness",
+        "kind": "record",
+        "text": "12 passed, 0 failed on parser version-1.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-performance",
+        "kind": "record",
+        "text": "Measurement is insufficient for a statistically supported performance conclusion.",
+        "actor": "main",
+        "tool": null
+      },
+      {
+        "id": "x-submission",
+        "kind": "record",
+        "text": "Submission accepted; final code identity=version-1.",
+        "actor": "main",
+        "tool": null
+      }
+    ]
+  },
+  "observations": [
+    {
+      "id": "o-step",
+      "kind": "exploration",
+      "title": "工作步骤：修复空配置",
+      "summary": "先定位边界错误，再比较两种处理位置。",
+      "facts": {
+        "level": "work_step",
+        "disposition": "retained"
+      },
+      "events": [
+        "e1"
+      ],
+      "subjects": [
+        "investigate"
+      ]
+    },
+    {
+      "id": "o-h1",
+      "kind": "exploration",
+      "title": "假设 A：在解析入口加保护",
+      "summary": "先尝试在入口处理；这不是与下一假设同时运行。",
+      "facts": {
+        "level": "hypothesis",
+        "disposition": "rejected"
+      },
+      "events": [
+        "e1"
+      ],
+      "subjects": [
+        "investigate"
+      ]
+    },
+    {
+      "id": "o-h2",
+      "kind": "exploration",
+      "title": "假设 B：在读取首字段前保护",
+      "summary": "在同一版本上提出备选位置，最终选择此方案。",
+      "facts": {
+        "level": "hypothesis",
+        "disposition": "retained"
+      },
+      "events": [
+        "x-alternative"
+      ],
+      "subjects": [
+        "x-alternative-action"
+      ]
+    },
+    {
+      "id": "o-trial",
+      "kind": "exploration",
+      "title": "参数试验：emptyPolicy=default",
+      "summary": "同一处理位置下的参数选择，不另立为一个假设。",
+      "facts": {
+        "level": "trial",
+        "disposition": "retained",
+        "parameters": "emptyPolicy=default"
+      },
+      "events": [
+        "x-parameter-trial"
+      ],
+      "subjects": [
+        "x-parameter-trial-action"
+      ]
+    },
+    {
+      "id": "o-skill-native",
+      "kind": "skill",
+      "title": "boundary-check",
+      "summary": "只证明指引已加载；不声称其中所有步骤都完成。",
+      "facts": {
+        "name": "boundary-check",
+        "load_method": "native_call",
+        "version": null
+      },
+      "events": [
+        "x-skill-native"
+      ],
+      "subjects": [
+        "x-skill-native-action"
+      ]
+    },
+    {
+      "id": "o-skill-guide",
+      "kind": "skill",
+      "title": "regression-check",
+      "summary": "只证明指引已加载；不声称其中所有步骤都完成。",
+      "facts": {
+        "name": "regression-check",
+        "load_method": "guide_output",
+        "version": "2.1"
+      },
+      "events": [
+        "x-skill-guide"
+      ],
+      "subjects": [
+        "x-skill-guide-action"
+      ]
+    },
+    {
+      "id": "o-skill-read",
+      "kind": "skill",
+      "title": "review-evidence",
+      "summary": "只证明指引已加载；不声称其中所有步骤都完成。",
+      "facts": {
+        "name": "review-evidence",
+        "load_method": "source_read",
+        "version": null
+      },
+      "events": [
+        "x-skill-read"
+      ],
+      "subjects": [
+        "x-skill-read-action"
+      ]
+    },
+    {
+      "id": "o-request",
+      "kind": "review",
+      "title": "审查请求：补丁与测试报告",
+      "summary": "附带源代码版本与现有结果，等待独立意见。",
+      "facts": {
+        "stage": "request",
+        "outcome": "requested",
+        "code_change": "unknown",
+        "material": "parser.ts + tests + evidence.md"
+      },
+      "events": [
+        "x-review-request"
+      ],
+      "subjects": [
+        "x-review-request-action"
+      ]
+    },
+    {
+      "id": "o-feedback",
+      "kind": "review",
+      "title": "意见：补齐复现材料",
+      "summary": "审查意见要求补材料，不等于当前代码正确性失败。",
+      "facts": {
+        "stage": "feedback",
+        "outcome": "revise",
+        "code_change": "unknown"
+      },
+      "events": [
+        "x-review-feedback"
+      ],
+      "subjects": [
+        "x-review-feedback-action"
+      ]
+    },
+    {
+      "id": "o-material",
+      "kind": "review",
+      "title": "补充材料，代码未变",
+      "summary": "只更新报告中的运行命令；前后同范围代码标识相同。",
+      "facts": {
+        "stage": "revision",
+        "outcome": "unknown",
+        "code_change": "unchanged",
+        "before_code": "version-1",
+        "after_code": "version-1",
+        "material": "evidence.md"
+      },
+      "events": [
+        "x-review-material"
+      ],
+      "subjects": [
+        "x-review-material-action"
+      ]
+    },
+    {
+      "id": "o-recheck",
+      "kind": "review",
+      "title": "再审：材料已完整",
+      "summary": "此 PASS 只表示该次审查通过。",
+      "facts": {
+        "stage": "recheck",
+        "outcome": "pass",
+        "code_change": "unknown"
+      },
+      "events": [
+        "x-review-recheck"
+      ],
+      "subjects": [
+        "x-review-recheck-action"
+      ]
+    },
+    {
+      "id": "o-review-pass",
+      "kind": "status",
+      "title": "独立结论：审查通过",
+      "summary": "审查通过不自动建立性能提升。",
+      "facts": {
+        "category": "review",
+        "outcome": "pass",
+        "scope": "本轮补丁与复现材料"
+      },
+      "events": [
+        "x-review-recheck"
+      ],
+      "subjects": [
+        "x-review-recheck-action"
+      ]
+    },
+    {
+      "id": "o-kw",
+      "kind": "knowledge",
+      "title": "写入经验：先检查空列表",
+      "summary": "保存本次发现供后续任务读取。",
+      "facts": {
+        "operation": "write",
+        "resource": "knowledge/empty-config.md"
+      },
+      "events": [
+        "x-knowledge-write"
+      ],
+      "subjects": [
+        "x-knowledge-write-action"
+      ]
+    },
+    {
+      "id": "o-kr",
+      "kind": "knowledge",
+      "title": "下一步读取边界检查经验",
+      "summary": "读取行为有记录；不从写入事件推断已学习。",
+      "facts": {
+        "operation": "read",
+        "resource": "knowledge/empty-config.md"
+      },
+      "events": [
+        "x-knowledge-read"
+      ],
+      "subjects": [
+        "x-knowledge-read-action"
+      ]
+    },
+    {
+      "id": "o-todo-add",
+      "kind": "task",
+      "title": "边界测试：add",
+      "summary": "同一任务的生命周期事件保留，不覆盖旧记录。",
+      "facts": {
+        "operation": "add",
+        "task_key": "boundary-tests",
+        "reason": "补齐边界测试",
+        "priority": "high"
+      },
+      "events": [
+        "x-todo-add"
+      ],
+      "subjects": [
+        "x-todo-add-action"
+      ]
+    },
+    {
+      "id": "o-todo-priority",
+      "kind": "task",
+      "title": "边界测试：reprioritize",
+      "summary": "同一任务的生命周期事件保留，不覆盖旧记录。",
+      "facts": {
+        "operation": "reprioritize",
+        "task_key": "boundary-tests",
+        "reason": "先处理回归风险",
+        "priority": "high"
+      },
+      "events": [
+        "x-todo-priority"
+      ],
+      "subjects": [
+        "x-todo-priority-action"
+      ]
+    },
+    {
+      "id": "o-todo-done",
+      "kind": "task",
+      "title": "边界测试：complete",
+      "summary": "同一任务的生命周期事件保留，不覆盖旧记录。",
+      "facts": {
+        "operation": "complete",
+        "task_key": "boundary-tests",
+        "reason": "测试通过并记录",
+        "priority": "high"
+      },
+      "events": [
+        "x-todo-done"
+      ],
+      "subjects": [
+        "x-todo-done-action"
+      ]
+    },
+    {
+      "id": "o-todo-external",
+      "kind": "task",
+      "title": "外部测试服务无响应",
+      "summary": "保留失败或停做原因，不归为完成。",
+      "facts": {
+        "operation": "fail",
+        "task_key": "external",
+        "reason": "外部测试服务无响应"
+      },
+      "events": [
+        "x-todo-external"
+      ],
+      "subjects": [
+        "x-todo-external-action"
+      ]
+    },
+    {
+      "id": "o-todo-rewrite",
+      "kind": "task",
+      "title": "完整重写范围超出本次修复",
+      "summary": "保留失败或停做原因，不归为完成。",
+      "facts": {
+        "operation": "stop",
+        "task_key": "rewrite",
+        "reason": "完整重写范围超出本次修复"
+      },
+      "events": [
+        "x-todo-rewrite"
+      ],
+      "subjects": [
+        "x-todo-rewrite-action"
+      ]
+    },
+    {
+      "id": "o-development_score",
+      "kind": "measurement",
+      "title": "development_score · throughput_ratio",
+      "summary": "各项测量范围不同，不放在一个速度排行榜中，也不据此声明统计显著。",
+      "facts": {
+        "metric": "throughput_ratio",
+        "value": 1.12,
+        "unit": "×",
+        "scope": "development_score",
+        "protocol": "开发机固定输入一次测量",
+        "baseline": "version-0",
+        "direction": "higher",
+        "measurement": "measured"
+      },
+      "events": [
+        "x-development_score"
+      ],
+      "subjects": [
+        "x-development_score-action"
+      ]
+    },
+    {
+      "id": "o-independent_score",
+      "kind": "measurement",
+      "title": "independent_score · throughput_ratio",
+      "summary": "各项测量范围不同，不放在一个速度排行榜中，也不据此声明统计显著。",
+      "facts": {
+        "metric": "throughput_ratio",
+        "value": 1.08,
+        "unit": "×",
+        "scope": "independent_score",
+        "protocol": "独立进程固定输入五次中位数",
+        "baseline": "version-0",
+        "direction": "higher",
+        "measurement": "measured"
+      },
+      "events": [
+        "x-independent_score"
+      ],
+      "subjects": [
+        "x-independent_score-action"
+      ]
+    },
+    {
+      "id": "o-local_timing",
+      "kind": "measurement",
+      "title": "local_timing · parse_latency",
+      "summary": "各项测量范围不同，不放在一个速度排行榜中，也不据此声明统计显著。",
+      "facts": {
+        "metric": "parse_latency",
+        "value": 0.04,
+        "unit": "ms",
+        "scope": "local_timing",
+        "protocol": "只计 parser 调用",
+        "baseline": "version-0",
+        "direction": "lower",
+        "measurement": "measured"
+      },
+      "events": [
+        "x-local_timing"
+      ],
+      "subjects": [
+        "x-local_timing-action"
+      ]
+    },
+    {
+      "id": "o-end_to_end_timing",
+      "kind": "measurement",
+      "title": "end_to_end_timing · request_latency",
+      "summary": "各项测量范围不同，不放在一个速度排行榜中，也不据此声明统计显著。",
+      "facts": {
+        "metric": "request_latency",
+        "value": 2.1,
+        "unit": "ms",
+        "scope": "end_to_end_timing",
+        "protocol": "包括读取、解析和响应序列化",
+        "baseline": "version-0",
+        "direction": "lower",
+        "measurement": "measured"
+      },
+      "events": [
+        "x-end_to_end_timing"
+      ],
+      "subjects": [
+        "x-end_to_end_timing-action"
+      ]
+    },
+    {
+      "id": "o-correctness",
+      "kind": "status",
+      "title": "正确性通过",
+      "summary": "12 passed, 0 failed on parser version-1.",
+      "facts": {
+        "category": "correctness",
+        "outcome": "pass",
+        "scope": "parser version-1"
+      },
+      "events": [
+        "x-correctness"
+      ],
+      "subjects": [
+        "x-correctness-action"
+      ]
+    },
+    {
+      "id": "o-performance",
+      "kind": "status",
+      "title": "性能结论仍未知",
+      "summary": "Measurement is insufficient for a statistically supported performance conclusion.",
+      "facts": {
+        "category": "performance",
+        "outcome": "unknown",
+        "scope": "parser version-1"
+      },
+      "events": [
+        "x-performance"
+      ],
+      "subjects": [
+        "x-performance-action"
+      ]
+    },
+    {
+      "id": "o-submission",
+      "kind": "status",
+      "title": "已完成提交",
+      "summary": "Submission accepted; final code identity=version-1.",
+      "facts": {
+        "category": "submission",
+        "outcome": "completed",
+        "scope": "parser version-1"
+      },
+      "events": [
+        "x-submission"
+      ],
+      "subjects": [
+        "x-submission-action"
+      ]
+    }
+  ],
+  "observationLinks": [
+    {
+      "source": "o-step",
+      "target": "o-h1",
+      "relation": "contains",
+      "reason": "工作步骤包含第一个假设。",
+      "events": [
+        "e1"
+      ]
+    },
+    {
+      "source": "o-step",
+      "target": "o-h2",
+      "relation": "contains",
+      "reason": "同一工作步骤下的另一假设。",
+      "events": [
+        "x-alternative"
+      ]
+    },
+    {
+      "source": "o-h1",
+      "target": "o-h2",
+      "relation": "alternative",
+      "reason": "两个方案处理同一个边界错误。",
+      "events": [
+        "x-alternative"
+      ]
+    },
+    {
+      "source": "o-h1",
+      "target": "o-h2",
+      "relation": "follows",
+      "reason": "记录明确先看入口，再尝试字段读取位置。",
+      "events": [
+        "x-alternative"
+      ]
+    },
+    {
+      "source": "o-h2",
+      "target": "o-trial",
+      "relation": "contains",
+      "reason": "参数试验属于假设 B。",
+      "events": [
+        "x-parameter-trial"
+      ]
+    },
+    {
+      "source": "o-request",
+      "target": "o-feedback",
+      "relation": "responds",
+      "reason": "反馈引用同一请求材料。",
+      "events": [
+        "x-review-feedback"
+      ]
+    },
+    {
+      "source": "o-feedback",
+      "target": "o-material",
+      "relation": "addresses",
+      "reason": "新增命令回应复现材料不足。",
+      "events": [
+        "x-review-material"
+      ]
+    },
+    {
+      "source": "o-material",
+      "target": "o-recheck",
+      "relation": "rechecks",
+      "reason": "再审明确引用更新后的材料。",
+      "events": [
+        "x-review-recheck"
+      ]
+    },
+    {
+      "source": "o-kw",
+      "target": "o-kr",
+      "relation": "reads_from",
+      "reason": "读写指向同一经验文件。",
+      "events": [
+        "x-knowledge-read"
+      ]
+    },
+    {
+      "source": "o-todo-add",
+      "target": "o-todo-priority",
+      "relation": "updates",
+      "reason": "任务标识保持不变。",
+      "events": [
+        "x-todo-priority"
+      ]
+    },
+    {
+      "source": "o-todo-priority",
+      "target": "o-todo-done",
+      "relation": "updates",
+      "reason": "任务标识保持不变。",
+      "events": [
+        "x-todo-done"
+      ]
+    }
+  ]
+}
