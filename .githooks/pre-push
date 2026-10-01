@@ -1,0 +1,9 @@
+#!/bin/sh
+# Local guard: main is updated through GitHub pull requests.
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+        printf '%s\n' 'Blocked: direct pushes to main are disabled. Push a working branch and open a PR for owner approval.' >&2
+        exit 1
+    fi
+done
+exit 0
