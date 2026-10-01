@@ -6,6 +6,8 @@ const commands=[
  [process.execPath,['viewer/scripts/test-state-trajectory.mjs']],
  [process.execPath,['viewer/scripts/test-semantic-trajectory.mjs']],
  [process.execPath,['viewer/scripts/test-observations.mjs']],
+ [process.execPath,['viewer/scripts/test-reading-layer.mjs']],
+ [process.execPath,['viewer/scripts/test-chat.mjs']],
  [process.execPath,['scripts/test-datasets.mjs']],
  [process.execPath,['scripts/test-pi-example.mjs']],
  ['python3',['scripts/check-example-secrets.py']],

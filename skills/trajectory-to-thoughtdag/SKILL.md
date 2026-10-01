@@ -188,3 +188,14 @@ scopes and independent status categories. Add only evidence-backed `observations
 `observationLinks`; record missing coverage in notes. Keep runner-specific parsing in adapters.
 The compiler validates the extension. Never infer code unchanged from a material-only command,
 full workflow execution from a skill load, or performance improvement from a review PASS.
+
+### Reading layer: what each step adds, and where the agent turned
+
+After the state graph validates, add the optional reading layer described in
+`references/reading-layer.md`: a zoom ladder (topic, takeaway, reason, verbatim quotes) on every
+state and branch and on the actions a reader would stop at; an epistemic `move` on the turns
+(ruleout, decision, pivot, open, and insight for findings that later steps use); `informs` links
+from an observation to the decision it changed; and one `journey` paragraph for the overview.
+Each takeaway says what that step adds, never its parent's summary again. Quote what the agent
+said or observed, not its thinking. `build_state_graph.py` validates the layer; to add it to an
+existing export, write a patch and check it with `scripts/ladder.py <graph> --patch <patch>`.

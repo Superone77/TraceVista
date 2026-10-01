@@ -8,6 +8,7 @@ from pathlib import Path
 
 from observations import validate_observations
 from build_canvas import expand, edge, base_data
+from ladder import validate_reading_layer
 
 BEHAVIORS = ('Explore', 'Plan', 'Edit', 'Execute', 'Verify', 'Diagnose')
 LINK_KINDS = ('sequence', 'informs', 'review_request', 'review_return')
@@ -130,6 +131,7 @@ def compile_graph(analysis, timeline):
                          'excluded_events': len(excluded), 'actions': len(actions),
                          'behaviors': {b: sum(a['behavior'] == b for a in actions.values()) for b in BEHAVIORS}}
     validate_observations(graph, seen, set(index))
+    validate_reading_layer(graph, index)
     return graph
 
 
