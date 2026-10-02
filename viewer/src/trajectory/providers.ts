@@ -3,7 +3,7 @@
 export type ChatProvider = 'anthropic' | 'openai';
 export interface ChatSettings { provider: ChatProvider; baseUrl: string; apiKey: string; model: string; remember: boolean }
 export interface ChatMessage { role: 'user' | 'assistant'; content: string }
-export interface ModelInfo { id: string; name?: string; created?: number }
+export interface ModelInfo { id: string; name?: string; created?: number; contextWindow?: number; maxOutputTokens?: number }
 export interface ProviderPreset {
   label: string; provider: ChatProvider; baseUrl: string; model: string;
   group: '云端 API' | '本地服务' | '自定义';
@@ -97,6 +97,27 @@ async function checkResponse(res: Response) {
   const hint = res.status === 401 || res.status === 403 ? 'key 无效、地域不符或没有权限' : res.status === 429 ? '额度不足或请求过于频繁' : res.status === 404 ? '接口路径或模型不存在' : res.statusText;
   throw new Error(`${res.status} ${hint}：${body}`);
 }
+const positiveTokens = (value: unknown): number | undefined => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+export function modelBudget(s: Pick<ChatSettings, 'provider' | 'baseUrl' | 'model'>, model?: ModelInfo) {
+  const info = model?.id === s.model.trim() ? model : undefined;
+  // Official endpoint only: custom gateways may expose different limits for the same ID.
+  // https://api-docs.deepseek.com/api/list-models/ (verified 2026-10-02).
+  const officialDeepSeek = presetOf(s) === 'deepseek' && ['deepseek-flash', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-v4-pro'].includes(s.model.trim());
+  const contextWindow = positiveTokens(info?.contextWindow) ?? (officialDeepSeek ? 1_048_576 : undefined);
+  const maxOutput = positiveTokens(info?.maxOutputTokens);
+  const outputTokens = Math.min(s.provider === 'anthropic' ? 4096 : 16384, maxOutput ?? Infinity, contextWindow ? Math.max(1, Math.floor(contextWindow / 2)) : Infinity);
+  const inputTokens = contextWindow ? Math.max(1, contextWindow - outputTokens) : 96000;
+  return { contextWindow, outputTokens, inputTokens, source: positiveTokens(info?.contextWindow) ? '模型接口' : officialDeepSeek ? 'DeepSeek 官方文档' : '未知模型的本地默认值' };
+}
+export function budgetKey(s: Pick<ChatSettings, 'provider' | 'baseUrl' | 'model'>): string {
+  let base = s.baseUrl.trim();
+  try { base = normalizedBase(base); } catch { /* Allow editing an incomplete endpoint. */ }
+  return JSON.stringify([s.provider, base, s.model.trim()]);
+}
+export function restoreInputBudgets(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, n]) => positiveTokens(n)));
+}
 const NOT_CHAT = /(embedding|whisper|tts|dall-e|moderation|davinci|babbage|transcribe|image|rerank)/i;
 export function parseModels(provider: ChatProvider, baseUrl: string, json: unknown): ModelInfo[] {
   const data = (json as { data?: unknown })?.data;
@@ -105,9 +126,13 @@ export function parseModels(provider: ChatProvider, baseUrl: string, json: unkno
   const models = data.filter((m): m is Record<string, unknown> => !!m && typeof m.id === 'string' && !!m.id.trim())
     .filter(m => { if (seen.has(m.id as string)) return false; seen.add(m.id as string); return true; })
     .filter(m => (m.capabilities as { completion_chat?: boolean } | undefined)?.completion_chat !== false)
-    .map(m => provider === 'anthropic'
-      ? { id: m.id as string, name: typeof m.display_name === 'string' ? m.display_name : undefined, created: typeof m.created_at === 'string' ? Date.parse(m.created_at) / 1000 : undefined }
-      : { id: m.id as string, name: typeof m.name === 'string' ? m.name : undefined, created: typeof m.created === 'number' ? m.created : undefined });
+    .map(m => ({
+      id: m.id as string,
+      name: typeof m.display_name === 'string' ? m.display_name : typeof m.name === 'string' ? m.name : undefined,
+      created: provider === 'anthropic' && typeof m.created_at === 'string' ? Date.parse(m.created_at) / 1000 : typeof m.created === 'number' ? m.created : undefined,
+      contextWindow: positiveTokens(m.context_window) ?? positiveTokens(m.context_length),
+      maxOutputTokens: positiveTokens(m.max_output_tokens),
+    }));
   const host = new URL(normalizedBase(baseUrl)).hostname;
   const chat = host === 'api.openai.com' || host === 'generativelanguage.googleapis.com' ? models.filter(m => !NOT_CHAT.test(m.id)) : models;
   return chat.some(m => m.created) ? [...chat].sort((a, b) => (b.created ?? 0) - (a.created ?? 0)) : chat;
@@ -144,10 +169,12 @@ export function readSSE(buffer: string, provider: ChatProvider, onText: (t: stri
   return rest;
 }
 /** Direct browser request. The optional connection test uses this same transport, with no trajectory. */
-export async function streamChat(s: ChatSettings, system: string, messages: ChatMessage[], onText: (t: string) => void, signal: AbortSignal, onStatus?: (s: StreamStatus) => void) {
+export async function streamChat(s: ChatSettings, system: string, messages: ChatMessage[], onText: (t: string) => void, signal: AbortSignal, onStatus?: (s: StreamStatus) => void, outputTokens = modelBudget(s).outputTokens) {
+  if (!positiveTokens(outputTokens)) throw new Error('回复额度必须为正整数');
   const body = s.provider === 'anthropic'
-    ? { model: s.model.trim(), max_tokens: 4096, system, messages, stream: true }
-    : { model: s.model.trim(), messages: [{ role: 'system', content: system }, ...messages], stream: true };
+    ? { model: s.model.trim(), max_tokens: outputTokens, system, messages, stream: true }
+    : { model: s.model.trim(), messages: [{ role: 'system', content: system }, ...messages], stream: true,
+      ...(presetOf(s) === 'openai' ? { max_completion_tokens: outputTokens } : { max_tokens: outputTokens }) };
   let hasText = false;
   const append = (t: string) => { if (t.trim()) hasText = true; onText(t); };
   try {

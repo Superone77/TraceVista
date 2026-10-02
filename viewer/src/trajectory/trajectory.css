@@ -198,3 +198,5 @@
 .welcome-actions button:hover{background:#404040;border-color:#404040}
 .welcome-example{background:var(--surface);color:var(--text)}
 .welcome-example:hover{background:var(--surface-2);border-color:var(--line-hover)}
+
+.chat-budget{display:grid;gap:3px;font-size:10.5px;color:var(--text-2);line-height:1.4;font-variant-numeric:tabular-nums}.chat-budget span:last-child{color:var(--text-3)}
