@@ -14,7 +14,8 @@ for(const d of catalog){
 assert.equal(datasetRequest('?example=pi-infra-r1',catalog,'/nested/'),'/nested/examples/pi-infra-r1.agent-state.json');
 assert.equal(datasetRequest('?data=my-run',catalog),'./local-data/my-run.json');
 assert.equal(datasetRequest('',catalog),null);
-assert.equal(datasetRequest('?example=1',catalog),null);
+assert.equal(datasetRequest('?example=1',catalog),'./examples/pi-infra-r1.agent-state.json');
+assert.deepEqual(catalog.map(d => d.id), ['pi-infra-r1'], 'Only the approved Pi example ships');
 for(const s of ['?example=missing','?data=../auth','?data=https://example.com','?data=','?data=%2Fetc%2Fpasswd'])assert.throws(()=>datasetRequest(s,catalog));
 assert.throws(()=>datasetRequest('?example=x',[{id:'x',file:'../private.json'}]));
 console.log('PASS: bundled examples, relative base path, local import route and invalid paths');

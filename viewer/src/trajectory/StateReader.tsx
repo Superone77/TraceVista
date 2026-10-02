@@ -8,7 +8,6 @@ import RoutedEdge, { type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
-import { sampleGraph } from './sample';
 import './trajectory.css';
 import exampleCatalog from '../../public/examples/index.json';
 import { datasetRequest } from './dataset';
@@ -223,10 +222,10 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
 }
 
 export default function StateReader() {
-  const [graph, setGraph] = useState<Graph | null>(() => new URLSearchParams(location.search).get('example') === '1' ? parseGraph(sampleGraph) : null);
+  const [graph, setGraph] = useState<Graph | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return p.get('demo') === '1' || p.has('data') || (p.has('example') && p.get('example') !== '1'); });
+  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return p.get('demo') === '1' || p.has('data') || p.has('example'); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -245,5 +244,5 @@ export default function StateReader() {
     return () => controller.abort();
   }, []);
   useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>关闭</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome"><div className="eyebrow">TraceVista</div><h1>从系统状态，<br />走进每一步执行。</h1><p>同一张地图，四层细节。缩小看状态变迁，放大看分支、行为，最后读到原始轨迹。</p><FilePicker label="导入状态轨迹" onImport={loadFile} /><button onClick={() => openGraph(sampleGraph)} disabled={loading}>{loading ? '读取本地记录…' : '体验通用示例'}</button><div className="dataset-list">{exampleCatalog.map(d => <a key={d.id} className="dataset-card" href={`?example=${encodeURIComponent(d.id)}`}><strong>{d.title}</strong><span>{d.description}</span></a>)}</div><p className="small">支持独立状态 JSON 和旧版画布导出。任意 agent、任意任务；文件只在本机浏览器解析。</p><p className="small">原始日志需先转换并标注状态变化。此查看器不调用模型，不自动推断缺失的状态。</p></div>}</>;
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>关闭</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome"><div className="eyebrow">TraceVista</div><h1>从系统状态，<br />走进每一步执行。</h1><p>同一张地图，四层细节。缩小看状态变迁，放大看分支、行为，最后读到原始轨迹。</p><FilePicker label="导入状态轨迹" onImport={loadFile} />{loading && <p role="status">读取轨迹…</p>}<div className="dataset-list">{exampleCatalog.map(d => <a key={d.id} className="dataset-card" href={`?example=${encodeURIComponent(d.id)}`}><strong>{d.title}</strong><span>{d.description}</span></a>)}</div><p className="small">支持独立状态 JSON 和旧版画布导出。任意 agent、任意任务；文件只在本机浏览器解析。</p><p className="small">原始日志需先转换并标注状态变化。转换阶段需由你核对状态与证据；追问功能按你设置的模型接口运行。</p></div>}</>;
 }
