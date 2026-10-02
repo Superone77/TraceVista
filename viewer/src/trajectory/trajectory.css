@@ -126,7 +126,7 @@
 .journey{position:absolute;top:44px;left:14px;z-index:6;width:min(380px,38%);background:#fffffffa;border:1px solid var(--line);border-radius:11px;padding:13px 16px;box-shadow:0 6px 22px var(--shadow-sm);font-size:13.5px;line-height:1.8;color:var(--text)}
 .journey-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-2)}.journey-head button{font-size:11px;padding:3px 8px}
 .journey p{margin:8px 0 10px}
-.journey-cites{display:flex;flex-wrap:wrap;gap:5px}.journey-cites button{font-size:11px;padding:2px 7px;font-weight:600;background:var(--surface-2)}
+.journey-cites{display:flex;flex-wrap:wrap;gap:5px}.journey-cites button{font-size:11px;padding:2px 7px;font-weight:600;color:var(--cite-tone);border-color:color-mix(in srgb,var(--cite-tone) 45%,white);background:color-mix(in srgb,var(--cite-tone) 4%,white)}.journey-cites button:hover{border-color:var(--cite-tone);background:color-mix(in srgb,var(--cite-tone) 9%,white)}
 .journey-pill{position:absolute;top:44px;left:14px;z-index:6;font-size:11px}
 .move-pill{display:inline-block;color:var(--move);border:1px solid color-mix(in srgb,var(--move) 45%,white);background:color-mix(in srgb,var(--move) 9%,white);border-radius:5px;padding:2px 8px;font-weight:700;margin:4px 0}
 .ladder-detail{border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin:12px 0;background:var(--panel)}.ladder-detail h3{margin-top:0}

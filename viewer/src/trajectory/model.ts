@@ -171,6 +171,13 @@ export function toolFingerprint(records: RawEvent[]): ToolMark[] {
   return [...marks.values()];
 }
 export type Entity = State | Branch | Action;
+/** Shared semantic tone for a canvas card and links referring to that card. */
+export function entityColor(entity: Entity): string {
+  if ('behavior' in entity) return colors[entity.behavior];
+  if ('snapshot' in entity) return stateVisual(entity).color;
+  return entity.move ? moveColors[entity.move] : '#94a3ac';
+}
+
 /** Six well-separated hues at one lightness, so the behaviors stay apart as text and as card edges. */
 export const colors: Record<Behavior, string> = {
   Explore: '#0e7490', Plan: '#6d4bb3', Edit: '#965b0f', Execute: '#2f7d3f', Verify: '#3558ad', Diagnose: '#a8456f',

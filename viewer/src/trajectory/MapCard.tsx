@@ -1,6 +1,6 @@
 import { memo, type CSSProperties } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { behaviors, colors, stateVisual, observationLabels, factText, moveColors, moveGlyphs, moveLabels, type Move, type Observation, type State, type Action, type Branch, type RawEvent, type ToolMark } from './model';
+import { behaviors, colors, entityColor, stateVisual, observationLabels, factText, moveColors, moveGlyphs, moveLabels, type Move, type Observation, type State, type Action, type Branch, type RawEvent, type ToolMark } from './model';
 import type { FoldItem, MapNode, Tier } from './semantic';
 import { FONTS, type Ladder } from './ladder';
 import ZoomText, { LadderMorph, type Quote } from './ZoomText';
@@ -51,7 +51,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const state = p.item as State;
   const visual = p.kind === 'state' ? stateVisual(state) : null;
   const move = (p.item as Action | Branch).move;
-  const color = p.kind === 'action' ? colors[action.behavior] : p.kind === 'branch' ? (move ? moveColors[move] : '#94a3ac') : visual?.color ?? '#6b7f8b';
+  const color = entityColor(p.item as State | Branch | Action);
   const style = { '--tone': color } as CSSProperties;
   const plaque = (kind: keyof typeof FONTS) => ladder
     ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} quotes={quotes} onEvidence={evidence} /></div>

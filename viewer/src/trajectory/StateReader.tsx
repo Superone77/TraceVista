@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow, type Edge, type Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { behaviors, colors, observationsFor, parseGraph, toolFingerprint, landmarkMoves, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
+import { behaviors, colors, entityColor, observationsFor, parseGraph, toolFingerprint, landmarkMoves, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
 import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, type Tier, type StateMode, type FoldItem } from './semantic';
 import MapCard, { type CardNode, type Landmark } from './MapCard';
 import RoutedEdge, { type Rect } from './RoutedEdge';
@@ -215,7 +215,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
       {tier === 'states' && graph.journey && (journeyOpen
-        ? <aside className="journey"><div className="journey-head"><b>这一轮的历程</b><button onClick={() => setJourneyOpen(false)}>收起</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} style={e.move ? { color: moveColors[e.move] } : undefined} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
+        ? <aside className="journey"><div className="journey-head"><b>这一轮的历程</b><button onClick={() => setJourneyOpen(false)}>收起</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
         : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>历程</button>)}
       {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
       <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />测量改善</span><span><i style={{background:stateTones.worse}} />测量退化</span><span><i style={{background:stateTones.historical}} />最终选择</span><span>↶ 回退用紫色虚线</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ 依据</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
