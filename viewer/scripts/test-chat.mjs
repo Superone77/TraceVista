@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
 async function moduleAt(path) {
-  const code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
+  let code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
+  if (path.endsWith('/chat.ts')) {
+    const providerCode = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/providers.ts', import.meta.url), 'utf8'));
+    code = code.replaceAll("'./providers'", JSON.stringify('data:text/javascript;base64,' + Buffer.from(providerCode).toString('base64')));
+  }
   return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 }
 const { parseGraph } = await moduleAt('../src/trajectory/model.ts');

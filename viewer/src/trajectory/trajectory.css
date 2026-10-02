@@ -151,3 +151,7 @@
 .chat-model-status{font-size:11px;color:#5f7568;margin:-2px 0 0 52px}.chat-model-status.error{color:#b04350}
 
 .reading-gap-note{font-size:11px;color:#876f40;max-width:210px;line-height:1.5}
+
+.chat-settings{margin:0;min-width:0;border:0;border-bottom:1px solid #e4ebe4;max-height:65%;overflow:auto;flex-shrink:1}
+.chat-settings:disabled{opacity:.8}.chat-provider-link{margin-left:52px;font-size:11px;color:#36634e}
+.chat-probe{display:flex;gap:8px;align-items:center}.chat-probe small{font-size:10.5px;color:#728073;line-height:1.5}

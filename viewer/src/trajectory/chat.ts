@@ -5,14 +5,9 @@
 // handoff to ThoughtDAG can hang each question and answer back on the card it was about.
 import type { Action, Branch, Entity, Graph, RawEvent } from './model';
 
-export type ChatProvider = 'anthropic' | 'openai';
-export interface ChatSettings { provider: ChatProvider; baseUrl: string; apiKey: string; model: string; remember: boolean }
-export const presets: Record<string, Omit<ChatSettings, 'apiKey' | 'remember'> & { label: string }> = {
-  anthropic: { label: 'Anthropic', provider: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-5-5' },
-  openrouter: { label: 'OpenRouter', provider: 'openai', baseUrl: 'https://openrouter.ai/api/v1', model: '' },
-  openai: { label: 'OpenAI', provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: '' },
-  custom: { label: '其他 OpenAI 兼容接口（含本地）', provider: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', model: '' },
-};
+import type { ChatMessage } from './providers';
+export { presets, readSSE, streamChat, parseModels, canListModels, listModels } from './providers';
+export type { ChatProvider, ChatSettings, ChatMessage, ModelInfo } from './providers';
 
 export type ContextLayer = 'system' | 'chain' | 'material' | 'reference';
 export interface ContextItem { layer: ContextLayer; node?: string; event?: string; chars: number }
@@ -20,7 +15,6 @@ export interface ChatTurn {
   id: string; role: 'user' | 'assistant'; text: string; at: string;
   focus?: string | null; provider?: string; model?: string; context?: ContextItem[]; cites?: string[]; error?: string;
 }
-export interface ChatMessage { role: 'user' | 'assistant'; content: string }
 
 const one = (s: string) => s.replace(/\s+/g, ' ').trim();
 function clip(text: string, max: number): string {
@@ -130,65 +124,4 @@ export function citations(text: string, known: (id: string) => 'node' | 'event' 
   }
   if (last < text.length) out.push({ text: text.slice(last) });
   return out;
-}
-
-/** Server-sent events to text deltas, for both providers. Returns the unfinished tail of the buffer. */
-export function readSSE(buffer: string, provider: ChatProvider, onText: (t: string) => void): string {
-  const lines = buffer.split('\n');
-  const rest = lines.pop() ?? '';
-  for (const line of lines) {
-    if (!line.startsWith('data:')) continue;
-    const data = line.slice(5).trim();
-    if (!data || data === '[DONE]') continue;
-    let json: Record<string, unknown>;
-    try { json = JSON.parse(data); } catch { continue; }
-    if (json.type === 'error' || json.error) throw new Error(JSON.stringify(json.error ?? json).slice(0, 300));
-    if (provider === 'anthropic') { const d = json.delta as { type?: string; text?: string } | undefined; if (json.type === 'content_block_delta' && d?.type === 'text_delta' && d.text) onText(d.text); }
-    else { const c = (json.choices as { delta?: { content?: string } }[] | undefined)?.[0]?.delta?.content; if (c) onText(c); }
-  }
-  return rest;
-}
-
-/** Call the provider from the browser and stream the answer. Nothing leaves the page except this request. */
-export async function streamChat(s: ChatSettings, system: string, messages: ChatMessage[], onText: (t: string) => void, signal: AbortSignal) {
-  const base = s.baseUrl.replace(/\/+$/, '');
-  const request = s.provider === 'anthropic'
-    ? fetch(`${base}/v1/messages`, { method: 'POST', signal, headers: { 'content-type': 'application/json', 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: s.model, max_tokens: 2400, system, messages, stream: true }) })
-    : fetch(`${base}/chat/completions`, { method: 'POST', signal, headers: { 'content-type': 'application/json', ...(s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {}) }, body: JSON.stringify({ model: s.model, messages: [{ role: 'system', content: system }, ...messages], stream: true }) });
-  const res = await request;
-  if (!res.ok || !res.body) throw new Error(`${res.status} ${res.statusText}：${(await res.text().catch(() => '')).slice(0, 300)}`);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer = readSSE(buffer + decoder.decode(value, { stream: true }), s.provider, onText);
-  }
-  readSSE(`${buffer}\n`, s.provider, onText);
-}
-
-export interface ModelInfo { id: string; name?: string; created?: number }
-/** Non-chat models the OpenAI list also returns; other providers list chat models only. */
-const NOT_CHAT = /(embedding|whisper|tts|dall-e|moderation|davinci|babbage|transcribe|image)/i;
-/** A provider's model list, newest first. Anthropic returns {data:[{id, display_name, created_at}]}; OpenAI-style lists {data:[{id, name?, created?}]}. */
-export function parseModels(provider: ChatProvider, baseUrl: string, json: unknown): ModelInfo[] {
-  const data = (json as { data?: unknown })?.data;
-  if (!Array.isArray(data)) throw new Error('返回内容里没有模型列表');
-  const models = data.filter((m): m is Record<string, unknown> => !!m && typeof (m as { id?: unknown }).id === 'string').map(m => provider === 'anthropic'
-    ? { id: m.id as string, name: typeof m.display_name === 'string' ? m.display_name : undefined, created: typeof m.created_at === 'string' ? Date.parse(m.created_at) / 1000 : undefined }
-    : { id: m.id as string, name: typeof m.name === 'string' ? m.name : undefined, created: typeof m.created === 'number' ? m.created : undefined });
-  const chat = /api\.openai\.com/.test(baseUrl) ? models.filter(m => !NOT_CHAT.test(m.id)) : models;
-  return chat.some(m => m.created) ? [...chat].sort((a, b) => (b.created ?? 0) - (a.created ?? 0)) : chat;
-}
-/** Whether the list can be fetched yet: Anthropic and OpenAI need a key; OpenRouter and local servers do not. */
-export const canListModels = (s: ChatSettings) => !!s.baseUrl.trim() && (!!s.apiKey.trim() || s.provider === 'openai' && !/api\.openai\.com/.test(s.baseUrl));
-/** Ask the provider which models this key can use. */
-export async function listModels(s: ChatSettings, signal?: AbortSignal): Promise<ModelInfo[]> {
-  const base = s.baseUrl.replace(/\/+$/, '');
-  const res = s.provider === 'anthropic'
-    ? await fetch(`${base}/v1/models?limit=1000`, { signal, headers: { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' } })
-    : await fetch(`${base}/models`, { signal, headers: s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {} });
-  if (!res.ok) throw new Error(`${res.status}${res.status === 401 || res.status === 403 ? '：key 无效或没有权限' : ''}`);
-  return parseModels(s.provider, s.baseUrl, await res.json());
 }

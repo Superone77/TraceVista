@@ -20,6 +20,11 @@ fingerprint in `model.ts` (from `src/lib/turn-insight.ts`), the fold rule in `se
 (after `src/lib/condense.ts`), and the prompts behind `references/reading-layer.md` (after
 `src/lib/ladder.ts` and `src/lib/gedankengang.ts`).
 
+The browser provider catalog and live model discovery in `viewer/src/trajectory/providers.ts`
+follow ThoughtDAG's `src/lib/runtime-providers.ts` and streaming behavior in `src/lib/direct-llm.ts`
+(same copyright and MIT license). Vendor-specific endpoints are checked against official API
+documentation. Its proxy, OAuth and subscription bridges are not included.
+
 ## Conversion skill
 
 `skills/trajectory-to-thoughtdag` is copied from the user's local private skill repository

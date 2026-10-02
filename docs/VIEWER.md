@@ -94,9 +94,26 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 
 ## 追问这条轨迹（可选，浏览器直连模型）
 
-工具栏"💬 追问"打开对话框。默认关闭；只有填写接口和 key 后才会发送请求，请求直接从浏览器发往所填接口，不经过任何服务器。支持 Anthropic、OpenRouter、OpenAI 和其他 OpenAI 兼容接口（含本地服务）。key 默认只保存在当前页面，勾选后才写入本机浏览器。
+工具栏“💬 追问”打开对话框，在“接口”中选择供应商、填写 API Key，再获取或手填模型 ID。请求直接从浏览器发往所选模型接口，不经过查看器后端。
 
-填好 key（OpenRouter 和本地接口不需要）后，会自动向该服务拉取可用模型列表：模型少时显示为下拉框，多时可以边输入边筛选；切换接口时，自动选中的模型会随新列表更新，手动填写的模型名不会被改动。
+### 供应商与模型列表
+
+| 类别 | 预设 |
+| --- | --- |
+| 云端 | Anthropic、OpenAI、OpenRouter、DeepSeek、Google AI Studio（Gemini）、Kimi、智谱/Z.ai、阿里百炼（Qwen）、MiniMax、Groq、Mistral |
+| 地域 | Kimi 和 MiniMax 提供中国区/国际区；百炼提供北京/新加坡。Key 需与地域一致 |
+| 本地 | Ollama、LM Studio |
+| 自定义 | OpenAI Chat Completions 兼容接口、Anthropic Messages 兼容接口 |
+
+大多数预设填好 key 后自动获取实时模型列表；模型输入框支持搜索选择，也始终允许手填。OpenRouter 的公开模型列表可不填 key，但聊天仍需 key。本地服务未启用认证时可留空。MiniMax 预设采用手填模型 ID，不把内置静态列表当成账号可用模型。自定义接口填好地址后，点击 ↻ 才请求模型列表。
+
+“测试回复”只发送一条测试短句，使用与聊天相同的调用路径，不附带轨迹。模型列表成功并不代表模型请求成功。服务可能需要额度或 CORS 配置；网页会显示认证、限额、超时和空回复错误。推理模型在输出正文前显示“模型正在思考”，不会把思考内容冒充最终回答。测试最多等待 60 秒，聊天最多 3 分钟，可随时停止。
+
+配置读取兼容此前的 Anthropic/OpenAI 设置。切换供应商或修改地址时清空 key 和模型，避免跨服务复用凭据。Key 默认只留在当前对话框的内存中；勾选“在本机浏览器记住 key”后写入 localStorage，不写 cookie、不进入轨迹或聊天导出。关闭后重新打开时，未保存的 key 需重新填写。
+
+本查看器采用浏览器直连，未接入 ThoughtDAG 的代理或订阅登录桥接。供应商须允许当前网页来源跨域访问；本地服务需先启动并配置 CORS。预设代表已适配请求格式，不代表各地区网络、账号权限与所有模型均已实测。Gemini 走其官方 OpenAI 兼容接口。
+
+参考：ThoughtDAG `src/lib/runtime-providers.ts`、`src/lib/direct-llm.ts`；[Gemini 兼容接口](https://ai.google.dev/gemini-api/docs/openai)、[百炼地域地址](https://www.alibabacloud.com/help/en/model-studio/base-url)、[Ollama](https://docs.ollama.com/api/openai-compatibility)、[LM Studio](https://lmstudio.ai/docs/developer/openai-compat)。
 
 - 不选卡片时问整条轨迹；在地图上点一张卡片，对话框就聚焦到这一步。
 - 发送的上下文按 ThoughtDAG"连线即上下文"组装：整条轨迹的大纲（各节点 ID、ladder、依据关系、历程）、聚焦卡片所在的脉络、它的原始记录、依据它或由它促成的节点，以及按问题检索到的原始记录。thinking 事件不发送。
