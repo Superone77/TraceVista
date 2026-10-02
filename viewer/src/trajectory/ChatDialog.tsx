@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { moveColors, type Entity, type Graph } from './model';
-import { buildChat, citations, DEFAULT_INPUT_TOKENS, type ChatTurn, type ContextOptions } from './chat';
+import { buildChat, citations, contextLabels, DEFAULT_INPUT_TOKENS, type ChatTurn, type ContextOptions } from './chat';
 import { canListModels, listModels, presets, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
@@ -23,7 +23,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const [settings, setSettings] = useState<ChatSettings>(() => restoreSettings(store.get(SETTINGS_KEY, {})));
   const [turns, setTurns] = useState<ChatTurn[]>(() => store.get<ChatTurn[]>(historyKey, []).map(t => t.role === 'assistant' && !t.text && !t.error ? { ...t, error: '上次请求已中断，请重新提问' } : t));
   const [draft, setDraft] = useState('');
-  const [contextMode, setContextMode] = useState<'prefix' | 'run'>('prefix');
+  const [contextMode, setContextMode] = useState<NonNullable<ContextOptions['mode']>>('prefix');
   const [compression, setCompression] = useState<ContextOptions['compression']>('full');
   const [inputTokens, setInputTokens] = useState(DEFAULT_INPUT_TOKENS);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   }, [busy]);
   const ready = requestReady(settings);
   const locked = !!busy || probe.busy;
-  useEffect(() => { setContextMode('prefix'); }, [focus?.id]);
+  useEffect(() => { setContextMode(mode => mode === 'current' || mode === 'nearby' ? mode : 'prefix'); }, [focus?.id]);
   // While streaming, the new pair is unfinished and cannot be replayed. Rebuild on completion,
   // not once per streamed token (large traces may contain megabytes of raw text).
   const contextHistory = useMemo(() => turns, [turns.length, !!busy]);
@@ -139,7 +139,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   }
   function exportContext() {
     const value = { format: 'trajectory-chat-context', version: 2, focus: focus?.id ?? null, mode: bundle.mode,
-      compression, scopeKey: bundle.scopeKey, preview, system: bundle.system, messages: bundle.messages, items: bundle.items };
+      compression: bundle.compression, scopeKey: bundle.scopeKey, preview, system: bundle.system, messages: bundle.messages, items: bundle.items };
     const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
     Object.assign(document.createElement('a'), { href: url, download: 'trajectory-chat-context.json' }).click(); URL.revokeObjectURL(url);
   }
@@ -182,23 +182,25 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           : <span key={i} className="cite unknown" title="记录中不存在这个编号">{p.id}?</span>)}
           {t.role === 'assistant' && !t.text && !t.error && <span className="chat-wait">{status === 'thinking' ? '模型正在思考…' : '等待模型回复…'} {waitSeconds} 秒</span>}</div>
         {t.error && <div className="chat-error">{t.error}</div>}
-        {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextMode === 'prefix' ? '截至此节点' : t.contextMode === 'run' ? '全程复盘' : '旧版上下文'} · 发送 {t.context.filter(c => c.event).length} 条记录{t.compression === 'excerpts' ? '（历史摘录）' : ''}{t.cites?.length ? ` · 引用 ${t.cites.length} 处` : ''}</small>}
+        {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextMode ? contextLabels[t.contextMode] : '旧版上下文'} · 发送 {t.context.filter(c => c.event).length} 条记录{t.compression === 'excerpts' ? '（历史摘录）' : ''}{t.cites?.length ? ` · 引用 ${t.cites.length} 处` : ''}</small>}
       </div>)}
     </div>
     <footer>
       <div className="chat-focus">{focus ? <><span>关注</span><button onClick={() => jump(focus.id)}>{focus.ladder?.topic ?? focus.title}</button><button onClick={clearFocus} aria-label="改为整条轨迹">×</button></> : <span>整条轨迹 · 点击卡片可聚焦到这一步</span>}</div>
       <div className="chat-context-options">
-        <select aria-label="上下文范围" value={bundle.mode} disabled={locked || !focus} onChange={e => setContextMode(e.target.value as 'prefix' | 'run')}>
-          <option value="prefix">截至此节点（含内部全部记录）</option><option value="run">全程复盘（含后续结果）</option>
+        <select aria-label="上下文范围" value={bundle.mode} disabled={locked || !focus} onChange={e => setContextMode(e.target.value as NonNullable<ContextOptions['mode']>)}>
+          <option value="current">仅当前节点</option><option value="nearby">当前 + 前一节点 + 历史状态摘要</option><option value="prefix">截至此节点（含内部全部记录）</option><option value="run">全程复盘（含后续结果）</option>
         </select>
-        <select aria-label="历史原文处理" value={compression} disabled={locked} onChange={e => setCompression(e.target.value as 'full' | 'excerpts')}>
+        <select aria-label="历史原文处理" value={bundle.compression} disabled={locked || preview.compact} onChange={e => setCompression(e.target.value as 'full' | 'excerpts')}>
           <option value="full">完整原文</option><option value="excerpts">历史首尾摘录 · 当前节点完整</option>
         </select>
       </div>
       <details className="chat-context-preview" onToggle={e => setPreviewOpen(e.currentTarget.open)}>
         <summary>本次上下文 · {preview.eventCount} 条记录 · 约 {preview.estimatedTokens.toLocaleString()} tokens</summary>
         {previewOpen && <div className="chat-context-body">
-          <p>当前节点 {preview.ownCount} 条；范围外 {preview.excludedCount} 条。{preview.compressedCount ? `${preview.compressedCount} 条历史记录使用首尾摘录。` : '所选记录全部发送原文，包括 thinking 记录。'}</p>
+          <p>当前节点 {preview.ownCount} 条；范围外 {preview.excludedCount} 条。{preview.compressedCount ? `${preview.compressedCount} 条历史记录使用首尾摘录。` : '所选记录发送完整原文。'}</p>
+          <p>前一节点：{preview.previousNode ? <button className="cite node" onClick={() => jump(preview.previousNode!.id)}>{preview.previousNode.id} · {preview.previousNode.title}</button> : '未纳入'}；历史状态摘要 {preview.summaryStates.length} 个。</p>
+          {preview.summaryStates.length > 0 && <details><summary>查看历史状态摘要</summary>{preview.summaryStates.map(s => <div key={s.id}><button className="cite node" onClick={() => jump(s.id)}>{s.id}</button><p>{s.text}</p></div>)}</details>}
           {preview.ranges.map(r => <p key={r.session}><b>{r.session}</b>：{r.first} → {r.last} · {r.count} 条 · {r.boundary}</p>)}
           {preview.warnings.map(w => <p key={w}>{w}</p>)}
           <p>带入同一节点、同一范围的 {preview.historyTurns / 2} 轮有效问答；其余 {preview.excludedHistoryTurns} 条消息不作为上下文。</p>
@@ -209,7 +211,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           <details><summary>逐条查看发送记录</summary>{bundle.items.filter(i => i.event).map(i => <div key={i.event}><button className="cite event" onClick={() => evidence(i.event!)}>{i.event}</button> {i.layer === 'material' ? '当前节点' : '此前 / 关联证据'} · {i.omittedChars ? `省略 ${i.omittedChars} 字` : '完整原文'}</div>)}</details>
         </div>}
       </details>
-      {preview.blocked && <div className="chat-error">上下文超过输入额度或额度无效，尚未发送。可手动选择历史摘录，或使用更大窗口的模型并在“本次上下文”中调整额度；当前节点原文不会截断。</div>}
+      {preview.blocked && <div className="chat-error">上下文超过输入额度或额度无效，尚未发送。可改选“仅当前节点”或“当前 + 前一节点 + 历史状态摘要”；如果当前卡片仍过大，请进入具体行为再追问。也可在“本次上下文”中调整额度。</div>}
       <div className="chat-input">
         <textarea value={draft} rows={2} placeholder={ready ? '问这条轨迹…（Enter 发送，Shift+Enter 换行）' : '先在“接口”里填写模型和 key'} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />

@@ -143,3 +143,45 @@ assert.equal(canListModels({ provider: 'anthropic', baseUrl: 'https://api.anthro
 assert.equal(canListModels({ provider: 'openai', baseUrl: 'https://openrouter.ai/api/v1', apiKey: '', model: '', remember: false }), true, 'OpenRouter lists without a key');
 assert.equal(canListModels({ provider: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '', remember: false }), false, 'OpenAI needs a key');
 console.log('PASS: bounded full history, nested containers, rollback alternatives, cross-session evidence, no future leakage, explicit excerpts/limits, scoped conversations, citations and provider contracts');
+
+// Huge old user messages can overwhelm excerpts; compact ranges must actually omit them.
+const compactFixture = structuredClone(unclassified);
+compactFixture.timeline.timeline[0].text = 'HUGE_OLD_USER ' + 'u'.repeat(4_000_000);
+compactFixture.states = [entity('old-state', ['main:1'], { snapshot: { code: 'v0' }, summary: 'OLD_STATE_SUMMARY' }),
+  entity('future-state', ['main:5'], { snapshot: {}, summary: 'FORBIDDEN_FUTURE_STATE' })];
+const current = buildChat(compactFixture, 'a3', 'why', [], { mode: 'current' });
+const nearby = buildChat(compactFixture, 'a3', 'why', [], { mode: 'nearby' });
+assert.deepEqual(current.items.filter(i => i.event).map(i => i.event), ['main:3', 'main:between', 'main:4']);
+assert.deepEqual(nearby.items.filter(i => i.event).map(i => i.event), ['main:2', 'main:3', 'main:between', 'main:4']);
+assert.equal(nearby.preview.previousNode.id, 'a2', 'previous execution peer, including failed alternatives');
+assert.equal(current.preview.previousNode, null);
+assert.equal(current.preview.summaryStates.length, 0);
+assert.deepEqual(nearby.preview.summaryStates.map(s => s.id), ['old-state']);
+assert(nearby.messages.at(-1).content.includes('OLD_STATE_SUMMARY'));
+for (const b of [current, nearby]) {
+  const sent = JSON.stringify(b.messages);
+  assert(!sent.includes('HUGE_OLD_USER') && !sent.includes('UNRELATED_REVIEW') && !sent.includes('FORBIDDEN_FUTURE_STATE'));
+  assert(sent.includes('k'.repeat(1800)) && sent.includes('z'.repeat(4000)), 'current span stays literal');
+  assert(b.preview.estimatedTokens < 10000 && !b.preview.blocked);
+  assert.equal(buildChat(compactFixture, 'a3', 'again', pair(b.scopeKey, 'OLD_CHAT_PAYLOAD'), { mode: b.mode }).preview.historyTurns, 0);
+}
+assert.equal(buildChat(compactFixture, 'a3', 'why', [], { compression: 'excerpts', inputTokens: 1e6 }).preview.blocked, true);
+assert.notEqual(compressed.scopeKey, bounded.scopeKey, 'compression changes cannot replay richer old discussions');
+assert.equal(buildChat(compactFixture, 'a1', 'why', [], { mode: 'current' }).preview.blocked, true, 'large current node is not silently cut');
+assert.equal(buildChat(compactFixture, 'a1', 'why', [], { mode: 'nearby' }).preview.previousNode, null);
+assert.equal(buildChat(compactFixture, null, 'why', [], { mode: 'nearby' }).mode, 'run', 'compact scope requires a selected node');
+const multiFocus = structuredClone(compactFixture); multiFocus.actions.find(a => a.id === 'a3').events.push('review:1');
+assert.equal(buildChat(multiFocus, 'a3', 'why', [], { mode: 'nearby' }).preview.previousNode, null, 'no guessed cross-session predecessor');
+const longState = structuredClone(compactFixture); longState.states[0].summary = 'a'.repeat(4000);
+assert(buildChat(longState, 'a3', 'why', [], { mode: 'nearby' }).preview.summaryStates[0].omittedChars > 0);
+assert.deepEqual(buildChat(fixture, 'b2', 'why', [], { mode: 'current' }).items.filter(i => i.event).map(i => i.event), ['main:2']);
+console.log('PASS: compact scopes, previous peer, bounded state summaries, full current span, no old-chat leakage, oversized current-node blocking');
+
+const overlap = structuredClone(fixture);
+overlap.states = [entity('s-before', ['main:1'], { snapshot: {} }), entity('s-after', ['main:4'], { snapshot: {} })];
+overlap.branches = [];
+overlap.actions = [action('prior-action', ['main:2','main:3','main:4']), action('current-action', ['main:4','main:5'])];
+overlap.actions[0].state = 's-before'; overlap.actions[1].state = 's-after';
+const adjacent = buildChat(overlap, 's-after', 'why', [], {mode:'nearby'});
+assert.equal(adjacent.preview.previousNode.id, 's-before', 'shared transition anchors must not skip the actual previous state');
+assert.equal(adjacent.preview.eventCount, 5, 'overlapping records appear only once');
