@@ -1,22 +1,39 @@
 export const behaviors = ['Explore', 'Plan', 'Edit', 'Execute', 'Verify', 'Diagnose'] as const;
 export type Behavior = typeof behaviors[number];
+/** Epistemic moves, from ThoughtDAG's ladder: what a step did to the reasoning. Most steps have none. */
+export const moves = ['insight', 'ruleout', 'decision', 'pivot', 'open'] as const;
+export type Move = typeof moves[number];
+/** Turns that stay visible when routine steps fold away. */
+export const landmarkMoves: readonly Move[] = ['ruleout', 'decision', 'pivot', 'open'];
+/** One hue per move, all dark enough to read as small text on white. */
+export const moveColors: Record<Move, string> = { insight: '#096aa8', ruleout: '#c33a3a', decision: '#5b4bd6', pivot: '#aa5017', open: '#796322' };
+export const moveLabels: Record<Move, string> = { insight: '发现', ruleout: '排除', decision: '决定', pivot: '转向', open: '未决' };
+export const moveGlyphs: Record<Move, string> = { insight: '●', ruleout: '✕', decision: '◆', pivot: '↪', open: '?' };
+/** Analyst-written zoom levels; abstract quotes are verbatim raw text with their event IDs. */
+export interface ReadingLadder { topic: string; takeaway: string; reason?: string; abstract?: { event: string; quote: string }[] }
 export interface RecordItem {
   id: string; title: string; summary: string; events: string[];
+  ladder?: ReadingLadder; move?: Move;
 }
 export interface State extends RecordItem {
   snapshot: Record<string, string | null>;
   lineage?: { parent: string; relation: 'derived' | 'restored' | 'retained'; reason: string; events: string[] };
   assessment?: { metric: string; unit?: string; value: number; previous?: number; previousState?: string; higherIsBetter: boolean; tolerance: number; correctness: boolean; measurement: 'measured' | 'historical'; note: string };
 }
+/** How a state reads against its parent. One place for the tone, so cards, details and legend agree. */
+export const stateTones = {
+  none: '#5f727c', failed: '#b3343c', historical: '#7a51a8', first: '#44708f',
+  same: '#776f52', better: '#17765c', worse: '#b8453f',
+} as const;
 export function stateVisual(state: State) {
   const m = state.assessment;
-  if (!m) return { color: '#6a7a82', label: '尚无可比测量', delta: null };
-  if (!m.correctness) return { color: '#bd464b', label: '正确性失败', delta: null };
-  if (m.measurement === 'historical') return { color: '#8860b3', label: '最终选择 · 未重新测量', delta: null };
-  if (m.previous == null || m.previous === 0) return { color: '#487994', label: '首次测量', delta: null };
+  if (!m) return { color: stateTones.none, label: '尚无可比测量', delta: null };
+  if (!m.correctness) return { color: stateTones.failed, label: '正确性失败', delta: null };
+  if (m.measurement === 'historical') return { color: stateTones.historical, label: '最终选择 · 未重新测量', delta: null };
+  if (m.previous == null || m.previous === 0) return { color: stateTones.first, label: '首次测量', delta: null };
   const delta = (m.value / m.previous - 1) * 100;
-  if (delta === 0) return { color: '#8c805e', label: '测量值相同', delta };
-  return (m.higherIsBetter ? delta > 0 : delta < 0) ? { color: '#268367', label: '测量值改善', delta } : { color: '#c25953', label: '测量值退化', delta };
+  if (delta === 0) return { color: stateTones.same, label: '测量值相同', delta };
+  return (m.higherIsBetter ? delta > 0 : delta < 0) ? { color: stateTones.better, label: '测量值改善', delta } : { color: stateTones.worse, label: '测量值退化', delta };
 }
 export interface Branch extends RecordItem {
   state: string; status: 'attempted' | 'retained' | 'proposed' | 'rejected';
@@ -35,7 +52,7 @@ export interface Transition {
 export interface RawEvent {
   id: string; text: string; kind: string; actor?: string; tool?: string; source_line?: number; call_id?: string;
   model?: string; tokens_in?: number | null; error?: boolean; skill?: string; session_id?: string;
-  tokens_scope?: 'session_cumulative' | 'session_total';
+  tokens_scope?: 'session_cumulative' | 'session_total'; t_min?: number | null;
 }
 
 /** Optional evidence layer. The six behaviors remain independent of these roles. */
@@ -130,10 +147,40 @@ export interface Graph {
   timeline: { timeline: RawEvent[]; sources: { name: string; text: string }[] };
   observations?: Observation[]; observationLinks?: ObservationLink[];
   artifacts?: { name: string; path: string; sha256: string; text: string }[];
+  /** Optional reading layer: one paragraph narrating the run's turns, citing what it narrates. */
+  journey?: { text: string; cites: string[] }; language?: 'zh' | 'en';
+}
+
+/** Tool glyphs, after ThoughtDAG's action fingerprint (src/lib/turn-insight.ts). */
+const toolGlyphs: [RegExp, string][] = [
+  [/^(read|cat|notebookread|view)/i, '📖'], [/^(edit|write|multiedit|notebookedit|apply_patch|patch)/i, '✏️'],
+  [/^(bash|shell|exec|run)/i, '⌨️'], [/^(grep|glob|ls|find|search|websearch|rg)/i, '🔍'],
+  [/^(webfetch|fetch)/i, '🌐'], [/^(task|agent)/i, '🤖'],
+];
+export interface ToolMark { glyph: string; name: string; count: number }
+/** What a stretch of work spent its calls on: reading, editing, running, searching. No model involved. */
+export function toolFingerprint(records: RawEvent[]): ToolMark[] {
+  const marks = new Map<string, ToolMark>();
+  for (const e of records) {
+    if (!['call', 'tool', 'tool_call'].includes(e.kind) || !e.tool) continue;
+    const glyph = toolGlyphs.find(([re]) => re.test(e.tool!))?.[1] ?? '🔧';
+    const mark = marks.get(glyph);
+    if (mark) { mark.count += 1; if (!mark.name.split(' / ').includes(e.tool)) mark.name += ` / ${e.tool}`; }
+    else marks.set(glyph, { glyph, name: e.tool, count: 1 });
+  }
+  return [...marks.values()];
 }
 export type Entity = State | Branch | Action;
+/** Shared semantic tone for a canvas card and links referring to that card. */
+export function entityColor(entity: Entity): string {
+  if ('behavior' in entity) return colors[entity.behavior];
+  if ('snapshot' in entity) return stateVisual(entity).color;
+  return entity.move ? moveColors[entity.move] : '#94a3ac';
+}
+
+/** Six well-separated hues at one lightness, so the behaviors stay apart as text and as card edges. */
 export const colors: Record<Behavior, string> = {
-  Explore: '#237899', Plan: '#8661bd', Edit: '#bf752b', Execute: '#247f70', Verify: '#4866b2', Diagnose: '#b6566d',
+  Explore: '#0e7490', Plan: '#6d4bb3', Edit: '#965b0f', Execute: '#2f7d3f', Verify: '#3558ad', Diagnose: '#a8456f',
 };
 
 /** Accept a neutral graph or a legacy canvas; never invent states from flat logs. */
@@ -177,7 +224,12 @@ export function parseGraph(value: unknown): Graph {
     e.summary ??= '';
     if (typeof e.summary !== 'string') throw new Error(`${e.id} 的摘要必须是文本`);
     if (!Array.isArray(e.events) || !e.events.length || e.events.some(id => !raw.has(id))) throw new Error(`${e.id} 的证据引用无效`);
+    if (e.move != null && !moves.includes(e.move)) throw new Error(`${e.id} 的推理标记无效`);
+    const l = e.ladder;
+    if (l != null && (typeof l !== 'object' || typeof l.topic !== 'string' || !l.topic.trim() || typeof l.takeaway !== 'string' || !l.takeaway.trim() || l.reason != null && typeof l.reason !== 'string'
+      || l.abstract != null && (!Array.isArray(l.abstract) || l.abstract.some(q => !q || typeof q.quote !== 'string' || !raw.has(q.event))))) throw new Error(`${e.id} 的缩放摘要格式无效或引用未知证据`);
   }
+  if (g.journey != null && (typeof g.journey.text !== 'string' || !g.journey.text.trim() || !Array.isArray(g.journey.cites) || g.journey.cites.some(c => !ids.has(c)))) throw new Error('历程段落需要正文和有效引用');
   const states = new Map(g.states.map(s => [s.id, s]));
   const branches = new Map(g.branches.map(b => [b.id, b]));
   const actions = new Map(g.actions.map(a => [a.id, a]));

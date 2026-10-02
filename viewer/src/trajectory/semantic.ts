@@ -1,7 +1,7 @@
 import type { Graph, Entity, Action, ProjectedEdge } from './model';
 
 export type Tier = 'states' | 'branches' | 'actions' | 'raw';
-export const tierLabels: Record<Tier, string> = { states: '系统状态', branches: '探索分支', actions: '具体行为', raw: '原始轨迹' };
+export const tierLabels: Record<Tier, string> = { states: '系统状态', branches: '工作阶段', actions: '具体行为', raw: '原始轨迹' };
 export function semanticTier(zoom: number, previous?: Tier): Tier {
   if (previous === 'raw' && zoom >= 1.05 || zoom >= 1.15) return 'raw';
   if (previous === 'actions' && zoom >= .77) return 'actions';
@@ -12,8 +12,39 @@ export function recordsForAction(g: Graph, action: Action) {
   const ids = new Set(action.events);
   return g.timeline.timeline.filter(e => ids.has(e.id));
 }
+/** A run of routine actions folded into one card (after ThoughtDAG's condense: landmarks never fold). */
+export interface FoldItem { id: string; title: string; summary: string; events: string[]; state: string; branch: string; actions: Action[] }
+export interface LayoutOptions { fold?: boolean; openFolds?: ReadonlySet<string> }
+export const FOLD_MIN = 3;
+export const BRANCH_H = 290;
+const FOLD_H = 96;
+/** Actions a reader must see when routine steps fold: turns, what informed them, and what changed state. */
+export function keptActions(g: Graph): Set<string> {
+  const keep = new Set<string>();
+  for (const a of g.actions) if (a.move) keep.add(a.id);
+  for (const l of g.links) if (l.kind === 'informs') { keep.add(l.source); keep.add(l.target); }
+  for (const t of g.transitions) keep.add(t.action);
+  return keep;
+}
+/** A branch's actions in order, with maximal runs of FOLD_MIN or more routine actions folded unless opened. */
+export function branchItems(g: Graph, branchId: string, opts: LayoutOptions = {}, keep = keptActions(g)): (Action | FoldItem)[] {
+  const actions = g.actions.filter(a => a.branch === branchId);
+  if (!opts.fold) return actions;
+  const out: (Action | FoldItem)[] = [];
+  let run: Action[] = [];
+  const flush = () => {
+    const id = run.length ? `fold:${run[0].id}` : '';
+    if (run.length >= FOLD_MIN && !opts.openFolds?.has(id)) out.push({ id, title: `${run.length} 个常规步骤`, summary: run.map(a => a.title).join('；'), events: run.flatMap(a => a.events), state: run[0].state, branch: branchId, actions: run });
+    else out.push(...run);
+    run = [];
+  };
+  for (const a of actions) { if (keep.has(a.id)) { flush(); out.push(a); } else run.push(a); }
+  flush();
+  return out;
+}
+export const isFold = (item: unknown): item is FoldItem => !!item && Array.isArray((item as FoldItem).actions);
 export interface MapNode {
-  id: string; kind: 'state' | 'branch' | 'action'; item: Entity;
+  id: string; kind: 'state' | 'branch' | 'action' | 'fold'; item: Entity | FoldItem;
   x: number; y: number; width: number; height: number; parentId?: string;
 }
 export type StateMode = 'lineage' | 'chronology';
@@ -27,10 +58,14 @@ export function stateConnections(g: Graph, mode: StateMode) {
   });
 }
 
-export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lineage'): Layout {
+export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lineage', opts: LayoutOptions = {}): Layout {
   const detailed = tier === 'actions' || tier === 'raw';
   const width = tier === 'states' ? 780 : Math.max(780, 48 + Math.max(1, ...g.states.map(s => g.branches.filter(b => b.state === s.id).length)) * 400);
   const actionHeight = tier === 'raw' ? 420 : 300;
+  const actionTop = 192 + BRANCH_H + 12;
+  const keep = keptActions(g);
+  const items = new Map(g.branches.map(b => [b.id, branchItems(g, b.id, opts, keep)]));
+  const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight;
   const nodes: MapNode[] = [];
   const connections = stateConnections(g, mode);
   const children = (id: string) => g.states.filter(s => connections.some(t => t.source === id && t.target === s.id));
@@ -51,17 +86,19 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
     placed.add(s.id);
     const x0 = left + ((spans.get(s.id)! - 1) * (width + 120)) / 2;
     const branches = g.branches.filter(b => b.state === s.id);
-    const depth = Math.max(0, ...branches.map(b => g.actions.filter(a => a.branch === b.id).length * (actionHeight + 24)));
-    const height = tier === 'states' ? 340 : detailed ? Math.max(400, 360 + depth) : 360;
+    const depth = Math.max(0, ...branches.map(b => items.get(b.id)!.reduce((h, item) => h + itemHeight(item) + 24, 0)));
+    const height = tier === 'states' ? 380 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
     nodes.push({ id: s.id, kind: 'state', item: s, x: x0, y, width, height });
     const startX = x0 + (width - branches.length * 400 + 40) / 2;
     if (tier !== 'states') branches.forEach((b, lane) => {
       const x = startX + lane * 400;
-      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: 140, parentId: s.id });
+      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: BRANCH_H, parentId: s.id });
       if (!detailed) return;
-      g.actions.filter(a => a.branch === b.id).forEach((a, i) => {
-        nodes.push({ id: a.id, kind: 'action', item: a, x, y: y + 344 + i * (actionHeight + 24), width: 360, height: actionHeight, parentId: s.id });
-      });
+      let top = y + actionTop;
+      for (const item of items.get(b.id)!) {
+        nodes.push({ id: item.id, kind: isFold(item) ? 'fold' : 'action', item, x, y: top, width: 360, height: itemHeight(item), parentId: s.id });
+        top += itemHeight(item) + 24;
+      }
     });
     let offset = left;
     for (const child of children(s.id)) { place(child, offset, y + height + 96); offset += spans.get(child.id)! * (width + 120); }
@@ -108,10 +145,12 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
   const visible = new Set(nodes.map(n => n.id));
   const edges: ProjectedEdge[] = stateConnections(g, layout.stateMode ?? 'lineage').map((t, i) => ({ id: `state-link:${i}`, ...t }));
   if (tier === 'states') return { nodes, edges };
+  const foldOf = new Map<string, string>();
+  for (const n of layout.nodes) if (n.kind === 'fold') for (const a of (n.item as FoldItem).actions) foldOf.set(a.id, n.id);
   for (const b of g.branches.filter(b => allowed.has(b.id))) {
     if (detailed) {
-      const aa = g.actions.filter(a => a.branch === b.id);
-      aa.forEach((a, i) => edges.push({ id: `sequence:${a.id}`, source: i ? aa[i - 1].id : b.id, target: a.id, kind: 'sequence', label: '' }));
+      const chain = layout.nodes.filter(n => (n.kind === 'action' || n.kind === 'fold') && (n.item as Action | FoldItem).branch === b.id).sort((m, n) => m.y - n.y);
+      chain.forEach((n, i) => edges.push({ id: `sequence:${n.id}`, source: i ? chain[i - 1].id : b.id, target: n.id, kind: 'sequence', label: '' }));
     }
   }
   if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: '产生新状态' });
@@ -120,15 +159,15 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
     const aggregate = new Map<string, ProjectedEdge>();
     for (const l of g.links) {
       const a = actions.get(l.source)!; const b = actions.get(l.target)!;
-      const source = detailed ? a.id : a.branch;
-      const target = detailed ? b.id : b.branch;
+      const source = detailed ? foldOf.get(a.id) ?? a.id : a.branch;
+      const target = detailed ? foldOf.get(b.id) ?? b.id : b.branch;
       if (source === target || !visible.has(source) || !visible.has(target)) continue;
       // The supplied sequence can also connect the end of one branch to another.
       if (l.kind === 'sequence' && a.branch === b.branch) continue;
       const id = `link:${source}:${target}:${l.kind}`;
       const prior = aggregate.get(id);
       if (prior) prior.count = (prior.count ?? 1) + 1;
-      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? '请求审查' : l.kind === 'review_return' ? '审查返回' : l.kind === 'sequence' ? '继续执行' : '后续依据' });
+      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? '请求审查' : l.kind === 'review_return' ? '审查返回' : l.kind === 'sequence' ? '继续执行' : l.kind === 'informs' ? '依据' : '后续依据' });
     }
     edges.push(...aggregate.values());
   }

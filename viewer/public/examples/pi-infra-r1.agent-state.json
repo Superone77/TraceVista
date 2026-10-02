@@ -29,6 +29,11 @@
         "提交编号": "0",
         "候选 Git tree": null,
         "提交状态": "尚未提交"
+      },
+      "ladder": {
+        "topic": "Python 循环基线",
+        "takeaway": "起点是 Python 循环基线，每次 3 到 17 ms",
+        "reason": "在此写出分组 Triton 内核，并查明主机启动约 45 µs 才是下限"
       }
     },
     {
@@ -60,6 +65,11 @@
         "correctness": true,
         "measurement": "measured",
         "note": "同一轮提交回执中的开发评分；颜色只表示实测数值变化，不代表统计显著性。"
+      },
+      "ladder": {
+        "topic": "分组 Triton 内核",
+        "takeaway": "提交 1 换成分组 Triton 内核，评分 18.67×",
+        "reason": "瓶颈转到主机启动，于是试 tile 扫描、直接启动和 raw stream"
       }
     },
     {
@@ -93,6 +103,11 @@
         "note": "同一轮提交回执中的开发评分；颜色只表示实测数值变化，不代表统计显著性。",
         "previous": 18.671309,
         "previousState": "s1"
+      },
+      "ladder": {
+        "topic": "直接启动",
+        "takeaway": "提交 2 用直接启动加 raw stream，评分 33.37×",
+        "reason": "再试 CUDA Graph 和 identity 缓存：Graph 被排除，identity 收益未确认"
       }
     },
     {
@@ -126,6 +141,11 @@
         "note": "同一轮提交回执中的开发评分；颜色只表示实测数值变化，不代表统计显著性。",
         "previous": 33.3692,
         "previousState": "s2"
+      },
+      "ladder": {
+        "topic": "identity 缓存",
+        "takeaway": "提交 3 加入 identity 缓存，评分退到 30.83×",
+        "reason": "对照 fresh 与 rotating 对象后放弃，回到提交 2 的代码"
       }
     },
     {
@@ -166,6 +186,11 @@
         "note": "同一轮提交回执中的开发评分；颜色只表示实测数值变化，不代表统计显著性。",
         "previous": 30.834023,
         "previousState": "s3"
+      },
+      "ladder": {
+        "topic": "精简特化键",
+        "takeaway": "提交 4 在提交 2 上精简特化键，评分 35.44×",
+        "reason": "边界测试通过；参数成本和 alignment 变体都没有收益，于是停止"
       }
     },
     {
@@ -207,6 +232,11 @@
         "correctness": true,
         "measurement": "historical",
         "note": "最终选择引用提交 4 的开发评分；独立评分另列在测量记录。"
+      },
+      "ladder": {
+        "topic": "选中提交 4",
+        "takeaway": "最终选中提交 4，开发评分 35.44×",
+        "reason": "最终报告把剩余空间归于主机 Python，两个变体只凭局部计时否决"
       }
     }
   ],
@@ -219,7 +249,22 @@
       "status": "attempted",
       "events": [
         "main:E2"
-      ]
+      ],
+      "ladder": {
+        "topic": "三份可编辑文件",
+        "takeaway": "只有三份可编辑文件，且 GPU 是 A100",
+        "reason": "先存下基线副本和哈希，之后可对照",
+        "abstract": [
+          {
+            "event": "main:E2",
+            "quote": "I'll start by reading the baseline code to understand the current implementation."
+          },
+          {
+            "event": "main:E38",
+            "quote": "First I'll snapshot the baseline into scratch as my own reference, then write the new implementation."
+          }
+        ]
+      }
     },
     {
       "id": "s0-baseline",
@@ -229,7 +274,18 @@
       "status": "attempted",
       "events": [
         "main:E42"
-      ]
+      ],
+      "ladder": {
+        "topic": "自己的参考",
+        "takeaway": "自己的参考与 10 组样例，基线每次 3 到 17 ms",
+        "reason": "原始路径逐 adapter 循环，这是要超越的数字",
+        "abstract": [
+          {
+            "event": "main:E85",
+            "quote": "T4096_H4096_R16_NL8_out4096  shrink=  5058.8us (      7 GB/s)"
+          }
+        ]
+      }
     },
     {
       "id": "s0-kernel",
@@ -239,7 +295,23 @@
       "status": "attempted",
       "events": [
         "main:E64"
-      ]
+      ],
+      "ladder": {
+        "topic": "分组 Triton 内核",
+        "takeaway": "分组 Triton 内核一次写完，10 组样例全过",
+        "reason": "本地误差约 3e-4，与基线相当",
+        "abstract": [
+          {
+            "event": "main:E87",
+            "quote": "Baseline measured (~5-17 ms per op). Now let me run my new implementation."
+          },
+          {
+            "event": "main:E89",
+            "quote": "shrink_relerr=2.948e-04 expand_relerr=4.119e-04"
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "s0-diagnostic",
@@ -249,7 +321,23 @@
       "status": "attempted",
       "events": [
         "main:E92"
-      ]
+      ],
+      "ladder": {
+        "topic": "主机启动",
+        "takeaway": "设备只要 19 到 220 µs，主机启动约 45 µs 才是下限",
+        "reason": "诊断插桩曾夸大计时，关掉后才看清",
+        "abstract": [
+          {
+            "event": "main:E91",
+            "quote": "every case reports ≈200 µs regardless of size"
+          },
+          {
+            "event": "main:E105",
+            "quote": "Pure device time is 19-220 µs, but there's a ~45 µs/call host launch overhead floor."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "s0-submit",
@@ -259,7 +347,22 @@
       "status": "attempted",
       "events": [
         "main:E123"
-      ]
+      ],
+      "ladder": {
+        "topic": "提交 1",
+        "takeaway": "提交 1 正确性通过，开发评分 18.67×",
+        "reason": "这是首个有评分的候选，剩余 15 次",
+        "abstract": [
+          {
+            "event": "main:E127",
+            "quote": "correctness: PASS"
+          },
+          {
+            "event": "main:E127",
+            "quote": "dev_speedup: 18.67"
+          }
+        ]
+      }
     },
     {
       "id": "s1-tuning",
@@ -269,7 +372,19 @@
       "status": "attempted",
       "events": [
         "main:E130"
-      ]
+      ],
+      "ladder": {
+        "topic": "tile 扫描",
+        "takeaway": "大范围 tile 扫描太慢停掉，改小范围前台 tile 扫描",
+        "reason": "后台任务随 shell 退出，只留下部分结果",
+        "abstract": [
+          {
+            "event": "main:E179",
+            "quote": "The background tuner died with its shell session. Let me run a small, focused sweep in the foreground."
+          }
+        ]
+      },
+      "move": "pivot"
     },
     {
       "id": "s1-direct",
@@ -279,7 +394,19 @@
       "status": "attempted",
       "events": [
         "main:E146"
-      ]
+      ],
+      "ladder": {
+        "topic": "直接启动",
+        "takeaway": "直接启动 CompiledKernel 比普通 launch 快，输出逐位一致",
+        "reason": "44 到 17 µs，先踩了参数个数错误",
+        "abstract": [
+          {
+            "event": "main:E210",
+            "quote": "a direct `CompiledKernel` launch cuts 44 µs → 17 µs with bitwise-identical output."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "s1-stream",
@@ -289,7 +416,19 @@
       "status": "attempted",
       "events": [
         "main:E223"
-      ]
+      ],
+      "ladder": {
+        "topic": "raw stream",
+        "takeaway": "主机成本里 stream 获取最贵，改用 raw stream",
+        "reason": "每次约 21.65 µs，比 63.8 µs 大幅降低",
+        "abstract": [
+          {
+            "event": "main:E253",
+            "quote": "The raw-stream API is 27× cheaper (0.23 µs vs 6.3 µs)."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "s1-submit",
@@ -299,7 +438,18 @@
       "status": "attempted",
       "events": [
         "main:E272"
-      ]
+      ],
+      "ladder": {
+        "topic": "提交 2",
+        "takeaway": "提交 2 正确性通过，开发评分 33.37×",
+        "reason": "比提交 1 的 18.67× 明显提高",
+        "abstract": [
+          {
+            "event": "main:E273",
+            "quote": "dev_speedup: 33.37"
+          }
+        ]
+      }
     },
     {
       "id": "s2-identity",
@@ -309,7 +459,19 @@
       "status": "attempted",
       "events": [
         "main:E276"
-      ]
+      ],
+      "ladder": {
+        "topic": "identity 缓存",
+        "takeaway": "identity 缓存修好重复累加，但命中后并没有更快",
+        "reason": "局部 21 µs 不变，收益只在复用对象时才有",
+        "abstract": [
+          {
+            "event": "main:E428",
+            "quote": "Clean A/B shows the current version is ~3-5 µs/op faster than round 2 on every shape."
+          }
+        ]
+      },
+      "move": "open"
     },
     {
       "id": "s2-graph",
@@ -319,7 +481,19 @@
       "status": "attempted",
       "events": [
         "main:E349"
-      ]
+      ],
+      "ladder": {
+        "topic": "CUDA Graph",
+        "takeaway": "CUDA Graph replay 单独 5 µs，整合后只省约 2 µs，删除",
+        "reason": "key 开销吃掉 replay 收益，风险不值",
+        "abstract": [
+          {
+            "event": "main:E405",
+            "quote": "Graphs only save ~2 µs net here (the key overhead eats the replay gain) — not worth the risk."
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "s2-submit",
@@ -329,7 +503,18 @@
       "status": "attempted",
       "events": [
         "main:E431"
-      ]
+      ],
+      "ladder": {
+        "topic": "提交 3",
+        "takeaway": "提交 3 正确性通过，评分退到 30.83×",
+        "reason": "低于提交 2 的 33.37×，仍是最佳",
+        "abstract": [
+          {
+            "event": "main:E432",
+            "quote": "dev_speedup: 30.83"
+          }
+        ]
+      }
     },
     {
       "id": "s3-compare",
@@ -339,7 +524,23 @@
       "status": "attempted",
       "events": [
         "main:E435"
-      ]
+      ],
+      "ladder": {
+        "topic": "identity 缓存",
+        "takeaway": "identity 缓存只在复用对象时更快，fresh 和 rotating 下反而更慢",
+        "reason": "评分 30.83 退步源于此，方案放弃",
+        "abstract": [
+          {
+            "event": "main:E434",
+            "quote": "Round 3 scored **30.83** vs round 2's 33.37, despite being 3-5 µs/op faster locally with *reused* tensors."
+          },
+          {
+            "event": "main:E441",
+            "quote": "The evidence suggests the harness may pass new tensor objects each call (so an identity cache never hits but still costs)."
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "s3-rebase",
@@ -349,7 +550,19 @@
       "status": "attempted",
       "events": [
         "main:E458"
-      ]
+      ],
+      "ladder": {
+        "topic": "提交 2 代码",
+        "takeaway": "回到提交 2 代码，用更便宜的特化键重做",
+        "reason": "修了签名和 float 分派两个错误，保留 slice offset",
+        "abstract": [
+          {
+            "event": "main:E457",
+            "quote": "Round 3's identity cache didn't pay off in the harness."
+          }
+        ]
+      },
+      "move": "pivot"
     },
     {
       "id": "s3-submit",
@@ -359,7 +572,18 @@
       "status": "attempted",
       "events": [
         "main:E505"
-      ]
+      ],
+      "ladder": {
+        "topic": "提交 4",
+        "takeaway": "提交 4 正确性通过，开发评分 35.44",
+        "reason": "比提交 2 的 33.37 高，新最优",
+        "abstract": [
+          {
+            "event": "main:E504",
+            "quote": "the new version is ~2.3 µs/op faster in *both* the fresh-tensor and stable-tensor patterns (19.7 µs vs 22.0 µs)."
+          }
+        ]
+      }
     },
     {
       "id": "s4-robust",
@@ -369,7 +593,18 @@
       "status": "attempted",
       "events": [
         "main:E509"
-      ]
+      ],
+      "ladder": {
+        "topic": "19 组边界测试",
+        "takeaway": "19 组边界测试全部通过",
+        "reason": "首次只因参考脚本输出形状写错而中断",
+        "abstract": [
+          {
+            "event": "main:E508",
+            "quote": "Round 4: **dev_speedup 35.44** (new best), correctness PASS."
+          }
+        ]
+      }
     },
     {
       "id": "s4-argcost",
@@ -379,7 +614,19 @@
       "status": "attempted",
       "events": [
         "main:E519"
-      ]
+      ],
+      "ladder": {
+        "topic": "参数个数",
+        "takeaway": "参数个数几乎不影响直接 launcher 成本",
+        "reason": "每个参数约 0.029 µs，继续削减参数无意义",
+        "abstract": [
+          {
+            "event": "main:E523",
+            "quote": "direct launch  6 args:  6.04us   21 args:  6.47us   -> 0.029us per extra argument"
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "s4-alignment",
@@ -389,7 +636,19 @@
       "status": "attempted",
       "events": [
         "main:E526"
-      ]
+      ],
+      "ladder": {
+        "topic": "alignment 特化",
+        "takeaway": "去掉 alignment 特化略慢，恢复提交 4 文件",
+        "reason": "正确性仍通过，局部计时没有收益，未提交",
+        "abstract": [
+          {
+            "event": "main:E534",
+            "quote": "The extra alignment-specialization skip measured slightly *slower* — reverting to the verified best version."
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "s4-finalize",
@@ -399,7 +658,19 @@
       "status": "attempted",
       "events": [
         "main:E539"
-      ]
+      ],
+      "ladder": {
+        "topic": "finalize",
+        "takeaway": "finalize 选定提交 4 作为最终结果",
+        "reason": "首次请求被 schema 拒绝，修正参数后重试成功",
+        "abstract": [
+          {
+            "event": "main:E538",
+            "quote": "Final state verified (10/10 benchmark cases + 19/19 robustness cases pass). Let me finalize."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "s5-audit",
@@ -409,7 +680,18 @@
       "status": "attempted",
       "events": [
         "main:E544"
-      ]
+      ],
+      "ladder": {
+        "topic": "文件哈希",
+        "takeaway": "最终文件哈希与提交 4 副本一致",
+        "reason": "agent 总结把剩余空间归于 Python 开销",
+        "abstract": [
+          {
+            "event": "main:E549",
+            "quote": "Finalized at submission 4/16."
+          }
+        ]
+      }
     }
   ],
   "actions": [
@@ -428,7 +710,18 @@
       "outcome": "proposed",
       "classification_reason": "原文明确表达尚未执行的读取计划。",
       "classification_basis": "analyst",
-      "t_min": 0.0
+      "t_min": 0.0,
+      "ladder": {
+        "topic": "先读基线",
+        "takeaway": "先读基线再定方向，尚未动手",
+        "reason": "读到的代码决定后面写什么",
+        "abstract": [
+          {
+            "event": "main:E2",
+            "quote": "I'll start by reading the baseline code to understand the current implementation."
+          }
+        ]
+      }
     },
     {
       "id": "a3",
@@ -447,7 +740,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.0
+      "t_min": 0.0,
+      "ladder": {
+        "topic": "kernel_utils",
+        "takeaway": "kernel_utils 原始只是占位，mm_k 直接抛 NotImplemented",
+        "reason": "内核实现要自己从零写",
+        "abstract": [
+          {
+            "event": "main:E5",
+            "quote": "def mm_k(*args, **kwargs):"
+          }
+        ]
+      }
     },
     {
       "id": "a4",
@@ -466,7 +770,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.0
+      "t_min": 0.0,
+      "ladder": {
+        "topic": "shrink 入口",
+        "takeaway": "shrink 入口读到接口约束，必须保持签名",
+        "reason": "后面只改内部，不动调用方式",
+        "abstract": [
+          {
+            "event": "main:E7",
+            "quote": "Punica: Multi-Tenant LoRA Serving."
+          }
+        ]
+      }
     },
     {
       "id": "a10",
@@ -486,7 +801,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.04
+      "t_min": 0.04,
+      "ladder": {
+        "topic": "expand 入口",
+        "takeaway": "expand 入口带累加语义，要与 shrink 配套",
+        "reason": "后面两个入口分别接新内核",
+        "abstract": [
+          {
+            "event": "main:E12",
+            "quote": "Punica: Multi-Tenant LoRA Serving."
+          }
+        ]
+      }
     },
     {
       "id": "a11",
@@ -542,7 +868,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.06
+      "t_min": 0.06,
+      "ladder": {
+        "topic": "utils.py",
+        "takeaway": "utils.py 路径不存在，只有三个文件可改",
+        "reason": "确认可编辑范围，不能新增依赖文件",
+        "abstract": [
+          {
+            "event": "main:E20",
+            "quote": "no such file or directory, lstat '/app/repo/vllm/lora/ops/triton_ops/utils.py'"
+          }
+        ]
+      }
     },
     {
       "id": "a22",
@@ -599,7 +936,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.11
+      "t_min": 0.11,
+      "ladder": {
+        "topic": "triton 3.3.1",
+        "takeaway": "环境是 triton 3.3.1 加 torch 2.7.1",
+        "reason": "后面的 JIT 读取以这个版本为准",
+        "abstract": [
+          {
+            "event": "main:E30",
+            "quote": "triton 3.3.1 torch 2.7.1+cu126"
+          }
+        ]
+      }
     },
     {
       "id": "a29",
@@ -636,7 +984,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 0.3
+      "t_min": 0.3,
+      "ladder": {
+        "topic": "A100",
+        "takeaway": "GPU 为 A100 40GB，scratch 目录可写",
+        "reason": "本地测试放在 scratch，不污染仓库",
+        "abstract": [
+          {
+            "event": "main:E35",
+            "quote": "name, memory.total [MiB]"
+          }
+        ]
+      }
     },
     {
       "id": "a34",
@@ -674,7 +1033,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 2.63
+      "t_min": 2.63,
+      "ladder": {
+        "topic": "基线",
+        "takeaway": "基线三份文件复制到 scratch 并记录 md5",
+        "reason": "之后随时能还原对照",
+        "abstract": [
+          {
+            "event": "main:E38",
+            "quote": "First I'll snapshot the baseline into scratch as my own reference, then write the new implementation."
+          }
+        ]
+      }
     },
     {
       "id": "a42",
@@ -694,7 +1064,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 3.95
+      "t_min": 3.95,
+      "ladder": {
+        "topic": "fp64 参考",
+        "takeaway": "写出独立的 fp64 参考与测试工具",
+        "reason": "正确性不依赖原始实现",
+        "abstract": []
+      }
     },
     {
       "id": "a46",
@@ -734,7 +1110,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 4.29
+      "t_min": 4.29,
+      "ladder": {
+        "topic": "10 组样例",
+        "takeaway": "10 组样例覆盖不同 token、rank、LoRA 数",
+        "reason": "同时做正确性与计时",
+        "abstract": []
+      }
     },
     {
       "id": "a53",
@@ -752,7 +1134,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 4.37
+      "t_min": 4.37,
+      "ladder": {
+        "topic": "ImportError",
+        "takeaway": "基线测试因导入方式失败，ImportError lora_shrink",
+        "reason": "scratch 副本触发包的 __init__ 导入",
+        "abstract": [
+          {
+            "event": "main:E54",
+            "quote": "ImportError: cannot import name 'lora_shrink' from 'vllm.lora.ops.triton_ops.lora_shrink_op'"
+          }
+        ]
+      }
     },
     {
       "id": "a56",
@@ -773,7 +1166,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 4.58
+      "t_min": 4.58,
+      "ladder": {
+        "topic": "模块加载",
+        "takeaway": "改用自定义模块加载修好导入问题",
+        "reason": "之后基线才能在 scratch 里运行",
+        "abstract": []
+      }
     },
     {
       "id": "a60",
@@ -791,7 +1190,18 @@
       "outcome": "running",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 4.73
+      "t_min": 4.73,
+      "ladder": {
+        "topic": "基线测量",
+        "takeaway": "基线测量启动后超过 30 秒仍在跑",
+        "reason": "基线很慢，转去写新内核",
+        "abstract": [
+          {
+            "event": "main:E61",
+            "quote": "Still running after 30 s"
+          }
+        ]
+      }
     },
     {
       "id": "a64",
@@ -813,7 +1223,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 5.25
+      "t_min": 5.25,
+      "ladder": {
+        "topic": "Triton shrink",
+        "takeaway": "按 LoRA 分组的 Triton shrink 和 expand 一次写成",
+        "reason": "把逐 adapter 的 Python 循环去掉",
+        "abstract": [
+          {
+            "event": "main:E63",
+            "quote": "Meanwhile, let me write the optimized implementation."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a69",
@@ -895,7 +1317,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 5.7
+      "t_min": 5.7,
+      "ladder": {
+        "topic": "基线",
+        "takeaway": "基线每个 op 约 2.7 到 17 ms，10 组均通过",
+        "reason": "这是对比用的原始耗时",
+        "abstract": [
+          {
+            "event": "main:E85",
+            "quote": "T4096_H4096_R16_NL8_out4096  shrink=  5058.8us (      7 GB/s)"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a88",
@@ -915,7 +1349,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 5.73
+      "t_min": 5.73,
+      "ladder": {
+        "topic": "新内核",
+        "takeaway": "新内核 10 组全过，单 op 降到约 200 µs",
+        "reason": "各样例都约 200 µs，疑是诊断插桩造成",
+        "abstract": [
+          {
+            "event": "main:E89",
+            "quote": "shrink=   211.9us (    159 GB/s)"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a92",
@@ -936,7 +1382,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 6.19
+      "t_min": 6.19,
+      "ladder": {
+        "topic": "主机下限",
+        "takeaway": "正确性全过，但各样例都约 200 µs，像主机下限",
+        "reason": "先关闭诊断再单独测量调用开销",
+        "abstract": [
+          {
+            "event": "main:E91",
+            "quote": "Correctness passes on all 10 local cases (relerr ≈ 3e-4 vs fp64 reference, same as baseline)."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a95",
@@ -954,7 +1412,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 6.47
+      "t_min": 6.47,
+      "ladder": {
+        "topic": "关掉诊断",
+        "takeaway": "关掉诊断后空内核也要约 18 µs，shrink 约 64 µs",
+        "reason": "主机开销有明显下限",
+        "abstract": [
+          {
+            "event": "main:E96",
+            "quote": "pure python arg prep: 1.14us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a99",
@@ -975,7 +1445,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 6.68
+      "t_min": 6.68,
+      "ladder": {
+        "topic": "CUDA graph",
+        "takeaway": "改用 CUDA graph 重放分离纯 GPU 时间",
+        "reason": "异步队列使 host 时间混入 GPU 时间，原数字有歧义",
+        "abstract": [
+          {
+            "event": "main:E98",
+            "quote": "Let me separate pure GPU time via CUDA graph replay, and profile the launch path."
+          }
+        ]
+      }
     },
     {
       "id": "a102",
@@ -993,7 +1474,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 6.94
+      "t_min": 6.94,
+      "ladder": {
+        "topic": "设备耗时",
+        "takeaway": "graph 重放的纯设备耗时 12 到 220 µs，墙钟约 65 µs",
+        "reason": "小样例被主机启动卡住",
+        "abstract": [
+          {
+            "event": "main:E103",
+            "quote": "T2048_H2048_R8_NL8_out2048       shrink  wall=  62.83us  graph_dev=  19.45us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a106",
@@ -1013,7 +1506,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 7.15
+      "t_min": 7.15,
+      "ladder": {
+        "topic": "转读 JIT",
+        "takeaway": "确认约 45 µs 每次的主机启动下限，转读 JIT",
+        "reason": "想看哪些启动开销可削减",
+        "abstract": [
+          {
+            "event": "main:E105",
+            "quote": "Pure device time is 19-220 µs, but there's a ~45 µs/call host launch overhead floor."
+          }
+        ]
+      }
     },
     {
       "id": "a108",
@@ -1031,7 +1535,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 7.29
+      "t_min": 7.29,
+      "ladder": {
+        "topic": "绝对路径",
+        "takeaway": "绝对路径读取被工具拒绝",
+        "reason": "改用 shell 的 sed 读 JIT 源码",
+        "abstract": [
+          {
+            "event": "main:E109",
+            "quote": "Expected a normalized project-relative path"
+          }
+        ]
+      }
     },
     {
       "id": "a111",
@@ -1106,7 +1621,23 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 7.53
+      "t_min": 7.53,
+      "ladder": {
+        "topic": "快速路径",
+        "takeaway": "参数越多启动越慢，快速路径 grid 调用失败",
+        "reason": "tuple index out of range，此路暂不通",
+        "abstract": [
+          {
+            "event": "main:E120",
+            "quote": "fast path failed: tuple index out of range"
+          },
+          {
+            "event": "main:E120",
+            "quote": "k15 (14 runtime scalars)   :  29.95us"
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a123",
@@ -1127,7 +1658,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 7.65
+      "t_min": 7.65,
+      "ladder": {
+        "topic": "提交 1",
+        "takeaway": "带着本地数据提交 1，评分异步等待",
+        "reason": "本地纯 GPU 时间已从约 5000 µs 降到 19 到 220 µs",
+        "abstract": [
+          {
+            "event": "main:E122",
+            "quote": "Pure-GPU time went from ~5,000 µs (baseline) to ~19-220 µs. Let me submit round 1."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a126",
@@ -1146,7 +1689,27 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 8.33
+      "t_min": 8.33,
+      "ladder": {
+        "topic": "回执",
+        "takeaway": "回执显示正确性通过，dev_speedup 18.67",
+        "reason": "dev_reward 0.04208，剩余 15 次",
+        "abstract": [
+          {
+            "event": "main:E127",
+            "quote": "correctness: PASS"
+          },
+          {
+            "event": "main:E127",
+            "quote": "dev_speedup: 18.67"
+          },
+          {
+            "event": "main:E127",
+            "quote": "remaining: 15"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a130",
@@ -1167,7 +1730,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 9.59
+      "t_min": 9.59,
+      "ladder": {
+        "topic": "tile 参数扫描",
+        "takeaway": "先写 tile 参数扫描，起点是提交 1 的 18.67×",
+        "reason": "要找剩余时间花在哪",
+        "abstract": [
+          {
+            "event": "main:E129",
+            "quote": "Round 1: **correctness PASS, dev_speedup 18.67** (baseline → mine). Let me analyze and find where the remaining time goes."
+          }
+        ]
+      }
     },
     {
       "id": "a133",
@@ -1185,7 +1759,13 @@
       "outcome": "running",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 10.11
+      "t_min": 10.11,
+      "ladder": {
+        "topic": "大范围 tile 搜索",
+        "takeaway": "大范围 tile 搜索启动后跑了超过 30 秒还没结果",
+        "reason": "上限 1500 秒，成本难以预估",
+        "abstract": []
+      }
     },
     {
       "id": "a136",
@@ -1204,7 +1784,14 @@
       "outcome": "stopped",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 10.65
+      "t_min": 10.65,
+      "ladder": {
+        "topic": "大范围搜索",
+        "takeaway": "大范围搜索跑了约 34 秒被手动终止",
+        "reason": "耗时过长，不值得等",
+        "abstract": []
+      },
+      "move": "ruleout"
     },
     {
       "id": "a139",
@@ -1242,7 +1829,13 @@
       "outcome": "running",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 10.84
+      "t_min": 10.84,
+      "ladder": {
+        "topic": "后台运行",
+        "takeaway": "定向扫描放到后台运行",
+        "reason": "后来发现后台进程没有持续",
+        "abstract": []
+      }
     },
     {
       "id": "a146",
@@ -1262,7 +1855,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 10.88
+      "t_min": 10.88,
+      "ladder": {
+        "topic": "CompiledKernel",
+        "takeaway": "趁扫描时读 CompiledKernel 启动 API",
+        "reason": "想找比普通 launch 更便宜的路径",
+        "abstract": [
+          {
+            "event": "main:E145",
+            "quote": "While the tuning sweep runs, let me examine Triton's compiled-kernel launch API for a cheaper launch path."
+          }
+        ]
+      }
     },
     {
       "id": "a148",
@@ -1318,7 +1922,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 11.85
+      "t_min": 11.85,
+      "ladder": {
+        "topic": "32 个参数",
+        "takeaway": "直接启动报错：launcher 要 32 个参数，只给了 26 个",
+        "reason": "快速路径写法不对",
+        "abstract": [
+          {
+            "event": "main:E155",
+            "quote": "TypeError: function takes exactly 32 arguments (26 given)"
+          }
+        ]
+      }
     },
     {
       "id": "a158",
@@ -1339,7 +1954,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 12.01
+      "t_min": 12.01,
+      "ladder": {
+        "topic": "主机各层",
+        "takeaway": "放弃脆弱的绕过写法，改量主机各层耗时",
+        "reason": "arity 错误说明手写参数不稳",
+        "abstract": [
+          {
+            "event": "main:E157",
+            "quote": "The fast-path bypass is fragile (arg-count mismatch) — I'll drop it. Let me measure exactly where host time goes."
+          }
+        ]
+      },
+      "move": "pivot"
     },
     {
       "id": "a161",
@@ -1357,7 +1984,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 12.21
+      "t_min": 12.21,
+      "ladder": {
+        "topic": "_lora_shrink",
+        "takeaway": "整个 _lora_shrink 63.84 µs，其中 triton launch 约 44.69 µs",
+        "reason": "去掉 launch 只剩约 11.29 µs",
+        "abstract": [
+          {
+            "event": "main:E162",
+            "quote": "triton launch full args       :  44.69us"
+          },
+          {
+            "event": "main:E162",
+            "quote": "whole _lora_shrink (1 launch) :  63.84us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a164",
@@ -1395,7 +2038,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 12.53
+      "t_min": 12.53,
+      "ladder": {
+        "topic": "profile",
+        "takeaway": "profile 显示 JIT 的 specialize_impl 和 run 占大头",
+        "reason": "说明 Python 特化逻辑是主机成本来源",
+        "abstract": [
+          {
+            "event": "main:E168",
+            "quote": "baseline: 43.45us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a170",
@@ -1433,7 +2088,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 13.13
+      "t_min": 13.13,
+      "ladder": {
+        "topic": "定向扫描",
+        "takeaway": "定向扫描只输出到 shrink 阶段，最好是 (32, 256, 4, 3) 的 27.5 µs",
+        "reason": "256 乘 256 配置超出共享内存",
+        "abstract": [
+          {
+            "event": "main:E174",
+            "quote": "shrink: (32, 256, 4, 3)=27.5 | (32, 128, 4, 3)=29.3 | (64, 256, 4, 3)=30.3 | (32, 256, 8, 3)=34.3 | (64, 128, 4, 3)=34.4 | (32, 128, 8, 3)=34.8"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a176",
@@ -1452,7 +2119,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 13.44
+      "t_min": 13.44,
+      "ladder": {
+        "topic": "后台扫描进程",
+        "takeaway": "后台扫描进程已经不在，日志只有 5 行",
+        "reason": "扫描随 shell 结束而死",
+        "abstract": [
+          {
+            "event": "main:E177",
+            "quote": "5 /tmp/pi-infra-state/scratch/tune.log"
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a180",
@@ -1473,7 +2152,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 13.5
+      "t_min": 13.5,
+      "ladder": {
+        "topic": "前台扫描",
+        "takeaway": "改为更小范围的前台扫描，只覆盖少数配置",
+        "reason": "避免再被后台退出打断",
+        "abstract": [
+          {
+            "event": "main:E179",
+            "quote": "The background tuner died with its shell session. Let me run a small, focused sweep in the foreground."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a183",
@@ -1510,7 +2201,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 14.18
+      "t_min": 14.18,
+      "ladder": {
+        "topic": "真实签名",
+        "takeaway": "读到 CUDA launcher 的真实签名",
+        "reason": "能补全缺失的 6 个参数",
+        "abstract": [
+          {
+            "event": "main:E187",
+            "quote": "def __call__(self, gridX, gridY, gridZ, stream, function, *args):"
+          }
+        ]
+      }
     },
     {
       "id": "a190",
@@ -1549,7 +2251,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 15.46
+      "t_min": 15.46,
+      "ladder": {
+        "topic": "fast launch",
+        "takeaway": "补全参数后 fast launch 17.32 µs，普通 launch 43.76 µs",
+        "reason": "输出逐位一致",
+        "abstract": [
+          {
+            "event": "main:E194",
+            "quote": "fast launch     :  17.32us"
+          },
+          {
+            "event": "main:E194",
+            "quote": "bitwise equal: True maxdiff: 0.0"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a196",
@@ -1624,7 +2342,13 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 16.06
+      "t_min": 16.06,
+      "ladder": {
+        "topic": "扫描日志",
+        "takeaway": "读扫描日志得到 no log",
+        "reason": "日志路径不存在，只能等前台结果",
+        "abstract": []
+      }
     },
     {
       "id": "a207",
@@ -1643,7 +2367,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 16.3
+      "t_min": 16.3,
+      "ladder": {
+        "topic": "前台扫描",
+        "takeaway": "前台扫描给出各形状的最佳 tile，例如 expand 用 (64, 128, 4, 1)",
+        "reason": "BLOCK_K 128 对多数形状最好",
+        "abstract": [
+          {
+            "event": "main:E208",
+            "quote": "B shrink (T=8192 groups=16 maxgrp=540): (32, 128, 4, 3)=122.0 | (32, 512, 4, 3)=138.7 | (32, 256, 4, 3)=140.2 | (64, 256, 4, 1)=142.0"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a211",
@@ -1665,7 +2401,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 16.34
+      "t_min": 16.34,
+      "ladder": {
+        "topic": "tile 配置",
+        "takeaway": "把更优 tile 配置和直接启动一起写进 kernel_utils",
+        "reason": "shrink 用 32/128，expand 用 64/128",
+        "abstract": [
+          {
+            "event": "main:E210",
+            "quote": "Tuning gives better tiles (BLOCK_M=32/BLOCK_K=128 for shrink; 64/128 for expand)"
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a217",
@@ -1688,7 +2436,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 16.95
+      "t_min": 16.95,
+      "ladder": {
+        "topic": "按名字校验",
+        "takeaway": "自己写出 bug：对元组用了 **dict，改成按名字校验",
+        "reason": "保证参数名与签名一致",
+        "abstract": [
+          {
+            "event": "main:E216",
+            "quote": "I introduced a bug (`**dict(constexprs)` on a tuple) — let me fix the launch plumbing and make it name-validated."
+          }
+        ]
+      }
     },
     {
       "id": "a223",
@@ -1707,7 +2466,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 17.28
+      "t_min": 17.28,
+      "ladder": {
+        "topic": "直接启动候选",
+        "takeaway": "直接启动候选 10 组样例全过",
+        "reason": "正确性没有因绕过 JIT 而受损",
+        "abstract": []
+      }
     },
     {
       "id": "a227",
@@ -1727,7 +2492,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 17.62
+      "t_min": 17.62,
+      "ladder": {
+        "topic": "每次调用",
+        "takeaway": "每次调用约从 64 µs 降到约 35 µs，但 wrapper 仍有成本",
+        "reason": "剩余约 5 到 7 µs 的 key 和 stream 成本",
+        "abstract": [
+          {
+            "event": "main:E226",
+            "quote": "All 10 cases still pass; per-op wall time dropped from ~64 µs to ~35 µs. Let me re-measure the host breakdown."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a230",
@@ -1765,7 +2542,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 18.25
+      "t_min": 18.25,
+      "ladder": {
+        "topic": "分解脚本",
+        "takeaway": "分解脚本报 list 没有 dtype",
+        "reason": "测试代码把列表当成张量，不是内核问题",
+        "abstract": [
+          {
+            "event": "main:E234",
+            "quote": "AttributeError: 'list' object has no attribute 'dtype'"
+          }
+        ]
+      }
     },
     {
       "id": "a236",
@@ -1804,7 +2592,19 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 18.46
+      "t_min": 18.46,
+      "ladder": {
+        "topic": "stride",
+        "takeaway": "伪造 stride 导致 misaligned address",
+        "reason": "说明 stride 整除性必须留在 key 里",
+        "abstract": [
+          {
+            "event": "main:E241",
+            "quote": "RuntimeError: CUDA error: misaligned address"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a244",
@@ -1843,7 +2643,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 18.79
+      "t_min": 18.79,
+      "ladder": {
+        "topic": "_specialization_key",
+        "takeaway": "wrapper 5.59 µs，_specialization_key 5.53 µs，stream 约 6 µs",
+        "reason": "stream 获取是单项最贵",
+        "abstract": [
+          {
+            "event": "main:E248",
+            "quote": "_specialization_key            :   5.53us"
+          },
+          {
+            "event": "main:E248",
+            "quote": "current_stream().cuda_stream   :   6.07us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a250",
@@ -1862,7 +2678,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 18.96
+      "t_min": 18.96,
+      "ladder": {
+        "topic": "raw stream",
+        "takeaway": "raw stream 只要 0.23 µs，current_stream 要 6.33 µs",
+        "reason": "约 27 倍差距",
+        "abstract": [
+          {
+            "event": "main:E251",
+            "quote": "_C._cuda_getCurrentRawStream(0)    0.23us"
+          },
+          {
+            "event": "main:E251",
+            "quote": "torch.cuda.current_stream()        6.33us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a254",
@@ -1885,7 +2717,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 19.46
+      "t_min": 19.46,
+      "ladder": {
+        "topic": "raw stream",
+        "takeaway": "改用 raw stream 并精简 stride 参数",
+        "reason": "直接采用上一步最便宜的 API",
+        "abstract": [
+          {
+            "event": "main:E253",
+            "quote": "The raw-stream API is 27× cheaper (0.23 µs vs 6.3 µs). Let me apply that plus stride-arg trimming."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a260",
@@ -1925,7 +2769,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 19.86
+      "t_min": 19.86,
+      "ladder": {
+        "topic": "新签名",
+        "takeaway": "新签名和 raw stream 路径 10 组样例全过",
+        "reason": "可以放心测局部成本",
+        "abstract": []
+      }
     },
     {
       "id": "a268",
@@ -1944,7 +2794,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 20.17
+      "t_min": 20.17,
+      "ladder": {
+        "topic": "21.65 µs",
+        "takeaway": "局部整个 op 21.65 µs，原来是 34.11 µs",
+        "reason": "主机路径已压到接近下限，可提交",
+        "abstract": [
+          {
+            "event": "main:E269",
+            "quote": "full op (fast launch, key hit) :  21.65us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a272",
@@ -1964,7 +2826,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 20.35
+      "t_min": 20.35,
+      "ladder": {
+        "topic": "提交 2",
+        "takeaway": "读到回执，best 换成提交 2，剩余 14 次",
+        "reason": "正确性通过，开发评分 33.37×",
+        "abstract": [
+          {
+            "event": "main:E273",
+            "quote": "dev_speedup: 33.37"
+          },
+          {
+            "event": "main:E273",
+            "quote": "best_so_far: submission 2, dev_speedup 33.37, dev_reward 0.2488"
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a276",
@@ -1984,7 +2862,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 22.36
+      "t_min": 22.36,
+      "ladder": {
+        "topic": "提交 2 副本",
+        "takeaway": "保存提交 2 副本，作为之后回退与对照基准",
+        "reason": "记录文件哈希，33.37× 来自主机启动成本",
+        "abstract": [
+          {
+            "event": "main:E275",
+            "quote": "Round 2: **dev_speedup 33.37** (from 18.67), correctness PASS"
+          }
+        ]
+      }
     },
     {
       "id": "a279",
@@ -2088,7 +2977,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 23.28
+      "t_min": 23.28,
+      "ladder": {
+        "topic": "identity 缓存",
+        "takeaway": "按对象 identity 缓存启动参数",
+        "reason": "相同对象 id 直接复用，跳过 specialization key",
+        "abstract": []
+      }
     },
     {
       "id": "a303",
@@ -2107,7 +3002,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 23.37
+      "t_min": 23.37,
+      "ladder": {
+        "topic": "add_inputs",
+        "takeaway": "首轮验证失败：add_inputs 样例 expand 相对误差 0.644",
+        "reason": "其余 9 组正常，只有累加样例坏",
+        "abstract": [
+          {
+            "event": "main:E304",
+            "quote": "[BAD] addinput_T4096_R16_NL8       shrink_relerr=2.948e-04 expand_relerr=6.441e-01"
+          }
+        ]
+      }
     },
     {
       "id": "a307",
@@ -2128,7 +3034,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 23.75
+      "t_min": 23.75,
+      "ladder": {
+        "topic": "最小复现",
+        "takeaway": "写 add_inputs 最小复现，隔离是直接启动还是内核改动",
+        "reason": "先确认回归来自哪一层",
+        "abstract": [
+          {
+            "event": "main:E306",
+            "quote": "A regression appeared on the `add_inputs` case."
+          }
+        ]
+      }
     },
     {
       "id": "a310",
@@ -2146,7 +3063,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 24.07
+      "t_min": 24.07,
+      "ladder": {
+        "topic": "首次调用误差",
+        "takeaway": "复现显示首次调用误差 0.644，再调用正常",
+        "reason": "问题只在缓存 miss，指向 launch 控制流",
+        "abstract": [
+          {
+            "event": "main:E311",
+            "quote": "[direct] repeat relerr=3.544e-04"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a314",
@@ -2169,7 +3098,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 24.26
+      "t_min": 24.26,
+      "ladder": {
+        "topic": "缓存 miss",
+        "takeaway": "缓存 miss 时内核被启动了两次，加了 return 修复",
+        "reason": "纯写入无害，add_inputs 会累加两遍",
+        "abstract": [
+          {
+            "event": "main:E313",
+            "quote": "Found it: on a cache miss my new code launched the kernel twice (harmless for pure writes, but `add_inputs` accumulates)."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a319",
@@ -2187,7 +3128,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 24.37
+      "t_min": 24.37,
+      "ladder": {
+        "topic": "return 修复",
+        "takeaway": "return 修复失败：首轮正常，重复调用误差变成 0.644",
+        "reason": "换位置出错，样例大面积 BAD",
+        "abstract": [
+          {
+            "event": "main:E320",
+            "quote": "[direct] repeat relerr=6.440e-01"
+          }
+        ]
+      }
     },
     {
       "id": "a323",
@@ -2208,7 +3160,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 24.78
+      "t_min": 24.78,
+      "ladder": {
+        "topic": "launch 分支",
+        "takeaway": "return 跳过了 spec 已缓存但张量是新的 launch 分支",
+        "reason": "结论：launch 必须每次恰好执行一次",
+        "abstract": [
+          {
+            "event": "main:E322",
+            "quote": "Let me restructure `_launch` so exactly one launch always happens."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a326",
@@ -2229,7 +3193,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 24.93
+      "t_min": 24.93,
+      "ladder": {
+        "topic": "重构 _launch",
+        "takeaway": "重构 _launch，保证每个分支恰好启动一次",
+        "reason": "取代打补丁式的 return",
+        "abstract": []
+      }
     },
     {
       "id": "a331",
@@ -2247,7 +3217,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 25.03
+      "t_min": 25.03,
+      "ladder": {
+        "topic": "10 组样例",
+        "takeaway": "重构后 add_inputs 与 10 组样例全部通过",
+        "reason": "误差回到 3.544e-04",
+        "abstract": [
+          {
+            "event": "main:E332",
+            "quote": "[direct] repeat relerr=3.544e-04"
+          }
+        ]
+      }
     },
     {
       "id": "a334",
@@ -2266,7 +3247,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 25.45
+      "t_min": 25.45,
+      "ladder": {
+        "topic": "21.45 µs",
+        "takeaway": "identity 缓存路径整体仍约 21.45 µs",
+        "reason": "wrapper 5.62 µs、stream 6.37 µs，没有变快",
+        "abstract": [
+          {
+            "event": "main:E335",
+            "quote": "full op (fast launch, key hit) :  21.45us"
+          }
+        ]
+      }
     },
     {
       "id": "a338",
@@ -2287,7 +3279,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 25.64
+      "t_min": 25.64,
+      "ladder": {
+        "topic": "缓存没加速",
+        "takeaway": "缓存没加速，先查它是否真的命中",
+        "reason": "别假设缓存生效",
+        "abstract": [
+          {
+            "event": "main:E337",
+            "quote": "The alias cache didn't speed things up — let me verify whether it actually hits."
+          }
+        ]
+      }
     },
     {
       "id": "a341",
@@ -2305,7 +3308,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 25.83
+      "t_min": 25.83,
+      "ladder": {
+        "topic": "alias dict hit? False",
+        "takeaway": "alias dict hit? False，命中的是 spec 缓存",
+        "reason": "alias key 构造 2.33 µs，反而更贵",
+        "abstract": [
+          {
+            "event": "main:E342",
+            "quote": "alias dict hit? False"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a345",
@@ -2325,7 +3340,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 26.01
+      "t_min": 26.01,
+      "ladder": {
+        "topic": "alias 命中",
+        "takeaway": "scratch 副本计数：200 次调用，alias 命中 199 次",
+        "reason": "alias 其实在命中，只是省不下时间",
+        "abstract": [
+          {
+            "event": "main:E344",
+            "quote": "The alias key builds in 2.3 µs yet the op didn't get faster"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a349",
@@ -2345,7 +3372,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 26.36
+      "t_min": 26.36,
+      "ladder": {
+        "topic": "replay",
+        "takeaway": "独立测得 CUDA Graph replay 约 5.00 µs，直接启动 21.01 µs",
+        "reason": "结果一致，只测了 replay 本身",
+        "abstract": [
+          {
+            "event": "main:E348",
+            "quote": "Let me measure whether a pre-captured CUDA-graph replay is actually cheaper on the host than the direct launch."
+          },
+          {
+            "event": "main:E350",
+            "quote": "graph replay only  : 5.00us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a353",
@@ -2366,7 +3409,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 26.81
+      "t_min": 26.81,
+      "ladder": {
+        "topic": "Graph 缓存",
+        "takeaway": "决定做按 identity 的 Graph 缓存，两次见到才 capture",
+        "reason": "带硬回退，目标是把 21 µs 压到 5 µs",
+        "abstract": [
+          {
+            "event": "main:E352",
+            "quote": "CUDA-graph replay is 5 µs vs 21 µs and gives identical results."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a357",
@@ -2408,7 +3463,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 27.47
+      "t_min": 27.47,
+      "ladder": {
+        "topic": "CUDA Graph 缓存",
+        "takeaway": "把 CUDA Graph 缓存整合进候选",
+        "reason": "替换原来的 launch 段",
+        "abstract": [
+          {
+            "event": "main:E360",
+            "quote": "Now I'll replace the launch section with the graph-backed version."
+          }
+        ]
+      }
     },
     {
       "id": "a367",
@@ -2448,7 +3514,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 27.75
+      "t_min": 27.75,
+      "ladder": {
+        "topic": "多 slice",
+        "takeaway": "Graph 整合正确性通过，但多 slice 形状反而更慢",
+        "reason": "qkv3slice 的 pipe 达 542 µs，capture 反复发生",
+        "abstract": [
+          {
+            "event": "main:E373",
+            "quote": "[ok ] qkv3slice_T4096_R16_NL8      shrink_relerr=2.952e-04 expand_relerr=4.874e-04"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a376",
@@ -2471,7 +3549,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 28.16
+      "t_min": 28.16,
+      "ladder": {
+        "topic": "slice offset",
+        "takeaway": "多 slice 每次建新 view，Graph key 反复变，改传 slice offset",
+        "reason": "同时加 capture 预算",
+        "abstract": [
+          {
+            "event": "main:E375",
+            "quote": "The S>1 path creates fresh view objects each call, so the graph key churns and causes repeated captures."
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a382",
@@ -2491,7 +3581,13 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 28.51
+      "t_min": 28.51,
+      "ladder": {
+        "topic": "错误行",
+        "takeaway": "替换脚本把两行拼在一起，查出错误行",
+        "reason": "需要重新换行修正",
+        "abstract": []
+      }
     },
     {
       "id": "a385",
@@ -2556,7 +3652,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 28.73
+      "t_min": 28.73,
+      "ladder": {
+        "topic": "slice offset",
+        "takeaway": "expand 包装层改传 slice offset，不再建 per slice view",
+        "reason": "配合 Graph key 稳定",
+        "abstract": [
+          {
+            "event": "main:E396",
+            "quote": "Now the launchers: pass a slice offset instead of creating per-slice views."
+          }
+        ]
+      }
     },
     {
       "id": "a402",
@@ -2574,7 +3681,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 28.87
+      "t_min": 28.87,
+      "ladder": {
+        "topic": "qkv3slice",
+        "takeaway": "Graph 加 slice offset 后 qkv3slice pipe 从 542 降到 177 µs",
+        "reason": "10 组通过，但小形状仍更慢",
+        "abstract": [
+          {
+            "event": "main:E403",
+            "quote": "[ok ] qkv3slice_T4096_R16_NL8      shrink_relerr=2.952e-04 expand_relerr=4.874e-04"
+          }
+        ]
+      }
     },
     {
       "id": "a406",
@@ -2594,7 +3712,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 29.33
+      "t_min": 29.33,
+      "ladder": {
+        "topic": "Graph 净省",
+        "takeaway": "Graph 净省约 2 µs，不值得冒险，回头对照提交 2",
+        "reason": "key 开销吃掉 replay 收益",
+        "abstract": [
+          {
+            "event": "main:E405",
+            "quote": "Graphs only save ~2 µs net here (the key overhead eats the replay gain) — not worth the risk."
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a410",
@@ -2617,7 +3747,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 29.5
+      "t_min": 29.5,
+      "ladder": {
+        "topic": "删除 Graph",
+        "takeaway": "删除 Graph 路径，换成更简单的 same objects 快速路径",
+        "reason": "保留 identity 缓存",
+        "abstract": [
+          {
+            "event": "main:E409",
+            "quote": "Let me replace the graph path with a simpler, airtight \"same objects\" fast path."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a415",
@@ -2635,7 +3777,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 30.41
+      "t_min": 30.41,
+      "ladder": {
+        "topic": "去掉 Graph",
+        "takeaway": "去掉 Graph 后局部调用约 17 µs，10 组样例通过",
+        "reason": "qkv3slice 的 shrink 计时仍有噪声",
+        "abstract": [
+          {
+            "event": "main:E416",
+            "quote": "[ok ] T2048_H2048_R8_NL8_out2048   shrink_relerr=3.558e-04 expand_relerr=3.956e-04"
+          }
+        ]
+      }
     },
     {
       "id": "a419",
@@ -2656,7 +3809,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 30.95
+      "t_min": 30.95,
+      "ladder": {
+        "topic": "对照 A/B",
+        "takeaway": "担心 S=3 形状回退，写与提交 2 的对照 A/B",
+        "reason": "目的是排除真实回归",
+        "abstract": [
+          {
+            "event": "main:E418",
+            "quote": "Let me verify the S=3 case isn't a real regression with a controlled A/B against the round-2 version."
+          }
+        ]
+      }
     },
     {
       "id": "a422",
@@ -2693,7 +3857,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 31.64
+      "t_min": 31.64,
+      "ladder": {
+        "topic": "每个形状",
+        "takeaway": "A/B 显示当前候选每个形状快 3 到 5 µs",
+        "reason": "但 A/B 反复使用同一批对象，没测 fresh",
+        "abstract": [
+          {
+            "event": "main:E426",
+            "quote": "ops          a: sh=17.9 ex=17.4 | sh=18.0 ex=16.8 | sh=16.7 ex=17.0"
+          }
+        ]
+      },
+      "move": "open"
     },
     {
       "id": "a429",
@@ -2713,7 +3889,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 32.15
+      "t_min": 32.15,
+      "ladder": {
+        "topic": "决定提交 3",
+        "takeaway": "语法与禁用词检查后决定提交 3",
+        "reason": "只用复用对象 A/B 做依据",
+        "abstract": [
+          {
+            "event": "main:E428",
+            "quote": "Clean A/B shows the current version is ~3-5 µs/op faster than round 2 on every shape."
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a431",
@@ -2731,7 +3919,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 32.25
+      "t_min": 32.25,
+      "ladder": {
+        "topic": "提交 3",
+        "takeaway": "提交 3 评分 30.83×，低于提交 2 的 33.37×",
+        "reason": "正确性通过，best_so_far 仍是提交 2",
+        "abstract": [
+          {
+            "event": "main:E432",
+            "quote": "best_so_far: submission 2, dev_speedup 33.37"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a435",
@@ -2752,7 +3952,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 34.01
+      "t_min": 34.01,
+      "ladder": {
+        "topic": "fresh 对象",
+        "takeaway": "提交 3 局部更快却评分退步，写 fresh 对象对比脚本",
+        "reason": "怀疑评测每次传新张量",
+        "abstract": [
+          {
+            "event": "main:E434",
+            "quote": "Round 3 scored **30.83** vs round 2's 33.37, despite being 3-5 µs/op faster locally with *reused* tensors."
+          }
+        ]
+      }
     },
     {
       "id": "a438",
@@ -2770,7 +3981,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 34.38
+      "t_min": 34.38,
+      "ladder": {
+        "topic": "fresh",
+        "takeaway": "identity 缓存 stable 17.0 µs 比 v2 快，fresh 65.5 µs 反而慢",
+        "reason": "对象复用与否决定收益，评测更像 fresh",
+        "abstract": [
+          {
+            "event": "main:E439",
+            "quote": "ops        fresh= 65.46us  stable= 17.01us  (alloc-only 48.46)"
+          },
+          {
+            "event": "main:E439",
+            "quote": "scratch    fresh= 61.08us  stable= 21.89us  (alloc-only 39.20)"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a442",
@@ -2793,7 +4020,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 34.7
+      "t_min": 34.7,
+      "ladder": {
+        "topic": "identity 快捷路径",
+        "takeaway": "让 identity 快捷路径在连续 miss 后自行关闭",
+        "reason": "想保住 stable 收益，又不拖累 fresh",
+        "abstract": [
+          {
+            "event": "main:E441",
+            "quote": "The evidence suggests the harness may pass new tensor objects each call (so an identity cache never hits but still costs)."
+          }
+        ]
+      }
     },
     {
       "id": "a448",
@@ -2831,7 +4069,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 35.27
+      "t_min": 35.27,
+      "ladder": {
+        "topic": "rotating",
+        "takeaway": "rotating 对象仍比 v2 慢，identity 方案放弃",
+        "reason": "24.68 对 22.41 µs，自适应关闭也没救回",
+        "abstract": [
+          {
+            "event": "main:E452",
+            "quote": "scratch    rotating= 22.41us  stable= 21.68us"
+          },
+          {
+            "event": "main:E452",
+            "quote": "ops        rotating= 24.68us  stable= 23.72us"
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a454",
@@ -2850,7 +4104,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 35.81
+      "t_min": 35.81,
+      "ladder": {
+        "topic": "v2 副本",
+        "takeaway": "对照 v2 副本 diff，确认要改的范围",
+        "reason": "为回退重做特化键做准备",
+        "abstract": [
+          {
+            "event": "main:E455",
+            "quote": "--- v2_33.37/kernel_utils.py"
+          }
+        ]
+      }
     },
     {
       "id": "a458",
@@ -2870,7 +4135,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 35.99
+      "t_min": 35.99,
+      "ladder": {
+        "topic": "v2 的 kernel_utils",
+        "takeaway": "恢复 v2 的 kernel_utils，拆分参数元组重做特化键",
+        "reason": "放弃 identity 缓存，在已验证设计上降成本",
+        "abstract": [
+          {
+            "event": "main:E457",
+            "quote": "Round 3's identity cache didn't pay off in the harness."
+          }
+        ]
+      },
+      "move": "pivot"
     },
     {
       "id": "a461",
@@ -2946,7 +4223,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 36.89
+      "t_min": 36.89,
+      "ladder": {
+        "topic": "key 函数签名",
+        "takeaway": "重做后首次验证失败：key 函数签名未同步",
+        "reason": "TypeError: 需要 2 个参数却传入 3 个",
+        "abstract": [
+          {
+            "event": "main:E471",
+            "quote": "TypeError: _specialization_key() takes 2 positional arguments but 3 were given"
+          }
+        ]
+      }
     },
     {
       "id": "a473",
@@ -2987,7 +4275,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 37.49
+      "t_min": 37.49,
+      "ladder": {
+        "topic": "特化 key",
+        "takeaway": "把特化 key 的形参改成 tensors、scalars、constexprs",
+        "reason": "对应 launch 的三元调用",
+        "abstract": [
+          {
+            "event": "main:E477",
+            "quote": "Successfully replaced 1 block(s) in vllm/lora/ops/triton_ops/kernel_utils.py."
+          }
+        ]
+      }
     },
     {
       "id": "a482",
@@ -3046,7 +4345,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 37.66
+      "t_min": 37.66,
+      "ladder": {
+        "topic": "float 标量",
+        "takeaway": "第二个错误：float 标量被当作整数做 & 15",
+        "reason": "key 函数缺少 float 分支",
+        "abstract": [
+          {
+            "event": "main:E491",
+            "quote": "unsupported operand type(s) for &: 'float' and 'int'"
+          }
+        ]
+      }
     },
     {
       "id": "a493",
@@ -3068,7 +4378,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 38.22
+      "t_min": 38.22,
+      "ladder": {
+        "topic": "float 参数",
+        "takeaway": "为 float 参数单独分派特化键，不再位运算",
+        "reason": "让 float 与 int、bool 各走自己的分支",
+        "abstract": [
+          {
+            "event": "main:E494",
+            "quote": "Successfully replaced 1 block(s) in vllm/lora/ops/triton_ops/kernel_utils.py."
+          }
+        ]
+      }
     },
     {
       "id": "a498",
@@ -3105,7 +4426,23 @@
       "outcome": "partial",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 38.87
+      "t_min": 38.87,
+      "ladder": {
+        "topic": "rotating",
+        "takeaway": "10 组样例通过，rotating 19.74 µs 比 v2 的 22.04 快",
+        "reason": "旧 micro 脚本失败，单独记录",
+        "abstract": [
+          {
+            "event": "main:E502",
+            "quote": "ops        rotating= 19.74us  stable= 19.30us"
+          },
+          {
+            "event": "main:E502",
+            "quote": "scratch    rotating= 22.04us  stable= 21.58us"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a505",
@@ -3125,7 +4462,22 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 39.14
+      "t_min": 39.14,
+      "ladder": {
+        "topic": "提交 4",
+        "takeaway": "提交 4 开发评分 35.44，相对提交 2 提高约 6%",
+        "reason": "fresh 与 stable 都快约 2.3 µs",
+        "abstract": [
+          {
+            "event": "main:E504",
+            "quote": "the new version is ~2.3 µs/op faster in *both* the fresh-tensor and stable-tensor patterns (19.7 µs vs 22.0 µs)."
+          },
+          {
+            "event": "main:E506",
+            "quote": "dev_speedup: 35.44"
+          }
+        ]
+      }
     },
     {
       "id": "a509",
@@ -3146,7 +4498,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 40.95
+      "t_min": 40.95,
+      "ladder": {
+        "topic": "边界测试",
+        "takeaway": "写 19 组边界测试，防止隐藏样例出意外",
+        "reason": "涵盖 bf16、fp32、rank、offset、非连续视图",
+        "abstract": [
+          {
+            "event": "main:E508",
+            "quote": "Round 4: **dev_speedup 35.44** (new best), correctness PASS."
+          }
+        ]
+      }
     },
     {
       "id": "a512",
@@ -3164,7 +4527,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 41.48
+      "t_min": 41.48,
+      "ladder": {
+        "topic": "offset",
+        "takeaway": "边界测试中断：参考脚本 offset 用例形状错误",
+        "reason": "是测试脚本的错，不是内核的错",
+        "abstract": [
+          {
+            "event": "main:E513",
+            "quote": "RuntimeError: shape mismatch: value tensor of shape [58, 512] cannot be broadcast to indexing result of shape [58, 256]"
+          }
+        ]
+      }
     },
     {
       "id": "a515",
@@ -3185,7 +4559,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 41.73
+      "t_min": 41.73,
+      "ladder": {
+        "topic": "19 组边界测试",
+        "takeaway": "修好参考脚本，19 组边界测试全部通过",
+        "reason": "首次 fp16、bf16、fp32 等用例已通过，其余 offset 用例补齐",
+        "abstract": [
+          {
+            "event": "main:E516",
+            "quote": "ALL OK"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a519",
@@ -3206,7 +4592,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 41.98
+      "t_min": 41.98,
+      "ladder": {
+        "topic": "launcher 成本",
+        "takeaway": "写测试，量参数个数对 launcher 成本的影响",
+        "reason": "决定是否值得继续削减参数",
+        "abstract": [
+          {
+            "event": "main:E518",
+            "quote": "Let me check how much the launcher cost depends on argument count"
+          }
+        ]
+      }
     },
     {
       "id": "a522",
@@ -3224,7 +4621,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 42.36
+      "t_min": 42.36,
+      "ladder": {
+        "topic": "0.029 µs",
+        "takeaway": "直接 launch 每多一个参数只增加 0.029 µs",
+        "reason": "6 参数 6.04 µs，21 参数 6.47 µs，不再削减参数",
+        "abstract": [
+          {
+            "event": "main:E523",
+            "quote": "direct launch  6 args:  6.04us   21 args:  6.47us   -> 0.029us per extra argument"
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a526",
@@ -3244,7 +4653,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 42.49
+      "t_min": 42.49,
+      "ladder": {
+        "topic": "保存提交 4",
+        "takeaway": "保存提交 4 副本，再试最后一个主机侧削减",
+        "reason": "去掉 alignment 特化",
+        "abstract": [
+          {
+            "event": "main:E525",
+            "quote": "The launcher cost is nearly independent of arg count (0.03 µs/arg), so I'll stop trimming args."
+          }
+        ]
+      }
     },
     {
       "id": "a529",
@@ -3281,7 +4701,23 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 43.34
+      "t_min": 43.34,
+      "ladder": {
+        "topic": "alignment 特化",
+        "takeaway": "去掉 alignment 特化后正确性通过，局部略慢",
+        "reason": "rotating 20.32 µs，对比 v4 的 19.74 µs",
+        "abstract": [
+          {
+            "event": "main:E532",
+            "quote": "scratch    rotating= 20.32us  stable= 20.20us"
+          },
+          {
+            "event": "main:E532",
+            "quote": "ALL OK"
+          }
+        ]
+      },
+      "move": "insight"
     },
     {
       "id": "a535",
@@ -3303,7 +4739,19 @@
       "outcome": "running",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 43.71
+      "t_min": 43.71,
+      "ladder": {
+        "topic": "恢复提交 4",
+        "takeaway": "恢复提交 4 全部文件并复验，哈希一致",
+        "reason": "只凭局部计时放弃该变体，未提交评分",
+        "abstract": [
+          {
+            "event": "main:E534",
+            "quote": "The extra alignment-specialization skip measured slightly *slower* — reverting to the verified best version."
+          }
+        ]
+      },
+      "move": "ruleout"
     },
     {
       "id": "a539",
@@ -3323,7 +4771,18 @@
       "outcome": "failure",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 44.3
+      "t_min": 44.3,
+      "ladder": {
+        "topic": "schema 拒绝",
+        "takeaway": "首次 finalize 被工具 schema 拒绝，尚未执行",
+        "reason": "附带了多余的参数",
+        "abstract": [
+          {
+            "event": "main:E540",
+            "quote": "Validation failed for tool \"shell\":"
+          }
+        ]
+      }
     },
     {
       "id": "a541",
@@ -3341,7 +4800,19 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 44.39
+      "t_min": 44.39,
+      "ladder": {
+        "topic": "finalize",
+        "takeaway": "finalize 成功，最终选中提交 4",
+        "reason": "第 4 次提交，共 16 次中只用了 4 次",
+        "abstract": [
+          {
+            "event": "main:E542",
+            "quote": "finalized: submission 4 at k=4/16 (planted via read-tree); the grader will now score /app/repo"
+          }
+        ]
+      },
+      "move": "decision"
     },
     {
       "id": "a544",
@@ -3379,7 +4850,18 @@
       "outcome": "success",
       "classification_reason": "依据原始命令的主要目的、返回结果及邻近发言人工标注。该节点包含原始工具调用及完整匹配回执；混合操作按主要目的归类。",
       "classification_basis": "analyst",
-      "t_min": 44.56
+      "t_min": 44.56,
+      "ladder": {
+        "topic": "提交 4 副本",
+        "takeaway": "最终三个文件哈希等于提交 4 副本",
+        "reason": "kernel_utils 哈希 39789882 一致",
+        "abstract": [
+          {
+            "event": "main:E548",
+            "quote": "39789882de3d28b3fce0a48d06c26456  vllm/lora/ops/triton_ops/kernel_utils.py"
+          }
+        ]
+      }
     },
     {
       "id": "final-report",
@@ -3396,7 +4878,19 @@
       "outcome": "reported",
       "classification_reason": "对已完成工作与测试结果的事后核对和汇总，不是新的测量。",
       "classification_basis": "analyst",
-      "t_min": 44.63
+      "t_min": 44.63,
+      "ladder": {
+        "topic": "剩余空间",
+        "takeaway": "最终报告：剩余空间在主机 Python，低于评分波动",
+        "reason": "identity 缓存和 alignment 变体都只靠局部计时否决，没测更多输入模式",
+        "abstract": [
+          {
+            "event": "main:E549",
+            "quote": "Remaining headroom is host-side Python (wrapper ~4.5 µs + key ~4 µs of ~19.5 µs) — below this metric's run-to-run spread."
+          }
+        ]
+      },
+      "move": "open"
     }
   ],
   "links": [
@@ -4907,6 +6401,183 @@
       "evidence": "原始会话中的最终总结。",
       "events": [
         "main:E549"
+      ]
+    },
+    {
+      "source": "a102",
+      "target": "a106",
+      "kind": "informs",
+      "evidence": "纯设备耗时远低于墙钟，所以转去读 Triton 启动路径找开销。",
+      "events": [
+        "main:E105"
+      ]
+    },
+    {
+      "source": "a88",
+      "target": "a92",
+      "kind": "informs",
+      "evidence": "各样例都约 200 µs，促使关掉诊断重测主机成本。",
+      "events": [
+        "main:E91"
+      ]
+    },
+    {
+      "source": "a102",
+      "target": "a123",
+      "kind": "informs",
+      "evidence": "确认设备时间已很小，足够先提交第一版。",
+      "events": [
+        "main:E122"
+      ]
+    },
+    {
+      "source": "a161",
+      "target": "a211",
+      "kind": "informs",
+      "evidence": "主机各层测量显示 launch 占 44.69 µs，所以把直接启动写进候选",
+      "events": [
+        "main:E162",
+        "main:E210"
+      ]
+    },
+    {
+      "source": "a193",
+      "target": "a211",
+      "kind": "informs",
+      "evidence": "fast launch 17 µs 且逐位一致，所以写进候选",
+      "events": [
+        "main:E194",
+        "main:E210"
+      ]
+    },
+    {
+      "source": "a207",
+      "target": "a211",
+      "kind": "informs",
+      "evidence": "前台扫描给出最佳 tile，所以写入配置",
+      "events": [
+        "main:E208",
+        "main:E210"
+      ]
+    },
+    {
+      "source": "a250",
+      "target": "a254",
+      "kind": "informs",
+      "evidence": "raw stream 比 current_stream 便宜 27 倍，所以改用",
+      "events": [
+        "main:E251",
+        "main:E253"
+      ]
+    },
+    {
+      "source": "a268",
+      "target": "a272",
+      "kind": "informs",
+      "evidence": "局部成本降到 21.65 µs 且通过，所以提交 2",
+      "events": [
+        "main:E269",
+        "main:E271"
+      ]
+    },
+    {
+      "source": "a341",
+      "target": "a345",
+      "kind": "informs",
+      "evidence": "alias 未命中的测量让 agent 去给 scratch 副本插桩计数命中",
+      "events": [
+        "main:E342",
+        "main:E344"
+      ]
+    },
+    {
+      "source": "a349",
+      "target": "a353",
+      "kind": "informs",
+      "evidence": "replay 5 µs 对 21 µs 的测量让 agent 决定做 Graph 缓存",
+      "events": [
+        "main:E350",
+        "main:E352"
+      ]
+    },
+    {
+      "source": "a372",
+      "target": "a376",
+      "kind": "informs",
+      "evidence": "qkv 多 slice 变慢让 agent 改传 slice offset 稳定 Graph key",
+      "events": [
+        "main:E373",
+        "main:E375"
+      ]
+    },
+    {
+      "source": "a406",
+      "target": "a410",
+      "kind": "informs",
+      "evidence": "Graph 只省约 2 µs，于是删掉 Graph 保留更简单的快速路径",
+      "events": [
+        "main:E405",
+        "main:E409"
+      ]
+    },
+    {
+      "source": "a425",
+      "target": "a431",
+      "kind": "informs",
+      "evidence": "复用对象的 A/B 显示更快，agent 据此提交了提交 3",
+      "events": [
+        "main:E426",
+        "main:E428"
+      ]
+    },
+    {
+      "source": "a431",
+      "target": "a451",
+      "kind": "informs",
+      "evidence": "提交 3 评分退步触发后续 fresh 与 rotating 对象对照",
+      "events": [
+        "main:E432",
+        "main:E451"
+      ]
+    },
+    {
+      "source": "a438",
+      "target": "a442",
+      "kind": "informs",
+      "evidence": "fresh 对象下反而更慢，促使加入自适应关闭",
+      "events": [
+        "main:E439",
+        "main:E441"
+      ]
+    },
+    {
+      "source": "a451",
+      "target": "a458",
+      "kind": "informs",
+      "evidence": "rotating 仍慢于 v2，于是放弃 identity 回到 v2",
+      "events": [
+        "main:E452",
+        "main:E457"
+      ]
+    },
+    {
+      "source": "a522",
+      "target": "a526",
+      "kind": "informs",
+      "evidence": "参数个数成本极低，所以停止削减参数转试 alignment",
+      "events": [
+        "main:E523",
+        "main:E525"
+      ]
+    },
+    {
+      "source": "a531",
+      "target": "a535",
+      "kind": "informs",
+      "evidence": "去掉 alignment 局部略慢，所以恢复提交 4",
+      "events": [
+        "main:E532",
+        "main:E534"
       ]
     }
   ],
@@ -15826,5 +17497,21 @@
       "Verify": 26,
       "Diagnose": 26
     }
-  }
+  },
+  "journey": {
+    "text": "起点是逐 adapter 的 Python 循环（3 到 17 ms）。分组 Triton 内核先拿到 18.67×，诊断随即显示瓶颈在主机启动而不在 GPU。于是改为直接启动 CompiledKernel 加 raw stream，得到 33.37×。CUDA Graph 因整合后只省约 2 µs 被排除；identity 缓存让提交 3 退到 30.83×，对照 fresh 与 rotating 对象后放弃。agent 回到提交 2 的代码重做特化键，提交 4 达到 35.44× 并被选中。仍未解决：identity 缓存和 alignment 变体都只凭局部计时否决，更多输入模式没有测。",
+    "cites": [
+      "s0-baseline",
+      "s0-diagnostic",
+      "s1-direct",
+      "s1-stream",
+      "s2-graph",
+      "s3-compare",
+      "s3-rebase",
+      "s4-alignment",
+      "s4-finalize",
+      "final-report"
+    ]
+  },
+  "language": "zh"
 }

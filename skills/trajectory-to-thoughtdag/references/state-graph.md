@@ -73,7 +73,7 @@ python3 /path/to/skill/scripts/build_state_graph.py state-analysis.json \
 
 The recommended file is a standalone `format: coding-agent-state-trajectory`, `version: 1`
 graph with the complete redacted timeline and sources. Import it directly in the local viewer.
-Use `--format canvas` (the compatibility default when the flag is absent) to get a v1
+The default format is `state`. Use explicit `--format canvas` to get a v1
 ThoughtDAG backup, whose first state's `data.stateTrajectory` holds the same graph.
 No records are deleted on collapse. Privacy/redaction rules still apply.
 
@@ -88,6 +88,14 @@ matching measurement scopes and protocols. Historical final selection is not a f
 Executed alternatives that are later abandoned remain branch `status: attempted` and use an
 exploration observation with `disposition: rejected`; branch `rejected` means untried.
 
+## Reading-layer authoring
+
+For a new viewer export, include `ladder` on every state/branch and important action,
+`move` on evidenced turns, `informs` links and a cited graph-level `journey`. Follow
+[reading-layer.md](reading-layer.md). Use `--require-reading-layer --quality-report report.json`
+to check structural coverage; inspect its evidence gaps before delivery. Existing files
+without the extension remain valid and start with all actions visible.
+
 ## Reader support
 
 Stock ThoughtDAG at inspected commit `f1afae2688291079dd743a49a40ff6cfd0de137e` only folds a
@@ -98,7 +106,7 @@ The reader accepts the canvas backup above or its extracted `stateTrajectory` ob
 Default: state nodes only. Expand a state for branches, expand a branch for actions.
 When endpoints are collapsed, relevant cross-links aggregate onto visible ancestors;
 when opened, links return to the exact action endpoints. Full raw evidence remains searchable.
-The reader parses locally and does not call models or upload logs. Ordinary real logs belong in ignored local-data. The explicitly approved private Pi example is bundled separately under examples; keep it private when sharing a build.
+Importing and rendering are local. Optional chat sends selected context only when the user invokes it. Ordinary real logs belong in ignored local-data. The explicitly approved private Pi example is bundled separately under examples; publish only examples the user has authorized for that destination.
 
 ## Exploration, review and measurement observations
 

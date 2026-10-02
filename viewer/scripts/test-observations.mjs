@@ -3,7 +3,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
 const code = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/model.ts',import.meta.url),'utf8'));
 const {parseGraph, observationsFor} = await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
-const fixture = JSON.parse(readFileSync(new URL('../public/examples/parser.agent-state.json',import.meta.url),'utf8'));
+const fixture = JSON.parse(readFileSync(new URL('./fixtures/parser.agent-state.json',import.meta.url),'utf8'));
 const original = JSON.stringify(fixture);
 const g = parseGraph(fixture);
 assert.equal(new Set(g.observations.map(o=>o.kind)).size,7);

@@ -41,7 +41,16 @@ that review. Allowed kinds: `review_request`, `review_return`. Missing timestamp
 unknown invocation positions remain unknown. A request with no recorded return must
 not get an invented return edge. Changing input logs can renumber events; recheck links.
 
-## 2. Write the analysis
+## 2. Default state-view export
+
+Use the merged timeline to write `state-analysis.json` following [state-graph.md](state-graph.md),
+[observations.md](observations.md) and [reading-layer.md](reading-layer.md). Preserve namespaced
+event IDs, actor labels and evidenced review handoffs. Build with `build_state_graph.py
+--format state --require-reading-layer`. The complete source records stay in that one file.
+
+The phase/canvas sections below apply only to explicit legacy ThoughtDAG requests.
+
+## 3. Legacy canvas analysis
 
 Read every timeline part and cite events. See [analysis-schema.md](analysis-schema.md).
 Use `actor` and `category` alongside `kind`, for example:
@@ -54,7 +63,7 @@ S9 must be an actual, separately evidenced decision by the main agent. Do not tr
 reviewer's performance claim as a measured result. Distinguish request, returned verdict,
 main-agent response and actual validation. Keep analyst interpretation in `analyst`.
 
-## 3. Build one file with both layers
+## 4. Legacy canvas build
 
 ```sh
 python3 /absolute/skill/scripts/build_canvas.py /absolute/work/analysis.json --timeline /absolute/work/extracted/timeline.json --with-event-graph --out /absolute/work/task.thoughtdag.json

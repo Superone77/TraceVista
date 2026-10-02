@@ -1,8 +1,8 @@
 /** Resolve bundled examples and opt-in local data without accepting external URLs. */
 export interface Dataset { id: string; title: string; file: string; description: string }
 export function datasetRequest(search: string, catalog: Dataset[], base = './'): string | null {
-  const p = new URLSearchParams(search), example = p.get('example'), data = p.get('data');
-  if (example === '1') return null; // Legacy in-memory synthetic example.
+  const p = new URLSearchParams(search), requested = p.get('example'), data = p.get('data');
+  const example = requested === '1' ? 'pi-infra-r1' : requested; // Legacy demo link opens the bundled Pi example.
   if (example) {
     const item = catalog.find(d => d.id === example);
     if (!item || !/^[a-zA-Z0-9_-]+\.agent-state\.json$/.test(item.file)) throw new Error('未找到这个内置示例。');
