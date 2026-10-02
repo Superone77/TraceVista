@@ -12,7 +12,7 @@
 
 内置示例：`?example=pi-infra-r1`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
-生产构建只打包内置示例，排除 local-data。已获准收录的 Pi 是私有示例，部署时需保持访问范围。
+生产构建只打包内置示例，排除 local-data。Pi 是当前获准公开的内置示例。
 
 ## 四层缩放
 
@@ -73,7 +73,7 @@
 不合法的文件显示错误，保留已打开的图。内容按文本渲染，不执行日志中的 HTML 或命令。
 
 原始 JSONL 需要先经来源适配器和状态标注转换；当前不声称能从任意日志自动推断完整系统状态。
-现有 `skills/trajectory-to-thoughtdag/scripts/build_state_graph.py` 导出可以直接使用。
+现有 `skills/tracevista-skill/scripts/build_state_graph.py` 导出可以直接使用。
 同一代码哈希可能回滚后再次出现，这时应使用新的观察状态 ID，不能把时间历史画成状态循环。
 
 只有成功的 Edit / Execute 且快照中确有差异，才能生成状态转换。
@@ -92,7 +92,7 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 - **连线避让**：跨分支连线遇到卡片时会侧向弯曲绕开。
 - **工具指纹**：⌨️ 运行、📖 读取、✏️ 编辑、🔍 搜索各自的调用次数，可以看出某个方向"读得多还是跑得多"。
 
-字段说明和写作规范见 `skills/trajectory-to-thoughtdag/references/reading-layer.md`。阅读层属于分析者标注，不会替代原始证据。
+字段说明和写作规范见 `skills/tracevista-skill/references/reading-layer.md`。阅读层属于分析者标注，不会替代原始证据。
 
 ## 追问这条轨迹（可选，浏览器直连模型）
 
@@ -157,7 +157,7 @@ state PASS. Measurements preserve scope, protocol, baseline and historical/fresh
 State color still uses an explicitly authored `assessment`; it never picks the largest metric
 or mixes measurement scopes automatically.
 
-The compiler contract and analyst guidance live in `skills/trajectory-to-thoughtdag/` and its
+The compiler contract and analyst guidance live in `skills/tracevista-skill/` and its
 `references/observations.md`. Validators check references, types, hierarchy cycles, task/resource
 identity, review-stage relationships, matching code identities for unchanged-code claims, and
 outcome categories. They cannot prove that an analyst's semantic interpretation is true.
@@ -175,3 +175,9 @@ Pi/LoRA-specific interpretation rules.
 部分标注的图默认显示全部行为，工具栏提示阅读层尚不完整。用户仍能主动选择“只看决策”；完整标注的图才默认折叠常规行为。旧文件仍可导入。
 
 模型选择使用真正的下拉框，不会按当前 ID 过滤列表。`name` / `display_name` 用于显示，请求始终使用 `id`。回复预留为 Anthropic 4,096 / OpenAI 兼容接口 16,384 tokens，并受接口报告的输出上限约束；请求同步携带相同的输出限制。窗口与输出额度共用，最终计数和限制由模型服务执行。
+
+## 从 tracevista-skill 打开
+
+`create_handoff.py` 生成完整 JSON 和本地 HTML 概览。HTML 的 **Open in TraceVista** 按钮通过浏览器窗口消息将文件交给查看器，无需手动再次选文件。接收入口只在专用 URL fragment 下启用，校验来源窗口、origin 和随机 token，再走同一套导入检查；不会自动开启追问。普通首页和原来的文件导入保持不变。
+
+交接页支持直接打开本地文件或由 localhost 提供；最多传递 64 MiB，超时或弹窗受限时可下载 JSON 并手动导入。源文件、session revision 和交接页都保存在本地，构建不包含它们。详情见 [交接协议](../skills/tracevista-skill/references/handoff.md)。

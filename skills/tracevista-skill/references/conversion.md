@@ -1,33 +1,4 @@
----
-name: trajectory-to-thoughtdag
-description: Convert Claude Code, Codex or Pi logs into a self-contained state graph with zoom summaries, decisions and cited raw evidence for the repository viewer. Supports main/reviewer sessions and optional legacy ThoughtDAG canvas export.
----
-
-# Agent trajectory → readable state graph
-
-## Default deliverable
-
-Produce one `.agent-state.json` for this repository's `viewer/`, including the complete
-redacted timeline, source records, state/action structure and a reading layer. A reader
-should understand the run's alternatives, turns, result and open questions, then zoom into
-literal evidence. Keep interpretations distinct from recorded facts and actor identity
-separate from behavior. Use the user's language for labels.
-
-Read [state-graph.md](references/state-graph.md), [observations.md](references/observations.md)
-and [reading-layer.md](references/reading-layer.md) when authoring a new export.
-For multiple sessions, also read [multi-agent.md](references/multi-agent.md).
-For an explicit stock ThoughtDAG request, use [legacy-canvas.md](references/legacy-canvas.md)
-and [analysis-schema.md](references/analysis-schema.md) instead of the state authoring path.
-
-```
-raw sessions → extract_timeline.py → timeline.json + timeline.md
-                                         ↓ analyst reads evidence
-                                  state-analysis.json
-                           structure + observations + reading layer
-                                         ↓ build_state_graph.py
-                                  task.agent-state.json
-                                  reading-quality.json
-```
+# Converting raw sessions
 
 ## 1. Identify and extract the input
 
@@ -56,7 +27,7 @@ reusing citations. Record which structure was reused and which interpretations w
 
 ## 2. Author structure and the reading layer together
 
-Read all timeline parts, then write `state-analysis.json` following the referenced contracts.
+Read all timeline parts, then write `state-analysis.json` following [state-graph.md](state-graph.md), [observations.md](observations.md) and [reading-layer.md](reading-layer.md).
 Declare the tracked state scope. Only evidenced successful Edit/Execute effects in that scope
 create states; tests and new knowledge attach to the existing state. Code ancestry, observed
 chronology and informational dependencies are independent relationships. Serial attempts can
@@ -82,7 +53,7 @@ For the current viewer, author these reading fields by default:
 
 A child's takeaway explains what it adds; it must not repeat its parent's conclusion.
 Use measurements with their scope and retain uncertainty. Quoted excerpts are navigation aids;
-the full source text remains in the export. See reading-layer.md for budgets and evidence rules.
+the full source text remains in the export. See [reading-layer.md](reading-layer.md) for budgets and evidence rules.
 
 ## 3. Build, inspect coverage and review meaning
 
@@ -109,26 +80,7 @@ python3 /absolute/skill/scripts/ladder.py /absolute/work/old.agent-state.json \
   --quality-report /absolute/work/reading-quality.json --out /absolute/work/new.agent-state.json
 ```
 
-Open the export in the local viewer. Check the overview, a rejected/restored path if present,
+Open the export in TraceVista. Check the overview, a rejected/restored path if present,
 an evidence-to-decision link and a raw-record card. Verify that folding is reversible and that
 important steps remain reachable. Default folding requires complete structural reading coverage;
 partial annotations start with all actions visible. Check both the JSON and the actual page.
-
-## 4. Deliver a reproducible local result
-
-Provide the full JSON, the quality report, the input identity and the local preview location.
-State any reused annotations and remaining evidence gaps. A file that merely validates is not
-proof that its reasoning map is useful. When comparing exports, use the same raw records and
-open both versions in the same engine. Do not rerun the underlying experiment for conversion.
-
-## Data handling and script maintenance
-
-Keep ordinary logs, input manifests and generated exports in ignored `.work/` or local-data;
-only explicitly approved examples belong in Git or a published build. Extraction redacts
-patterns; repeatable `--secret-file` can match known local credential values without copying
-them. Never print credentials. `--no-redact` is only for explicit user requests. Preserve full
-redacted source attachments and keep generated files private (600; directories 700).
-
-The scripts use Python's standard library and make no model calls. The invoking agent authors
-the reading layer; optional viewer chat is separate. After script changes, run the skill tests;
-for viewer changes also run the repository's `pnpm test` and `pnpm build`.

@@ -27,7 +27,7 @@ documentation. Its proxy, OAuth and subscription bridges are not included.
 
 ## Conversion skill
 
-`skills/trajectory-to-thoughtdag` is copied from the user's local private skill repository
+`skills/tracevista-skill` is copied from the user's local private skill repository
 (base commit `e0c1221a4d45c9c006dc7cc6d5f2805e2f3e8cde` plus local state/observation changes).
 This repository contains the complete version used by the example, including standalone-export changes. It does not depend on access to the older private repository.
 
@@ -35,5 +35,5 @@ This repository contains the complete version used by the example, including sta
 
 The single complete Pi JSON export is a user-authorized private research example. It includes model/tool
 output and snippets of the task code. The upstream viewer license is not a blanket license
-for the research logs. Keep repository access and any hosted build private. Do not add API
+for the research logs. The user approved publishing this Pi export with TraceVista. Other imports are not bundled. Do not add API
 keys, OAuth tokens, Codex login files, or unreviewed experiment directories.
