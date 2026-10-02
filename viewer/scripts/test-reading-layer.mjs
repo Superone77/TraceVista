@@ -5,7 +5,7 @@ async function moduleAt(path) {
   const code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
   return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 }
-const { pickLevel, FONTS, fromReading, localLadder, withoutParent, ladderPieces, levelText } = await moduleAt('../src/trajectory/ladder.ts');
+const { pickLevel, FONTS, fromReading, localLadder, withoutParent, ladderPieces, levelText, readingCoverage } = await moduleAt('../src/trajectory/ladder.ts');
 const { parseGraph, toolFingerprint, landmarkMoves } = await moduleAt('../src/trajectory/model.ts');
 const { branchItems, keptActions, layoutGraph, semanticProjection, FOLD_MIN } = await moduleAt('../src/trajectory/semantic.ts');
 
@@ -56,6 +56,16 @@ for (const broken of [
   g => { g.actions[0].ladder = { topic: 'x', takeaway: 'x', abstract: [{ event: 'nope', quote: 'x' }] }; },
   g => { g.journey = { text: 'x', cites: ['ghost'] }; },
 ]) { const copy = structuredClone(base); broken(copy); assert.throws(() => parseGraph(copy)); }
+
+// Partial annotation must not silently hide unannotated actions by default.
+assert.equal(readingCoverage(plain).ready, false);
+assert.equal(readingCoverage(g).ready, false, 'One annotated action is not a reader-ready graph');
+const complete = structuredClone(g);
+for (const e of [...complete.states, ...complete.branches, ...complete.actions]) e.ladder = { topic: 'step', takeaway: 'step described' };
+assert.equal(readingCoverage(complete).ready, true);
+delete complete.actions[8].ladder;
+assert.equal(readingCoverage(complete).ready, false, 'Transition actions need a ladder');
+assert(readingCoverage(complete).missing.includes('a8'));
 
 // Folding (after ThoughtDAG's condense): runs of FOLD_MIN+ routine actions fold; turns, informs ends and state changes never do.
 assert.equal(branchItems(plain, 'b').length, 9, 'Folding is off unless asked for');

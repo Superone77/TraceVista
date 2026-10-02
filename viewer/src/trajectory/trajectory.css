@@ -149,3 +149,5 @@
 .map-card.state.cited:not(.tier-states){outline:none;box-shadow:none}
 .chat-model{display:flex;gap:5px;min-width:0}.chat-model select,.chat-model input{flex:1;min-width:0}.chat-model button{font-size:13px;padding:2px 9px}
 .chat-model-status{font-size:11px;color:#5f7568;margin:-2px 0 0 52px}.chat-model-status.error{color:#b04350}
+
+.reading-gap-note{font-size:11px;color:#876f40;max-width:210px;line-height:1.5}

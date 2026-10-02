@@ -3,7 +3,18 @@
 // verbatim quotes from raw events as the deepest level. A level is shown when its canvas-space
 // font reaches HANDOFF_PX on screen, so zooming in grows the sentence the reader was following
 // instead of swapping it. Pure functions: no model calls, no app state.
-import type { ReadingLadder } from './model';
+import type { ReadingLadder, Graph } from './model';
+
+/** Same structural readiness contract as scripts/ladder.py; no inference from node text. */
+export function readingCoverage(graph: Graph) {
+  const critical = new Set(graph.actions.filter(a => a.move).map(a => a.id));
+  graph.transitions.forEach(t => critical.add(t.action));
+  graph.links.filter(l => l.kind === 'informs').forEach(l => { critical.add(l.source); critical.add(l.target); });
+  const required = [...graph.states, ...graph.branches, ...graph.actions.filter(a => critical.has(a.id))];
+  const missing = required.filter(e => !e.ladder?.topic?.trim() || !e.ladder?.takeaway?.trim()).map(e => e.id);
+  const missingJourney = !graph.journey?.text?.trim() || !graph.journey?.cites?.length;
+  return { ready: graph.states.length > 0 && missing.length === 0 && !missingJourney, missing, missingJourney };
+}
 
 export interface LadderToken { t: string; space?: boolean }
 /** A level item: an index into the abstract's tokens, or a free-text word carrying its trailing space. */

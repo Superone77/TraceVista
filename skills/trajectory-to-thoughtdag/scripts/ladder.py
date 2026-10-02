@@ -8,6 +8,7 @@ for the writer and hard limits (with a small margin) here, so plaques stay legib
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -120,10 +121,57 @@ def validate_reading_layer(graph, index):
             raise ValueError('journey must cite the states, branches or actions it narrates')
 
 
+def reading_quality(graph):
+    """Structural coverage, not a claim that the analyst's interpretation is correct."""
+    groups = {k: graph.get(k, []) for k in ('states', 'branches', 'actions')}
+    items = [i for rows in groups.values() for i in rows]
+    critical = {a['id'] for a in groups['actions'] if a.get('move')}
+    critical.update(t['action'] for t in graph.get('transitions', []))
+    informs = [l for l in graph.get('links', []) if l.get('kind') == 'informs']
+    critical.update(e for l in informs for e in (l['source'], l['target']))
+    required = [*groups['states'], *groups['branches'],
+                *(a for a in groups['actions'] if a['id'] in critical)]
+    def has_ladder(item):
+        return all(isinstance((item.get('ladder') or {}).get(k), str) and item['ladder'][k].strip()
+                   for k in ('topic', 'takeaway'))
+    missing = [i['id'] for i in required if not has_ladder(i)]
+    journey = graph.get('journey') or {}
+    has_journey = bool(journey.get('text', '').strip() and journey.get('cites'))
+    destinations = {l['target'] for l in informs}
+    return {
+        'ready': bool(groups['states']) and not missing and has_journey,
+        'coverage': {k: {'total': len(rows), 'annotated': sum(has_ladder(i) for i in rows)}
+                     for k, rows in groups.items()},
+        'missing_ladders': missing,
+        'missing_journey': not has_journey,
+        'critical_actions': sorted(critical),
+        'missing_reasons': [i['id'] for i in required if not (i.get('ladder') or {}).get('reason', '').strip()],
+        'missing_quotes': [i['id'] for i in required if not (i.get('ladder') or {}).get('abstract')],
+        'decisions_without_informs': [a['id'] for a in groups['actions']
+            if a.get('move') in ('decision', 'pivot', 'ruleout') and a['id'] not in destinations],
+        'moves': {m: sum(i.get('move') == m for i in items) for m in MOVES},
+        'informs': len(informs),
+        'interpretation_check': 'Coverage only. Inspect cited evidence and explain unresolved gaps; do not invent links or quotes.'
+    }
+
+
+def write_private_json(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Set permissions at creation, before any trajectory text is written.
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+        os.chmod(path, 0o600)
+        json.dump(value, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Check a reading-layer patch against a state graph.')
     parser.add_argument('graph', help='a .agent-state.json file')
     parser.add_argument('--patch', help='{"entities": {id: {ladder, move}}, "links": [...], "journey": {...}}')
+    parser.add_argument('--out', help='Save the validated graph, including the patch, to a new file')
+    parser.add_argument('--quality-report', help='Write the structural coverage and gaps as JSON')
+    parser.add_argument('--require-reading-layer', action='store_true', help='Fail if reader-ready coverage is incomplete')
     args = parser.parse_args()
     graph = json.loads(Path(args.graph).read_text())
     if args.patch:
@@ -135,9 +183,14 @@ def main():
     except ValueError as e:
         print(f'FAIL: {e}')
         sys.exit(1)
-    items = [*graph['states'], *graph['branches'], *graph['actions']]
-    print(json.dumps({'ladders': sum('ladder' in i for i in items), 'moves': {m: sum(i.get('move') == m for i in items) for m in MOVES},
-                      'informs': sum(l.get('kind') == 'informs' for l in graph.get('links', []))}, ensure_ascii=False))
+    report = reading_quality(graph)
+    if args.quality_report:
+        write_private_json(args.quality_report, report)
+    print(json.dumps(report, ensure_ascii=False))
+    if args.require_reading_layer and not report['ready']:
+        raise SystemExit('FAIL: incomplete reading layer; inspect missing_ladders and missing_journey')
+    if args.out:
+        write_private_json(args.out, graph)
 
 
 def apply_patch(graph, patch):

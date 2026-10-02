@@ -3,12 +3,11 @@
 import argparse
 import copy
 import json
-import os
 from pathlib import Path
 
 from observations import validate_observations
 from build_canvas import expand, edge, base_data
-from ladder import validate_reading_layer
+from ladder import validate_reading_layer, reading_quality, write_private_json
 
 BEHAVIORS = ('Explore', 'Plan', 'Edit', 'Execute', 'Verify', 'Diagnose')
 LINK_KINDS = ('sequence', 'informs', 'review_request', 'review_return')
@@ -156,10 +155,17 @@ def main():
     parser.add_argument('analysis')
     parser.add_argument('--timeline', required=True)
     parser.add_argument('--out', required=True)
-    parser.add_argument('--format', choices=('state', 'canvas'), default='canvas',
+    parser.add_argument('--format', choices=('state', 'canvas'), default='state',
                         help='state: standalone JSON for the local viewer; canvas: legacy ThoughtDAG backup')
+    parser.add_argument('--require-reading-layer', action='store_true', help='Require reader-ready structural coverage')
+    parser.add_argument('--quality-report', help='Write reading-layer coverage and unresolved gaps as JSON')
     args = parser.parse_args()
     graph = compile_graph(json.loads(Path(args.analysis).read_text()), json.loads(Path(args.timeline).read_text()))
+    report = reading_quality(graph)
+    if args.quality_report:
+        write_private_json(args.quality_report, report)
+    if args.require_reading_layer and not report['ready']:
+        raise SystemExit('Incomplete reading layer: ' + json.dumps(report, ensure_ascii=False))
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.format == 'state':
@@ -167,9 +173,8 @@ def main():
         payload = graph
     else:
         payload = as_canvas(graph)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n')
-    os.chmod(output, 0o600)
-    print(json.dumps(graph['coverage'], ensure_ascii=False))
+    write_private_json(output, payload)
+    print(json.dumps({'events': graph['coverage'], 'reading': report}, ensure_ascii=False))
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-# Reading layer: zoom ladders, epistemic moves, informs links, journey (optional v1 extension)
+# Reading layer: zoom ladders, epistemic moves, informs links, journey (compatible v1 extension; default for new viewer exports)
 
 The state graph says *what happened*. This layer says *what each step established and why
 the agent turned*, at a length a reader can take in at every zoom. It is adapted from
@@ -6,7 +6,7 @@ ThoughtDAG's summary ladder (`src/lib/ladder.ts`, `ladder-context.ts`, `gedanken
 Files without it stay valid; the viewer falls back to titles and summaries.
 
 Everything here is analyst interpretation. Write it while reading the timeline, cite raw
-events, and keep it apart from facts. The viewer never calls a model: it only renders.
+events, and keep it apart from facts. Rendering this layer never calls a model; the viewer has a separate optional chat feature.
 
 ## 1. Ladder on a state, branch or action
 
@@ -42,7 +42,7 @@ Write like this:
 - For the abstract, prefer the agent's visible messages (`note` events) and measurement or
   error lines from tool results: they show what it saw and said. Do not quote `thinking` events;
   hidden reasoning may inform your reading, but the map cites what the agent said and observed.
-- Every ladder is optional. Give one to every state and branch, and to every action a reader
+- The schema accepts old files without ladders. New viewer exports give one to every state and branch, and to every action a reader
   would stop at. Routine actions may keep only their title.
 
 ## 2. Epistemic move
@@ -96,3 +96,16 @@ and a journey without citations. To check a patch against an existing export:
 ```bash
 python3 scripts/ladder.py task.agent-state.json --patch reading-layer.json
 ```
+
+## Reader-ready coverage
+
+`--require-reading-layer` checks all states/branches and actions marked with a move, used
+in a transition or at either end of an informs link, plus a cited journey. The optional
+`--quality-report report.json` lists missing ladders/journey and warnings for absent reasons,
+quotes and decisions without informs. A zero-link run can be valid: explain the missing
+causal evidence rather than inventing links. Coverage cannot verify the truth of a takeaway
+or discover a decision the analyst missed. Inspect these manually against raw records.
+
+Partial annotations remain displayable, with all actions visible initially. A user can still
+choose decision folding manually. A complete reading layer enables folding by default.
+To save a checked patch, add `--out new.agent-state.json` to the patch command above.

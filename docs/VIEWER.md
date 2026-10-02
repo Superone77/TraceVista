@@ -140,3 +140,9 @@ not guessed from keyword mentions by the renderer. Existing v1 files without thi
 Synthetic example: `/?example=parser`. It contains all seven observation kinds and invented
 numbers for UI testing. The private Pi example is authorized and bundled; ordinary real imports
 stay in ignored local-data. The viewer contains no Pi/LoRA-specific interpretation rules.
+
+## 新轨迹的阅读层检查
+
+仓库 skill 默认导出 `.agent-state.json`，并用 `--require-reading-layer` 检查状态、分支和关键行为的摘要以及历程说明。`--quality-report` 另外列出缺少原因、原文摘句和决定依据连线的位置；它检查结构覆盖，不能判断解释是否正确。缺少证据时保留缺口。
+
+部分标注的图默认显示全部行为，工具栏提示阅读层尚不完整。用户仍能主动选择“只看决策”；完整标注的图才默认折叠常规行为。旧文件仍可导入。
