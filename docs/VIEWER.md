@@ -1,4 +1,4 @@
-# Agent State Atlas · 本地 coding agent 状态与轨迹查看器
+# TraceVista · 本地 coding agent 状态与轨迹查看器
 
 基于 ThoughtDAG 的本地 React Flow 画布，独立入口为 `trajectory.html`。
 支持不同任务、agent 和 reviewer；不依赖某个优化实验。无需模型 key，不调用模型，不上传日志。
@@ -7,6 +7,8 @@
 
 在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`。
 端口 8875，首页可选择 Pi 实例、合成例子或导入本地 JSON。完整复现与部署说明见 [README](../README.md)。
+
+打开轨迹后仅显示顶部工具栏，品牌、任务标题和副标题不占用画布空间（标签页仍保留任务名称）。“导入轨迹”直接位于工具栏；导出完整记录和返回首页位于“显示”菜单。界面使用深浅灰色，轨迹内部的行为、状态和连线保留语义色；详情里的卡片与标签沿用语义色，追问区的警告与错误用红色提示。画布不再显示状态统计与手势提示条。
 
 内置示例：`?example=pi-infra-r1` / `?example=parser`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。

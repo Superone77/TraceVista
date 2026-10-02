@@ -202,7 +202,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           <p>前一节点：{preview.previousNode ? <button className="cite node" onClick={() => jump(preview.previousNode!.id)}>{preview.previousNode.id} · {preview.previousNode.title}</button> : '未纳入'}；历史状态摘要 {preview.summaryStates.length} 个。</p>
           {preview.summaryStates.length > 0 && <details><summary>查看历史状态摘要</summary>{preview.summaryStates.map(s => <div key={s.id}><button className="cite node" onClick={() => jump(s.id)}>{s.id}</button><p>{s.text}</p></div>)}</details>}
           {preview.ranges.map(r => <p key={r.session}><b>{r.session}</b>：{r.first} → {r.last} · {r.count} 条 · {r.boundary}</p>)}
-          {preview.warnings.map(w => <p key={w}>{w}</p>)}
+          {preview.warnings.map(w => <p className="chat-warning" key={w}>{w}</p>)}
           <p>带入同一节点、同一范围的 {preview.historyTurns / 2} 轮有效问答；其余 {preview.excludedHistoryTurns} 条消息不作为上下文。</p>
           <label>输入额度（tokens）<input type="number" aria-label="输入 token 额度" min="1" step="1000" value={inputTokens || ''} disabled={locked} onChange={e => setInputTokens(Number(e.target.value))} /></label>
           <p>按字符粗估，不是供应商的精确计数。请按模型窗口设置输入额度，并预留回复空间；默认 96,000。</p>

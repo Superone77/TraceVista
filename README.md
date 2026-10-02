@@ -1,4 +1,4 @@
-# trajactory_visualizer
+# TraceVista
 
 **把 coding agent 的日志变成可以逐层放大的状态与执行地图。**
 
