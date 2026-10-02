@@ -12,7 +12,7 @@
 
 内置示例：`?example=pi-infra-r1`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
-生产构建只打包内置示例，排除 local-data。已获准收录的 Pi 是私有示例，部署时需保持访问范围。
+生产构建只打包内置示例，排除 local-data。Pi 是当前获准公开的内置示例。
 
 ## 四层缩放
 
@@ -73,7 +73,7 @@
 不合法的文件显示错误，保留已打开的图。内容按文本渲染，不执行日志中的 HTML 或命令。
 
 原始 JSONL 需要先经来源适配器和状态标注转换；当前不声称能从任意日志自动推断完整系统状态。
-现有 `skills/trajectory-to-thoughtdag/scripts/build_state_graph.py` 导出可以直接使用。
+现有 `skills/tracevista-skill/scripts/build_state_graph.py` 导出可以直接使用。
 同一代码哈希可能回滚后再次出现，这时应使用新的观察状态 ID，不能把时间历史画成状态循环。
 
 只有成功的 Edit / Execute 且快照中确有差异，才能生成状态转换。
@@ -92,7 +92,7 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 - **连线避让**：跨分支连线遇到卡片时会侧向弯曲绕开。
 - **工具指纹**：⌨️ 运行、📖 读取、✏️ 编辑、🔍 搜索各自的调用次数，可以看出某个方向"读得多还是跑得多"。
 
-字段说明和写作规范见 `skills/trajectory-to-thoughtdag/references/reading-layer.md`。阅读层属于分析者标注，不会替代原始证据。
+字段说明和写作规范见 `skills/tracevista-skill/references/reading-layer.md`。阅读层属于分析者标注，不会替代原始证据。
 
 ## 追问这条轨迹（可选，浏览器直连模型）
 
@@ -157,7 +157,7 @@ state PASS. Measurements preserve scope, protocol, baseline and historical/fresh
 State color still uses an explicitly authored `assessment`; it never picks the largest metric
 or mixes measurement scopes automatically.
 
-The compiler contract and analyst guidance live in `skills/trajectory-to-thoughtdag/` and its
+The compiler contract and analyst guidance live in `skills/tracevista-skill/` and its
 `references/observations.md`. Validators check references, types, hierarchy cycles, task/resource
 identity, review-stage relationships, matching code identities for unchanged-code claims, and
 outcome categories. They cannot prove that an analyst's semantic interpretation is true.
@@ -175,3 +175,11 @@ Pi/LoRA-specific interpretation rules.
 部分标注的图默认显示全部行为，工具栏提示阅读层尚不完整。用户仍能主动选择“只看决策”；完整标注的图才默认折叠常规行为。旧文件仍可导入。
 
 模型选择使用真正的下拉框，不会按当前 ID 过滤列表。`name` / `display_name` 用于显示，请求始终使用 `id`。回复预留为 Anthropic 4,096 / OpenAI 兼容接口 16,384 tokens，并受接口报告的输出上限约束；请求同步携带相同的输出限制。窗口与输出额度共用，最终计数和限制由模型服务执行。
+
+## 从 tracevista-skill 直接打开
+
+`create_view.py` 输出本机直达 URL，并保持服务运行。打开链接后，页面直接显示全屏 TraceVista，自动载入完整轨迹，无需概览页、弹窗或再次点击导入。默认 iframe 加载云端引擎；本地开发可指定 `--viewer-url`。
+
+接收入口只在专用 URL fragment 下启用，校验父窗口（兼容旧版 opener）、origin 和随机 token，再走同一套导入检查。普通首页和文件导入不受影响，也不会自动开启追问。
+
+本机服务只提供随机路径对应的当前文件，最多传递 64 MiB；不会浏览整个目录。超时或无法加载引擎时才显示手动导入回退。链接在服务停止后失效，完整 JSON 和修订副本仍可重新打开。详情见 [打开方式与协议](../skills/tracevista-skill/references/opening.md)。

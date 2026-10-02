@@ -5,14 +5,14 @@
 缩小时看系统状态和版本分叉；放大后依次看到探索方向、具体行为、原始 trajectory。
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
-本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`trajectory-to-thoughtdag` 转换 skill，
+本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
 以及一份完整导出的 **Pi Infra Harness / LoRA / 20261001-r1** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 克隆并打开示例
 
 需要 **Node.js 24.x、pnpm 11.19.0**。转换新的日志或跑 skill 测试还需要 **Python ≥ 3.10**。
-查看器在浏览器本地运行。
+可以直接使用云端查看器 **https://tracevista.pages.dev/** 并导入文件；也可以按下面步骤本地运行。
 
 ```bash
 git clone https://github.com/Superone77/trajactory_visualizer.git
@@ -54,7 +54,7 @@ Pi 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最�
 
 ### 阅读层（借鉴 ThoughtDAG）
 
-Pi 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，32 个转向地标标注了排除、决定、转向或未决，18 条依据边从观察指向它改变的决定，总览左侧还有一段历程。"只看决策"模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/trajectory-to-thoughtdag/references/reading-layer.md)。
+Pi 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，32 个转向地标标注了排除、决定、转向或未决，18 条依据边从观察指向它改变的决定，总览左侧还有一段历程。"只看决策"模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
 
 工具栏"💬 追问"可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“测试回复”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
 
@@ -110,14 +110,16 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 `pnpm test` 验证 skill、引用完整性、状态分叉、四层投影和示例中保留的原文。
 转换新日志时，`.work/` 可用于存放中间文件，它不会进入提交。
 
-## 5. 用 skill 转换自己的轨迹
+## 5. 用 tracevista-skill 生成和修改轨迹
 
 可直接让支持 skill 的 coding agent 使用：
 
-> 使用 `skills/trajectory-to-thoughtdag/SKILL.md`，将我的轨迹转换为本查看器的状态 JSON。
-> 声明跟踪范围，保留原始证据，分开版本来源和时间顺序；缺失的信息明确标注。
+> 使用 `skills/tracevista-skill/SKILL.md`，将这份日志转换成 TraceVista 文件，
+> 返回点击后就能看到完整轨迹的 TraceVista 链接。后续修改请沿用这份文件和原始证据。
 
-也可以把整个 `skills/trajectory-to-thoughtdag/` 文件夹复制到你的 agent 的 skill 目录。
+也可以把整个 `skills/tracevista-skill/` 文件夹复制到你的 agent 的 skill 目录，并用 `$tracevista-skill` 调用。旧名称是 `trajectory-to-thoughtdag`；现有 `.agent-state.json` 文件继续兼容。
+
+这个分工类似 Excalidraw：**skill 生成和修改标准文件，云端引擎负责打开和交互**。skill 使用 Python 标准库，可以单独安装，不依赖本仓库的 Node 环境。
 
 处理流程：
 
@@ -126,22 +128,44 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
     → extract_timeline.py：提取事件和完整原文
     → agent 阅读证据并编写 state-analysis.json：状态、分支、行为和关系
     → build_state_graph.py --format state：验证引用和变化，输出状态 JSON
-    → 查看器“导入状态轨迹”
+    → create_view.py：生成点击即打开完整轨迹的链接
+    → 云端或本地查看器接收文件，逐层查看
 ```
 
 ```bash
-python3 skills/trajectory-to-thoughtdag/scripts/extract_timeline.py /path/to/session.jsonl \
+python3 skills/tracevista-skill/scripts/extract_timeline.py /path/to/session.jsonl \
   --out .work/my-run
 
 # 由 agent 阅读 timeline，并编写 state-analysis.json 后执行：
-python3 skills/trajectory-to-thoughtdag/scripts/build_state_graph.py .work/my-run/state-analysis.json \
-  --timeline .work/my-run/timeline.json --format state --out .work/my-run/task.agent-state.json
+python3 skills/tracevista-skill/scripts/build_state_graph.py .work/my-run/state-analysis.json \
+  --timeline .work/my-run/timeline.json --format state --require-reading-layer \
+  --quality-report .work/my-run/reading-quality.json --out .work/my-run/task.agent-state.json
 ```
 
+对已有导出，无需重新转换：
+
+```bash
+python3 skills/tracevista-skill/scripts/validate_trace.py /path/to/task.agent-state.json \
+  --require-reading-layer
+python3 skills/tracevista-skill/scripts/create_view.py /path/to/task.agent-state.json \
+  --out-dir .work/my-run/view --name task
+```
+
+命令启动本机服务，先输出 JSON（含 `url`），随后持续运行。打开这个 URL 就直接看到
+自动加载轨迹的全屏 TraceVista，**没有中间概览页，也不用再点一次按钮**。
+默认使用云端可视化引擎；本地测试可加 `--viewer-url http://127.0.0.1:8875/`。
+
+链接仅在这台机器、该服务运行期间有效。轨迹仍保存在完整 JSON 中，不放进网址或上传到存储服务。
+要只生成文件而不启动服务，可加 `--prepare-only`；后续可从保存的 JSON 重新生成直达链接。
+
+让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从
+项目下 `.work/tracevista/state` 恢复；每次保存生成独立修订，保留原始事件与证据 ID。
+完整交互及可选参数见 [skill](skills/tracevista-skill/SKILL.md) 和 [打开方式](skills/tracevista-skill/references/opening.md)。
+
 多个主 agent / reviewer 会话使用相对路径 manifest，见
-[多 agent 说明](skills/trajectory-to-thoughtdag/references/multi-agent.md)。
-状态、观察层字段分别见 [状态协议](skills/trajectory-to-thoughtdag/references/state-graph.md) 和
-[观察记录协议](skills/trajectory-to-thoughtdag/references/observations.md)。
+[多 agent 说明](skills/tracevista-skill/references/multi-agent.md)。
+状态、观察层字段分别见 [状态协议](skills/tracevista-skill/references/state-graph.md) 和
+[观察记录协议](skills/tracevista-skill/references/observations.md)。
 `--format canvas` 可导出兼容 ThoughtDAG 的旧版画布格式。
 
 新增示例：将生成图放到 `viewer/public/examples/<id>.agent-state.json`，在
@@ -154,7 +178,7 @@ python3 skills/trajectory-to-thoughtdag/scripts/build_state_graph.py .work/my-ru
 viewer/                           独立 React Flow 查看器
   src/trajectory/                 状态布局、语义缩放、原文、详情和观察层
   public/examples/                随构建发布的示例及目录
-skills/trajectory-to-thoughtdag/   自包含的转换 skill、协议、脚本和测试
+skills/tracevista-skill/           自包含的转换 skill、协议、脚本和测试
 scripts/                          跨组件验证及示例检查
 docs/                             操作说明、预览
 pnpm-lock.yaml                    固定前端依赖及完整性

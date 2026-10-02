@@ -11,6 +11,7 @@ import ChatDialog from './ChatDialog';
 import './trajectory.css';
 import exampleCatalog from '../../public/examples/index.json';
 import { datasetRequest } from './dataset';
+import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 
 const nodeTypes = { trajectory: MapCard };
 const edgeTypes = { routed: RoutedEdge };
@@ -222,15 +223,32 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
 }
 
 export default function StateReader() {
+  const [handoff] = useState(() => {
+    try { return { request: readHandoffRequest(location.hash), invalid: false }; }
+    catch { return { request: null, invalid: true }; }
+  });
   const [graph, setGraph] = useState<Graph | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return p.get('demo') === '1' || p.has('data') || p.has('example'); });
+  const cancelHandoff = useRef<(() => void) | null>(null);
+  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example'); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
+    cancelHandoff.current?.(); setLoading(false);
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   useEffect(() => {
+    if (!handoff.request && !handoff.invalid) return;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    if (handoff.invalid) { setError(HANDOFF_LINK_ERROR); setLoading(false); return; }
+    const cancel = startHandoff(window, handoff.request!, value => {
+      openGraph(value); setLoading(false);
+    }, message => { setError(message); setLoading(false); });
+    cancelHandoff.current = cancel;
+    return cancel;
+  }, [handoff]);
+  useEffect(() => {
+    if (handoff.request || handoff.invalid) return;
     let path: string | null;
     try { path = datasetRequest(location.search, exampleCatalog, import.meta.env.BASE_URL); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); setLoading(false); return; }
