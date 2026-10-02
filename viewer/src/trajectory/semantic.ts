@@ -1,7 +1,7 @@
 import type { Graph, Entity, Action, ProjectedEdge } from './model';
 
 export type Tier = 'states' | 'branches' | 'actions' | 'raw';
-export const tierLabels: Record<Tier, string> = { states: '系统状态', branches: '探索分支', actions: '具体行为', raw: '原始轨迹' };
+export const tierLabels: Record<Tier, string> = { states: '系统状态', branches: '工作阶段', actions: '具体行为', raw: '原始轨迹' };
 export function semanticTier(zoom: number, previous?: Tier): Tier {
   if (previous === 'raw' && zoom >= 1.05 || zoom >= 1.15) return 'raw';
   if (previous === 'actions' && zoom >= .77) return 'actions';
