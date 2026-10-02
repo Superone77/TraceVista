@@ -5,7 +5,8 @@ export const moves = ['insight', 'ruleout', 'decision', 'pivot', 'open'] as cons
 export type Move = typeof moves[number];
 /** Turns that stay visible when routine steps fold away. */
 export const landmarkMoves: readonly Move[] = ['ruleout', 'decision', 'pivot', 'open'];
-export const moveColors: Record<Move, string> = { insight: '#0b84c6', ruleout: '#d64545', decision: '#6b5ce7', pivot: '#df7f26', open: '#b8860b' };
+/** One hue per move, all dark enough to read as small text on white. */
+export const moveColors: Record<Move, string> = { insight: '#096aa8', ruleout: '#c33a3a', decision: '#5b4bd6', pivot: '#aa5017', open: '#796322' };
 export const moveLabels: Record<Move, string> = { insight: '发现', ruleout: '排除', decision: '决定', pivot: '转向', open: '未决' };
 export const moveGlyphs: Record<Move, string> = { insight: '●', ruleout: '✕', decision: '◆', pivot: '↪', open: '?' };
 /** Analyst-written zoom levels; abstract quotes are verbatim raw text with their event IDs. */
@@ -19,15 +20,20 @@ export interface State extends RecordItem {
   lineage?: { parent: string; relation: 'derived' | 'restored' | 'retained'; reason: string; events: string[] };
   assessment?: { metric: string; unit?: string; value: number; previous?: number; previousState?: string; higherIsBetter: boolean; tolerance: number; correctness: boolean; measurement: 'measured' | 'historical'; note: string };
 }
+/** How a state reads against its parent. One place for the tone, so cards, details and legend agree. */
+export const stateTones = {
+  none: '#5f727c', failed: '#b3343c', historical: '#7a51a8', first: '#44708f',
+  same: '#776f52', better: '#17765c', worse: '#b8453f',
+} as const;
 export function stateVisual(state: State) {
   const m = state.assessment;
-  if (!m) return { color: '#6a7a82', label: '尚无可比测量', delta: null };
-  if (!m.correctness) return { color: '#bd464b', label: '正确性失败', delta: null };
-  if (m.measurement === 'historical') return { color: '#8860b3', label: '最终选择 · 未重新测量', delta: null };
-  if (m.previous == null || m.previous === 0) return { color: '#487994', label: '首次测量', delta: null };
+  if (!m) return { color: stateTones.none, label: '尚无可比测量', delta: null };
+  if (!m.correctness) return { color: stateTones.failed, label: '正确性失败', delta: null };
+  if (m.measurement === 'historical') return { color: stateTones.historical, label: '最终选择 · 未重新测量', delta: null };
+  if (m.previous == null || m.previous === 0) return { color: stateTones.first, label: '首次测量', delta: null };
   const delta = (m.value / m.previous - 1) * 100;
-  if (delta === 0) return { color: '#8c805e', label: '测量值相同', delta };
-  return (m.higherIsBetter ? delta > 0 : delta < 0) ? { color: '#268367', label: '测量值改善', delta } : { color: '#c25953', label: '测量值退化', delta };
+  if (delta === 0) return { color: stateTones.same, label: '测量值相同', delta };
+  return (m.higherIsBetter ? delta > 0 : delta < 0) ? { color: stateTones.better, label: '测量值改善', delta } : { color: stateTones.worse, label: '测量值退化', delta };
 }
 export interface Branch extends RecordItem {
   state: string; status: 'attempted' | 'retained' | 'proposed' | 'rejected';
@@ -165,8 +171,9 @@ export function toolFingerprint(records: RawEvent[]): ToolMark[] {
   return [...marks.values()];
 }
 export type Entity = State | Branch | Action;
+/** Six well-separated hues at one lightness, so the behaviors stay apart as text and as card edges. */
 export const colors: Record<Behavior, string> = {
-  Explore: '#237899', Plan: '#8661bd', Edit: '#bf752b', Execute: '#247f70', Verify: '#4866b2', Diagnose: '#b6566d',
+  Explore: '#0e7490', Plan: '#6d4bb3', Edit: '#965b0f', Execute: '#2f7d3f', Verify: '#3558ad', Diagnose: '#a8456f',
 };
 
 /** Accept a neutral graph or a legacy canvas; never invent states from flat logs. */

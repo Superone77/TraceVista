@@ -51,7 +51,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const state = p.item as State;
   const visual = p.kind === 'state' ? stateVisual(state) : null;
   const move = (p.item as Action | Branch).move;
-  const color = p.kind === 'action' ? colors[action.behavior] : p.kind === 'branch' ? (move ? moveColors[move] : '#9aa79e') : visual?.color ?? '#738579';
+  const color = p.kind === 'action' ? colors[action.behavior] : p.kind === 'branch' ? (move ? moveColors[move] : '#94a3ac') : visual?.color ?? '#6b7f8b';
   const style = { '--tone': color } as CSSProperties;
   const plaque = (kind: keyof typeof FONTS) => ladder
     ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} quotes={quotes} onEvidence={evidence} /></div>
