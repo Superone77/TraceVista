@@ -115,7 +115,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 可直接让支持 skill 的 coding agent 使用：
 
 > 使用 `skills/tracevista-skill/SKILL.md`，将这份日志转换成 TraceVista 文件，
-> 生成可以打开查看器的交接页。后续修改请沿用这份文件和原始证据。
+> 返回点击后就能看到完整轨迹的 TraceVista 链接。后续修改请沿用这份文件和原始证据。
 
 也可以把整个 `skills/tracevista-skill/` 文件夹复制到你的 agent 的 skill 目录，并用 `$tracevista-skill` 调用。旧名称是 `trajectory-to-thoughtdag`；现有 `.agent-state.json` 文件继续兼容。
 
@@ -128,7 +128,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
     → extract_timeline.py：提取事件和完整原文
     → agent 阅读证据并编写 state-analysis.json：状态、分支、行为和关系
     → build_state_graph.py --format state：验证引用和变化，输出状态 JSON
-    → create_handoff.py：生成本地概览和“在 TraceVista 中打开”按钮
+    → create_view.py：生成点击即打开完整轨迹的链接
     → 云端或本地查看器接收文件，逐层查看
 ```
 
@@ -147,17 +147,20 @@ python3 skills/tracevista-skill/scripts/build_state_graph.py .work/my-run/state-
 ```bash
 python3 skills/tracevista-skill/scripts/validate_trace.py /path/to/task.agent-state.json \
   --require-reading-layer
-python3 skills/tracevista-skill/scripts/create_handoff.py /path/to/task.agent-state.json \
-  --out-dir .work/my-run/handoff --name task
+python3 skills/tracevista-skill/scripts/create_view.py /path/to/task.agent-state.json \
+  --out-dir .work/my-run/view --name task
 ```
 
-打开脚本返回的本地 HTML，点击 **Open in TraceVista** 即可加载到查看器；也可下载 JSON 后手动导入。
-交接页通过浏览器窗口传递文件，不把轨迹放进网址或上传保存。此按钮需要包含交接功能的引擎版本；
-自部署或本地测试可加 `--viewer-url http://127.0.0.1:8875/`。这不是可分享的云端文件链接。
+命令启动本机服务，先输出 JSON（含 `url`），随后持续运行。打开这个 URL 就直接看到
+自动加载轨迹的全屏 TraceVista，**没有中间概览页，也不用再点一次按钮**。
+默认使用云端可视化引擎；本地测试可加 `--viewer-url http://127.0.0.1:8875/`。
+
+链接仅在这台机器、该服务运行期间有效。轨迹仍保存在完整 JSON 中，不放进网址或上传到存储服务。
+要只生成文件而不启动服务，可加 `--prepare-only`；后续可从保存的 JSON 重新生成直达链接。
 
 让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从
 项目下 `.work/tracevista/state` 恢复；每次保存生成独立修订，保留原始事件与证据 ID。
-完整交互及可选参数见 [skill](skills/tracevista-skill/SKILL.md) 和 [交接说明](skills/tracevista-skill/references/handoff.md)。
+完整交互及可选参数见 [skill](skills/tracevista-skill/SKILL.md) 和 [打开方式](skills/tracevista-skill/references/opening.md)。
 
 多个主 agent / reviewer 会话使用相对路径 manifest，见
 [多 agent 说明](skills/tracevista-skill/references/multi-agent.md)。

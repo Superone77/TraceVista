@@ -1,0 +1,79 @@
+# Directly opening a trace
+
+## User-facing result
+
+Return an **Open in TraceVista** link in the chat. Clicking it must show the loaded,
+full-screen visualization, without an intermediate overview page, popup or another button.
+Keep the complete `.agent-state.json` as a secondary artifact. A bare cloud homepage is not
+a direct link to the trace.
+
+```sh
+python3 /absolute/skill/scripts/create_view.py /absolute/task.agent-state.json \
+  --out-dir /absolute/work/view --name task
+```
+
+The command prints one JSON result with `url`, `graph`, `quality_report`, `viewer_url` and
+`counts`, then serves in the foreground. Keep it running in a long-lived command session.
+Open and test the returned `url` before delivering it. The server selects a free port by
+default; `--port` can request a specific one. `--prepare-only` writes the JSON and quality
+report without starting a server, and therefore does not return a viewing URL.
+
+The page directly embeds the selected TraceVista engine and automatically passes it the
+complete file. Default engine: `https://tracevista.pages.dev/`. A locally running engine can
+be selected with `--viewer-url http://127.0.0.1:8875/`. The skill needs Python's standard
+library; it does not need to clone, build or run the engine's source.
+
+## Lifetime and fallback
+
+- The URL is local to the same machine and works while that helper process runs. Keep its
+  command/session identity. Stop it when no longer needed; never kill unrelated servers.
+- Refreshing the outer page reloads the complete trace automatically. View state and transient
+  selection are not saved by this link. Graph revisions are preserved separately below.
+- Restarting from the saved JSON produces a new live URL. Do not reuse a URL from a stopped
+  server or promise a permanent/public share link.
+- If the engine cannot load, no longer supports import, or a browser policy blocks embedding,
+  show a loading error and offer the complete JSON plus manual import in a standalone viewer.
+- The 64 MiB limit applies to automatic transfer. Do not truncate evidence to fit it. This
+  size limit is not a guarantee of smooth rendering for graphs of that size.
+
+Only the random route for this trace is served, not a filesystem directory. The helper binds
+127.0.0.1, checks Host and returns no-store responses. It does not upload a copy to cloud
+storage. The selected engine's code processes the file in the browser. Optional viewer chat
+sends selected context to the configured model only when the user asks a question.
+
+## Continuing an edit
+
+Use `session_state.py save --graph FILE` with available analysis, timeline and quality report.
+It stores a new private revision and atomically updates the latest pointer. `show` verifies
+checksums and returns paths. Default `.work/tracevista/state` is project-scoped; use
+`TRACEVISTA_STATE_DIR` or `--state-dir` when working elsewhere.
+
+For a reading-only correction, patch the existing graph while preserving raw events and IDs.
+For changed structure, edit the analysis and rebuild against the saved timeline. Validate the
+result and start a new direct view from that revision. An old running view still contains its
+original revision, so return the new link explicitly.
+
+## Browser protocol (maintainers)
+
+The local page creates a full-viewport iframe whose URL fragment contains
+`tracevista-import=<32–128 hexadecimal characters>&source=<encoded local origin>`.
+No trace bytes appear in the URL. Register the parent's message listener before starting
+navigation. The frame receiver captures the fragment before clearing it.
+
+Messages carry `type` and `token`:
+
+1. Viewer → parent: `tracevista:ready`.
+2. Parent → viewer: `tracevista:import`, with the complete `json` string.
+3. Viewer → parent: `tracevista:loaded`, or `tracevista:error` with a fixed error code.
+
+Sender verifies `event.source === iframe.contentWindow`, exact viewer origin and token;
+JSON is sent only to the exact target origin. Receiver uses its parent when framed, otherwise
+its opener for legacy flows; it checks that peer, the declared local source origin and token.
+Only an explicit valid import fragment activates the receiver. The receiver accepts one
+matching import, runs the ordinary graph parser and then acknowledges. Both sides stop
+listening after completion or 30 seconds. Failures do not send raw exception text.
+
+Allowed source origins remain `null` for legacy local files and HTTP(S) loopback origins
+`localhost`, `127.0.0.1` and `[::1]`. A null-origin legacy peer receives only status replies
+using `*`; trajectory messages always have a fixed target origin. The embedded engine must
+allow framing by the local helper, and the helper's CSP must allow that engine origin.

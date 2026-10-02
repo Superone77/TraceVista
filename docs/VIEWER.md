@@ -176,8 +176,10 @@ Pi/LoRA-specific interpretation rules.
 
 模型选择使用真正的下拉框，不会按当前 ID 过滤列表。`name` / `display_name` 用于显示，请求始终使用 `id`。回复预留为 Anthropic 4,096 / OpenAI 兼容接口 16,384 tokens，并受接口报告的输出上限约束；请求同步携带相同的输出限制。窗口与输出额度共用，最终计数和限制由模型服务执行。
 
-## 从 tracevista-skill 打开
+## 从 tracevista-skill 直接打开
 
-`create_handoff.py` 生成完整 JSON 和本地 HTML 概览。HTML 的 **Open in TraceVista** 按钮通过浏览器窗口消息将文件交给查看器，无需手动再次选文件。接收入口只在专用 URL fragment 下启用，校验来源窗口、origin 和随机 token，再走同一套导入检查；不会自动开启追问。普通首页和原来的文件导入保持不变。
+`create_view.py` 输出本机直达 URL，并保持服务运行。打开链接后，页面直接显示全屏 TraceVista，自动载入完整轨迹，无需概览页、弹窗或再次点击导入。默认 iframe 加载云端引擎；本地开发可指定 `--viewer-url`。
 
-交接页支持直接打开本地文件或由 localhost 提供；最多传递 64 MiB，超时或弹窗受限时可下载 JSON 并手动导入。源文件、session revision 和交接页都保存在本地，构建不包含它们。详情见 [交接协议](../skills/tracevista-skill/references/handoff.md)。
+接收入口只在专用 URL fragment 下启用，校验父窗口（兼容旧版 opener）、origin 和随机 token，再走同一套导入检查。普通首页和文件导入不受影响，也不会自动开启追问。
+
+本机服务只提供随机路径对应的当前文件，最多传递 64 MiB；不会浏览整个目录。超时或无法加载引擎时才显示手动导入回退。链接在服务停止后失效，完整 JSON 和修订副本仍可重新打开。详情见 [打开方式与协议](../skills/tracevista-skill/references/opening.md)。

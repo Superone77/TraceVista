@@ -23,9 +23,10 @@ for (const hash of [fragment('null') + '&extra=1', fragment('null') + '&source=n
   '#tracevista-import=' + 'z'.repeat(32) + '&source=null', '#tracevista-import=' + 'a'.repeat(129) + '&source=null',
   '#tracevista-import=' + token]) assert.throws(() => readHandoffRequest(hash));
 
-function helper(source = 'null', importer = value => value) {
-  const messages = [], listeners = new Set(), timers = new Map(), imported = [], errors = [];
-  const opener = { postMessage: (message, origin) => messages.push({ message, origin }) };
+function helper(source = 'null', importer = value => value, { framed = false, hasOpener = true } = {}) {
+  const openerMessages = [], parentMessages = [], listeners = new Set(), timers = new Map(), imported = [], errors = [];
+  const opener = hasOpener ? { postMessage: (message, origin) => openerMessages.push({ message, origin }) } : null;
+  const parent = { postMessage: (message, origin) => parentMessages.push({ message, origin }) };
   const host = {
     opener,
     addEventListener: (type, fn) => { assert.equal(type, 'message'); listeners.add(fn); },
@@ -33,27 +34,34 @@ function helper(source = 'null', importer = value => value) {
     setTimeout: (fn, ms) => { assert.equal(ms, HANDOFF_TIMEOUT_MS); timers.set(fn, fn); return fn; },
     clearTimeout: timer => timers.delete(timer),
   };
+  host.parent = framed ? parent : host;
+  const peer = framed ? parent : opener;
+  const messages = framed ? parentMessages : openerMessages;
   const request = readHandoffRequest(fragment(source));
   const start = () => startHandoff(host, request, value => { imported.push(importer(value)); }, message => errors.push(message));
-  const emit = (data, extra = {}) => { for (const listener of [...listeners]) listener({ source: opener, origin: source, data, ...extra }); };
+  const emit = (data, extra = {}) => { for (const listener of [...listeners]) listener({ source: peer, origin: source, data, ...extra }); };
   const send = (json, extra = {}) => emit({ type: 'tracevista:import', token, json }, extra);
   const expire = () => { for (const timer of [...timers.values()]) timer(); };
   const cleanup = start();
-  return { source, messages, listeners, timers, imported, errors, host, opener, emit, send, expire, cleanup, start };
+  return { source, messages, openerMessages, parentMessages, listeners, timers, imported, errors, host, opener, peer, emit, send, expire, cleanup, start };
 }
 
 // Only an explicit helper session may import; the receiver never fetches or sends the JSON back.
 const originalFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Handoff must not make network requests'); };
 try {
-  for (const source of ['null', 'http://localhost:8080']) {
-    const h = helper(source, parseGraph);
+  for (const source of ['null', 'http://localhost:8080']) for (const options of [
+    { framed: false }, { framed: true }, { framed: true, hasOpener: false },
+  ]) {
+    const h = helper(source, parseGraph, options);
     const fixture = JSON.parse(readFileSync(new URL('./fixtures/parser.agent-state.json', import.meta.url), 'utf8'));
     assert.deepEqual(h.messages, [{ message: { type: 'tracevista:ready', token }, origin: source === 'null' ? '*' : source }]);
     for (const data of [null, [], 'text', { type: 'wrong', token, json: '{}' }, { type: 'tracevista:import', token: 'wrong', json: '{}' }]) h.emit(data);
     h.send(JSON.stringify(fixture), { origin: 'https://evil.test' });
     h.send(JSON.stringify(fixture), { source: {} });
     h.send(JSON.stringify(fixture), { source: null });
+    // A frame cannot import from its opener, and a popup cannot import from its parent/self.
+    h.send(JSON.stringify(fixture), { source: options.framed ? h.opener : h.host.parent });
     assert.equal(h.imported.length, 0); assert.equal(h.listeners.size, 1);
     h.send(JSON.stringify(fixture));
     assert.equal(h.imported.length, 1);
@@ -64,6 +72,7 @@ try {
     h.send('{}'); h.expire();
     assert.equal(h.imported.length, 1); assert.equal(h.errors.length, 0);
     assert(!JSON.stringify(h.messages).includes('timeline'));
+    assert.equal((options.framed ? h.openerMessages : h.parentMessages).length, 0);
   }
 
   // Malformed payloads consume the authenticated attempt and cannot leak source-derived errors.
@@ -87,8 +96,9 @@ try {
   const cancelled = helper(); cancelled.cleanup(); cancelled.send('{}'); cancelled.expire();
   assert.equal(cancelled.errors.length, 0); assert.equal(cancelled.imported.length, 0);
   assert.equal(cancelled.listeners.size, 0); assert.equal(cancelled.timers.size, 0);
-  const noOpener = helper(); noOpener.cleanup(); noOpener.host.opener = null; noOpener.start();
-  assert.equal(noOpener.errors.length, 1); assert.equal(noOpener.listeners.size, 0);
+  const standalone = helper('null', value => value, { hasOpener: false });
+  assert.equal(standalone.errors.length, 1); assert.equal(standalone.listeners.size, 0);
+  assert.equal(standalone.timers.size, 0); assert.equal(standalone.messages.length, 0);
 
   // React StrictMode runs setup/cleanup/setup: retain the initially parsed request after URL cleanup.
   const remount = helper(); remount.cleanup();
@@ -107,4 +117,4 @@ try {
   assert.deepEqual(boundary.imported, [HANDOFF_MAX_BYTES - 2]);
   assert.equal(boundary.messages.at(-1).message.type, 'tracevista:loaded');
 } finally { globalThis.fetch = originalFetch; }
-console.log('PASS: explicit local handoff, source/origin/token binding, one import, graph validation, redacted errors, timeout/cleanup, StrictMode lifecycle, UTF-8 limits and no network requests (mock windows)');
+console.log('PASS: parent/opener local handoff, source/origin/token binding, parent priority, standalone errors, one import, graph validation, redacted errors, timeout/cleanup, StrictMode lifecycle, UTF-8 limits and no network requests (mock windows)');

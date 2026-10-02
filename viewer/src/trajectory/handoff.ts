@@ -1,4 +1,4 @@
-/** One local helper window may hand a JSON file to this viewer, entirely in-browser. */
+/** One local parent page or opener may hand a JSON file to this viewer, entirely in-browser. */
 export const HANDOFF_MAX_BYTES = 64 * 1024 * 1024;
 export const HANDOFF_TIMEOUT_MS = 30_000;
 export interface HandoffRequest { token: string; source: string }
@@ -7,10 +7,10 @@ const errorMessages: Record<HandoffError, string> = {
   'invalid-json': '本地文件不是有效的 JSON，请重新生成或手动导入。',
   'invalid-graph': '本地文件未通过轨迹格式检查，请修复导出文件后重试。',
   'too-large': '轨迹超过一键打开的 64 MiB 上限，请使用“导入轨迹”选择本地文件。',
-  timeout: '等待本地文件超时，请回到本地页面重新打开，或使用“导入轨迹”。',
-  unavailable: '无法连接本地页面，请从本地页面的按钮重新打开，或使用“导入轨迹”。',
+  timeout: '等待本地文件超时，请重新打开轨迹链接，或使用“导入轨迹”。',
+  unavailable: '无法连接本地页面，请重新打开轨迹链接，或使用“导入轨迹”。',
 };
-export const HANDOFF_LINK_ERROR = '本地文件打开链接无效，请从本地页面重新打开，或使用“导入轨迹”。';
+export const HANDOFF_LINK_ERROR = '本地文件打开链接无效，请重新打开轨迹链接，或使用“导入轨迹”。';
 
 /** Opaque file origins and loopback helpers only; arbitrary websites are not import sources. */
 export function isLocalHandoffOrigin(origin: string): boolean {
@@ -34,7 +34,7 @@ export function readHandoffRequest(hash: string): HandoffRequest | null {
   return { token, source };
 }
 
-type HandoffHost = Pick<Window, 'opener' | 'addEventListener' | 'removeEventListener' | 'setTimeout' | 'clearTimeout'>;
+type HandoffHost = Pick<Window, 'parent' | 'opener' | 'addEventListener' | 'removeEventListener' | 'setTimeout' | 'clearTimeout'>;
 
 /** No fetch, storage, original-file errors, or file contents are sent back to the helper. */
 export function startHandoff(
@@ -43,8 +43,9 @@ export function startHandoff(
   onImport: (value: unknown) => void,
   onError: (message: string) => void,
 ): () => void {
-  const opener: Window | null = host.opener;
-  if (!opener) { onError(errorMessages.unavailable); return () => {}; }
+  // Bind one peer for the whole session; an embedded viewer always uses its parent.
+  const peer: Window | null = host.parent !== host ? host.parent : host.opener;
+  if (!peer) { onError(errorMessages.unavailable); return () => {}; }
   const targetOrigin = request.source === 'null' ? '*' : request.source;
   let active = true;
   let timer: number | undefined;
@@ -54,7 +55,7 @@ export function startHandoff(
     if (timer !== undefined) host.clearTimeout(timer);
   }
   function reply(type: 'tracevista:ready' | 'tracevista:loaded' | 'tracevista:error', code?: HandoffError) {
-    opener!.postMessage({ type, token: request.token, ...(code ? { code } : {}) }, targetOrigin);
+    peer!.postMessage({ type, token: request.token, ...(code ? { code } : {}) }, targetOrigin);
   }
   function fail(code: HandoffError) {
     cleanup();
@@ -62,7 +63,7 @@ export function startHandoff(
     try { reply('tracevista:error', code); } catch { /* A closed helper must not hide the local error. */ }
   }
   function receive(event: MessageEvent) {
-    if (!active || event.source !== opener || event.origin !== request.source) return;
+    if (!active || event.source !== peer || event.origin !== request.source) return;
     const data: unknown = event.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const message = data as { type?: unknown; token?: unknown; json?: unknown };
