@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 const source = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/providers.ts', import.meta.url), 'utf8'));
-const { presets, normalizedBase, presetOf, switchPreset, changeEndpoint, restoreSettings, requestReady, canListModels, listModels, parseModels, streamChat, safeError, apiUrl } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { modelBudget, budgetKey, restoreInputBudgets, presets, normalizedBase, presetOf, switchPreset, changeEndpoint, restoreSettings, requestReady, canListModels, listModels, parseModels, streamChat, safeError, apiUrl } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const settings = id => ({ ...presets[id], model: 'test-model', apiKey: 'synthetic-test-key', remember: false });
 
 // Destination binding: switching protocol, region or even path must not reuse a key/model.
@@ -38,6 +38,32 @@ assert(!requestReady({ ...old, model: '' }));
 assert(!safeError(new Error('echo synthetic-test-key'), old).includes(old.apiKey));
 assert.match(safeError(new TypeError('Failed to fetch'), old), /CORS/);
 
+// Model metadata controls the local allowance; never infer a gateway limit from its model name.
+const ds = { ...settings('deepseek'), model: 'deepseek-flash' };
+const meta = parseModels('openai', ds.baseUrl, { data: [
+  { id: 'deepseek-flash', name: 'DeepSeek-V4.1-Flash', context_window: 1048576, max_output_tokens: 393216 },
+  { id: 'small-model', context_length: 128000, max_output_tokens: 2048 },
+  { id: 'invalid', context_window: -1, context_length: '1000000', max_output_tokens: Infinity },
+] });
+assert.equal(meta[0].contextWindow, 1048576);
+assert.equal(meta[0].maxOutputTokens, 393216);
+assert.equal(meta[2].contextWindow, undefined);
+assert.equal(meta[2].maxOutputTokens, undefined);
+const largeBudget = modelBudget(ds, meta[0]);
+assert.equal(largeBudget.inputTokens, 1032192);
+assert.equal(largeBudget.outputTokens, 16384);
+assert.equal(largeBudget.source, '模型接口');
+assert.equal(modelBudget(ds).contextWindow, 1048576, 'Official endpoint fallback when discovery is unavailable');
+assert.equal(modelBudget({ ...ds, model: 'unknown' }).contextWindow, undefined);
+assert.equal(modelBudget({ ...ds, baseUrl: 'https://gateway.example/v1' }).inputTokens, 96000);
+assert.equal(modelBudget({ ...ds, model: 'small-model' }, meta[1]).inputTokens, 125952);
+assert.equal(modelBudget({ ...ds, model: 'small-model' }, meta[0]).inputTokens, 96000, 'Metadata from another model must not leak');
+assert.notEqual(budgetKey(ds), budgetKey({ ...ds, model: 'small-model' }));
+assert.notEqual(budgetKey(ds), budgetKey({ ...ds, baseUrl: 'https://gateway.example/v1' }));
+assert(!budgetKey(ds).includes(ds.apiKey));
+assert.deepEqual(restoreInputBudgets({ good: 900000, negative: -1, zero: 0, fraction: 1.5, bad: '900000', inf: Infinity }), { good: 900000 });
+assert.deepEqual(restoreInputBudgets(null), {});
+
 const originalFetch = globalThis.fetch;
 let calls = [];
 const response = (payload, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
@@ -64,6 +90,7 @@ try {
     assert(!url.includes(s.apiKey)); assert.equal(init.redirect, 'error'); assert.equal(init.credentials, 'omit');
     const body = JSON.parse(init.body);
     assert.equal(body.model, 'test-model'); assert.equal(body.stream, true);
+    assert.equal(body.max_completion_tokens ?? body.max_tokens, modelBudget(s).outputTokens, 'Request must reserve the output used by the budget');
     assert(!init.body.includes(s.apiKey)); assert(!('thinking' in body), 'No vendor-only options sent to other providers');
     if (preset.provider === 'anthropic') {
       assert.equal(body.system, 'system instruction'); assert.equal(init.headers['x-api-key'], s.apiKey);
@@ -86,6 +113,9 @@ try {
   await listModels({ ...settings('ollama'), apiKey: '' });
   globalThis.fetch = async () => { throw new Error('must not probe MiniMax'); };
   await assert.rejects(listModels(settings('minimax')), /手动填写/);
+  // Explicit metadata-derived output reservation reaches the provider.
+  globalThis.fetch = async (_, init) => { assert.equal(JSON.parse(init.body).max_tokens, 2048); return response({ choices: [{ message: { content: 'ok' } }] }); };
+  await streamChat(ds, '', [], () => {}, new AbortController().signal, undefined, 2048);
   // Servers that ignore streaming and send JSON still produce a visible answer.
   globalThis.fetch = async () => response({ choices: [{ message: { content: 'json answer' } }] });
   let result = '';
