@@ -20,27 +20,97 @@ for (const e of [...g.states, ...g.branches, ...g.actions]) assert(out.includes(
 assert(out.includes('[[a451]] → [[a458]]') && out.includes('历程'));
 assert(out.length < 40000, `outline is ${out.length} chars`);
 
-// Focused on a card: its chain, its own raw records, what informed it; never thinking; within budget.
+// Focus includes every preceding raw record in the selected session, including thinking.
 const focused = buildChat(g, 'a458', '为什么回到 v2？', []);
 const sentEvents = focused.items.filter(i => i.event).map(i => i.event);
-assert(focused.items.some(i => i.layer === 'chain' && i.node === 's3-rebase'), 'branch above the card');
-assert(focused.items.some(i => i.layer === 'chain' && i.node === 's3'), 'state above the card');
-const own = g.actions.find(a => a.id === 'a458').events.filter(id => events.get(id).kind !== 'thinking');
-assert(own.every(id => sentEvents.includes(id)), 'the card\'s own non-thinking records are sent');
-assert(focused.items.some(i => i.layer === 'reference' && i.node === 'a451'), 'the observation that informed it');
-assert(sentEvents.every(id => events.get(id).kind !== 'thinking'), 'thinking is never sent');
+const own = g.actions.find(a => a.id === 'a458').events;
+assert(own.every(id => sentEvents.includes(id)), 'all current-card records are sent');
+const lastOwn = Math.max(...own.map(id => g.timeline.timeline.findIndex(e => e.id === id)));
+const priorMain = g.timeline.timeline.slice(0, lastOwn + 1).filter(e => e.id.startsWith('main:'));
+assert(priorMain.every(e => sentEvents.includes(e.id)), 'entire prior main session, not last six actions');
+assert.equal(sentEvents.length, new Set(sentEvents).size, 'deduplicated');
+assert(focused.items.some(i => i.node === 's3-rebase'));
+assert(focused.items.some(i => i.node === 's3'));
+assert(focused.items.some(i => i.node === 'a451'));
 assert(focused.messages.at(-1).content.endsWith('问题：为什么回到 v2？'));
 assert(focused.system.startsWith(SYSTEM));
-const total = focused.system.length + focused.messages.reduce((n, m) => n + m.content.length, 0);
-assert(total < 130000, `request is ${total} chars`);
+assert(!focused.messages.at(-1).content.includes(g.journey.text), 'prefix excludes retrospective journey');
+for (const e of priorMain) assert(focused.messages.at(-1).content.includes(e.text), `unclipped ${e.id}`);
+assert(focused.preview.estimatedTokens > 0);
+assert.equal(focused.preview.compressedCount, 0);
 
-// Without focus, the question retrieves matching records; history rides along, errors do not.
+// Full-run mode deliberately includes all evidence; unscoped old chats cannot leak hindsight.
 const found = retrieve(g, 'CUDA Graph replay 整合收益', new Set());
-assert(found.length > 0 && found.some(e => /graph/i.test(e.text)), 'retrieval finds Graph records');
-const history = [{ id: '1', role: 'user', text: '先问一句', at: '' }, { id: '2', role: 'assistant', text: '', error: '401', at: '' }];
+assert(found.length > 0);
+const history = [{ id: '1', role: 'user', text: '旧版全局问答', at: '' }, { id: '2', role: 'assistant', text: '未来结论', at: '' }];
 const open = buildChat(g, null, 'CUDA Graph 为什么删掉？', history);
-assert(open.items.some(i => i.layer === 'reference' && i.event), 'retrieved records are listed as references');
-assert.deepEqual(open.messages.map(m => m.role), ['user', 'user'], 'failed answers are not replayed');
+assert.equal(open.preview.eventCount, g.timeline.timeline.length);
+assert.equal(open.messages.length, 1);
+assert(open.messages.at(-1).content.includes(g.journey.text));
+
+// Synthetic boundary test: alternate branch/rollback, late result, independent review clock,
+// retrospective labels, oversized records, and conversations from the future.
+const raw = (id, text, time = null) => ({ id, text, kind: 'message', t_min: time });
+const entity = (id, refs, more = {}) => ({ id, title: 'FUTURE_TITLE', summary: 'FUTURE_SUMMARY', events: refs, ...more });
+const action = (id, refs, branch = 'b1') => entity(id, refs, { state: 's0', branch, behavior: 'Explore', actor: 'main', t_min: null });
+const fixture = {
+  title: 'test', scope: 'FUTURE_SCOPE', notes: ['FUTURE_NOTE'],
+  states: [entity('s0', ['main:1'], { snapshot: {} })],
+  branches: [entity('b1', ['main:1'], { state: 's0', status: 'retained' }), entity('b2', ['main:2'], { state: 's0', status: 'rejected' })],
+  actions: [action('a1', ['main:1']), action('a2', ['main:2'], 'b2'), action('a3', ['main:3', 'main:4']), action('a4', ['main:5']),
+    action('r1', ['review:1']), action('r2', ['review:2'])],
+  timeline: { timeline: [raw('main:1', 'ORIGINAL_TASK ' + 'x'.repeat(2400)), raw('main:2', 'FAILED_ALTERNATIVE'),
+    { ...raw('main:3', 'ORIGINAL_THINKING'), kind: 'thinking' }, raw('main:4', 'CURRENT_FULL ' + 'z'.repeat(4000)),
+    raw('main:5', 'FUTURE_RAW'), raw('review:1', 'ASSOCIATED_REVIEW', 999), raw('review:2', 'UNRELATED_REVIEW', 0)], sources: [{ name: 'instructions', text: 'FUTURE_SOURCE' }] },
+  links: [{ source: 'r1', target: 'a3', kind: 'informs', events: ['main:4', 'review:1'], evidence: 'FUTURE_EDGE_TEXT' },
+    { source: 'a3', target: 'a4', kind: 'informs', events: ['main:5'], evidence: 'FUTURE_OUTGOING' },
+    { source: 'a4', target: 'a3', kind: 'informs', events: ['main:5'], evidence: 'FUTURE_INCOMING' }],
+  journey: { text: 'FUTURE_JOURNEY', cites: ['a4'] }, transitions: [],
+};
+const bounded = buildChat(fixture, 'a3', 'why', []);
+const request = bounded.system + JSON.stringify(bounded.messages);
+for (const term of ['ORIGINAL_TASK', 'FAILED_ALTERNATIVE', 'ORIGINAL_THINKING', 'CURRENT_FULL', 'ASSOCIATED_REVIEW']) assert(request.includes(term), term);
+assert(!request.includes('FUTURE_'), 'no raw, summary, scope, note, source, or edge hindsight');
+assert(!request.includes('UNRELATED_REVIEW'), 'independent relative clock cannot establish prior history');
+assert.deepEqual(bounded.items.filter(i => i.event).map(i => i.event), ['main:1', 'main:2', 'main:3', 'main:4', 'review:1']);
+const whole = buildChat(fixture, 'a3', 'why', [], { mode: 'run' });
+assert.equal(whole.preview.eventCount, 7);
+assert(whole.messages.at(-1).content.includes('FUTURE_JOURNEY'));
+const branch = buildChat(fixture, 'b2', 'why', []);
+assert.equal(branch.preview.ownCount, 1);
+assert.deepEqual(branch.items.filter(i => i.event).map(i => i.event), ['main:1', 'main:2']);
+const state = buildChat(fixture, 's0', 'why', []);
+assert.equal(state.preview.ownCount, 7, 'state includes all nested actions, not just landmarks');
+const compressed = buildChat(fixture, 'a3', 'why', [], { compression: 'excerpts', inputTokens: 1 });
+assert(compressed.preview.blocked, 'oversized input blocks instead of dropping records');
+assert.equal(compressed.preview.eventCount, bounded.preview.eventCount, 'no records dropped in excerpt mode');
+assert.equal(compressed.preview.compressedCount, 1);
+assert(compressed.items.find(i => i.event === 'main:1').omittedChars > 0);
+assert.equal(compressed.items.find(i => i.event === 'main:4').omittedChars, 0, 'current node remains full');
+assert(compressed.messages.at(-1).content.includes('z'.repeat(4000)));
+assert.equal(buildChat(fixture, 'a3', 'why', [], { inputTokens: 1e6 }).preview.blocked, false);
+assert.equal(buildChat(fixture, 'a3', 'why', [], { inputTokens: NaN }).preview.blocked, true);
+assert.throws(() => buildChat(fixture, 'missing', 'why', []), /不存在/);
+const pair = (key, text) => [{ role: 'user', text: `ask ${text}`, scopeKey: key }, { role: 'assistant', text: `answer ${text}`, scopeKey: key }];
+const past = [...pair(whole.scopeKey, 'FUTURE_CHAT'), ...pair(bounded.scopeKey, 'SAME_CHAIN'),
+  { role: 'user', text: 'ORPHAN', scopeKey: bounded.scopeKey }, { role: 'assistant', text: 'ERROR', error: 'failed', scopeKey: bounded.scopeKey }];
+const followup = buildChat(fixture, 'a3', 'again', past);
+assert.equal(followup.preview.historyTurns, 2);
+assert(followup.messages.some(m => m.content.includes('SAME_CHAIN')));
+assert(!followup.messages.some(m => /FUTURE_CHAT|ORPHAN|ERROR/.test(m.content)));
+assert.equal(buildChat(fixture, 'a1', 'why', past).preview.historyTurns, 0, 'another node gets its own discussion');
+assert.equal(buildChat(fixture, 'a3', 'why', pair('legacy', 'old')).preview.historyTurns, 0);
+const changed = structuredClone(fixture); changed.timeline.timeline[0].text += 'changed';
+assert.equal(buildChat(changed, 'a3', 'why', past).preview.historyTurns, 0, 'changed imports cannot reuse old evidence scope');
+const unclassified = structuredClone(fixture);
+unclassified.timeline.timeline.splice(3, 0, raw('main:between', 'STREAM_INSIDE ' + 'k'.repeat(1800), -20));
+unclassified.timeline.timeline[0].kind = 'user';
+const spanned = buildChat(unclassified, 'a3', 'why', [], { compression: 'excerpts' });
+assert.equal(spanned.items.find(i => i.event === 'main:between').omittedChars, 0, 'unclassified records inside a card stay complete');
+assert.equal(spanned.items.find(i => i.event === 'main:1').omittedChars, 0, 'original user instructions stay complete');
+assert.equal(spanned.preview.ownCount, 3, 'card span includes intervening records even when timestamps are missing or non-monotonic');
+const longDiscussion = Array.from({ length: 6 }, (_, i) => pair(bounded.scopeKey, `turn${i}`)).flat();
+assert.equal(buildChat(fixture, 'a3', 'why', longDiscussion).preview.historyTurns, 12, 'successful discussion is not silently limited to eight messages');
 
 // Citations: cards and events become links; an id the record lacks is marked.
 const known = id => g.actions.some(a => a.id === id) ? 'node' : events.has(id) ? 'event' : null;
@@ -72,4 +142,4 @@ assert.throws(() => parseModels('openai', 'http://127.0.0.1:11434/v1', { error: 
 assert.equal(canListModels({ provider: 'anthropic', baseUrl: 'https://api.anthropic.com', apiKey: '', model: '', remember: false }), false, 'Anthropic needs a key');
 assert.equal(canListModels({ provider: 'openai', baseUrl: 'https://openrouter.ai/api/v1', apiKey: '', model: '', remember: false }), true, 'OpenRouter lists without a key');
 assert.equal(canListModels({ provider: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: '', model: '', remember: false }), false, 'OpenAI needs a key');
-console.log(`PASS: outline (${out.length} chars), focused context with chain/material/reference, no thinking sent, retrieval, citations, streaming for both providers, model lists for three provider shapes`);
+console.log('PASS: bounded full history, nested containers, rollback alternatives, cross-session evidence, no future leakage, explicit excerpts/limits, scoped conversations, citations and provider contracts');

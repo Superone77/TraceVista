@@ -155,3 +155,7 @@
 .chat-settings{margin:0;min-width:0;border:0;border-bottom:1px solid #e4ebe4;max-height:65%;overflow:auto;flex-shrink:1}
 .chat-settings:disabled{opacity:.8}.chat-provider-link{margin-left:52px;font-size:11px;color:#36634e}
 .chat-probe{display:flex;gap:8px;align-items:center}.chat-probe small{font-size:10.5px;color:#728073;line-height:1.5}
+.chat-context-options{display:flex;gap:5px;flex-wrap:wrap}.chat-context-options select{flex:1;min-width:0;max-width:100%;font:inherit;font-size:11px;border:1px solid #d3ddd5;border-radius:5px;padding:4px;background:#f8faf7}
+.chat-context-preview{font-size:11px;color:#5f7568}.chat-context-preview summary{cursor:pointer;padding:3px 0}.chat-context-body{max-height:180px;overflow:auto;overflow-wrap:anywhere;line-height:1.55;padding:4px 7px;background:#f8faf7;border-radius:6px;user-select:text}
+.chat-context-body p{margin:4px 0 7px}.chat-context-body label{display:flex;align-items:center;gap:8px}.chat-context-body input{width:115px;min-width:0;border:1px solid #d3ddd5;border-radius:4px;padding:3px;font:inherit}.chat-context-body button{font-size:11px}.chat-context-body details{margin-top:7px}
+.chat-dialog>footer{max-height:65%;overflow:auto;flex-shrink:0}

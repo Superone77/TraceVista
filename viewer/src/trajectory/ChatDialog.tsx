@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { moveColors, type Entity, type Graph } from './model';
-import { buildChat, citations, type ChatTurn } from './chat';
+import { buildChat, citations, DEFAULT_INPUT_TOKENS, type ChatTurn, type ContextOptions } from './chat';
 import { canListModels, listModels, presets, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
@@ -23,6 +23,10 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const [settings, setSettings] = useState<ChatSettings>(() => restoreSettings(store.get(SETTINGS_KEY, {})));
   const [turns, setTurns] = useState<ChatTurn[]>(() => store.get<ChatTurn[]>(historyKey, []).map(t => t.role === 'assistant' && !t.text && !t.error ? { ...t, error: '上次请求已中断，请重新提问' } : t));
   const [draft, setDraft] = useState('');
+  const [contextMode, setContextMode] = useState<'prefix' | 'run'>('prefix');
+  const [compression, setCompression] = useState<ContextOptions['compression']>('full');
+  const [inputTokens, setInputTokens] = useState(DEFAULT_INPUT_TOKENS);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [busy, setBusy] = useState<AbortController | null>(null);
   const [showSettings, setShowSettings] = useState(() => !requestReady(settings));
   const [probe, setProbe] = useState<{ busy: boolean; text: string; error?: boolean }>({ busy: false, text: '' });
@@ -82,6 +86,13 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   }, [busy]);
   const ready = requestReady(settings);
   const locked = !!busy || probe.busy;
+  useEffect(() => { setContextMode('prefix'); }, [focus?.id]);
+  // While streaming, the new pair is unfinished and cannot be replayed. Rebuild on completion,
+  // not once per streamed token (large traces may contain megabytes of raw text).
+  const contextHistory = useMemo(() => turns, [turns.length, !!busy]);
+  const bundle = useMemo(() => buildChat(graph, focus?.id ?? null, draft.trim(), contextHistory,
+    { mode: contextMode, compression, inputTokens }), [graph, focus?.id, draft, contextHistory, contextMode, compression, inputTokens]);
+  const preview = bundle.preview;
   function editConnection(next: ChatSettings) {
     setModels([]); setModelsAsked(0); autoPicked.current = null;
     setProbe({ busy: false, text: '' }); setSettings(next);
@@ -101,11 +112,12 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   }
   async function send() {
     const question = draft.trim();
-    if (!question || locked || !ready) return;
-    const { system, messages, items } = buildChat(graph, focus?.id ?? null, question, turns);
+    if (!question || locked || !ready || preview.blocked) return;
+    const { system, messages, items, scopeKey, mode, compression: sentCompression } = bundle;
     const at = new Date().toISOString();
-    const ask: ChatTurn = { id: newId(), role: 'user', text: question, at, focus: focus?.id ?? null };
-    const answer: ChatTurn = { id: newId(), role: 'assistant', text: '', at, focus: focus?.id ?? null, provider: selectedPreset(settings).label, model: settings.model, context: items };
+    const scope = { scopeKey, contextMode: mode, compression: sentCompression };
+    const ask: ChatTurn = { id: newId(), role: 'user', text: question, at, focus: focus?.id ?? null, ...scope };
+    const answer: ChatTurn = { id: newId(), role: 'assistant', text: '', at, focus: focus?.id ?? null, provider: selectedPreset(settings).label, model: settings.model, context: items, ...scope };
     setTurns(t => [...t, ask, answer]); setDraft('');
     const controller = new AbortController(); activeRequest.current = controller; setBusy(controller); setWaitSeconds(0); setStatus('waiting');
     const timer = window.setTimeout(() => controller.abort('请求超过 3 分钟，已停止；可缩小问题范围后重试'), 180_000);
@@ -124,6 +136,12 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     const value = { format: 'trajectory-chat', version: 1, trajectory: graph.title, exportedAt: new Date().toISOString(), turns };
     const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
     Object.assign(document.createElement('a'), { href: url, download: 'trajectory-chat.json' }).click(); URL.revokeObjectURL(url);
+  }
+  function exportContext() {
+    const value = { format: 'trajectory-chat-context', version: 2, focus: focus?.id ?? null, mode: bundle.mode,
+      compression, scopeKey: bundle.scopeKey, preview, system: bundle.system, messages: bundle.messages, items: bundle.items };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+    Object.assign(document.createElement('a'), { href: url, download: 'trajectory-chat-context.json' }).click(); URL.revokeObjectURL(url);
   }
   const preset = presetOf(settings);
   const host = (() => { try { return new URL(settings.baseUrl).host; } catch { return settings.baseUrl; } })();
@@ -164,15 +182,38 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           : <span key={i} className="cite unknown" title="记录中不存在这个编号">{p.id}?</span>)}
           {t.role === 'assistant' && !t.text && !t.error && <span className="chat-wait">{status === 'thinking' ? '模型正在思考…' : '等待模型回复…'} {waitSeconds} 秒</span>}</div>
         {t.error && <div className="chat-error">{t.error}</div>}
-        {t.role === 'assistant' && t.context && <small>{t.model} · 发送 {t.context.filter(c => c.event).length} 条原始记录{t.cites?.length ? ` · 引用 ${t.cites.length} 处` : ''}</small>}
+        {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextMode === 'prefix' ? '截至此节点' : t.contextMode === 'run' ? '全程复盘' : '旧版上下文'} · 发送 {t.context.filter(c => c.event).length} 条记录{t.compression === 'excerpts' ? '（历史摘录）' : ''}{t.cites?.length ? ` · 引用 ${t.cites.length} 处` : ''}</small>}
       </div>)}
     </div>
     <footer>
       <div className="chat-focus">{focus ? <><span>关注</span><button onClick={() => jump(focus.id)}>{focus.ladder?.topic ?? focus.title}</button><button onClick={clearFocus} aria-label="改为整条轨迹">×</button></> : <span>整条轨迹 · 点击卡片可聚焦到这一步</span>}</div>
+      <div className="chat-context-options">
+        <select aria-label="上下文范围" value={bundle.mode} disabled={locked || !focus} onChange={e => setContextMode(e.target.value as 'prefix' | 'run')}>
+          <option value="prefix">截至此节点（含内部全部记录）</option><option value="run">全程复盘（含后续结果）</option>
+        </select>
+        <select aria-label="历史原文处理" value={compression} disabled={locked} onChange={e => setCompression(e.target.value as 'full' | 'excerpts')}>
+          <option value="full">完整原文</option><option value="excerpts">历史首尾摘录 · 当前节点完整</option>
+        </select>
+      </div>
+      <details className="chat-context-preview" onToggle={e => setPreviewOpen(e.currentTarget.open)}>
+        <summary>本次上下文 · {preview.eventCount} 条记录 · 约 {preview.estimatedTokens.toLocaleString()} tokens</summary>
+        {previewOpen && <div className="chat-context-body">
+          <p>当前节点 {preview.ownCount} 条；范围外 {preview.excludedCount} 条。{preview.compressedCount ? `${preview.compressedCount} 条历史记录使用首尾摘录。` : '所选记录全部发送原文，包括 thinking 记录。'}</p>
+          {preview.ranges.map(r => <p key={r.session}><b>{r.session}</b>：{r.first} → {r.last} · {r.count} 条 · {r.boundary}</p>)}
+          {preview.warnings.map(w => <p key={w}>{w}</p>)}
+          <p>带入同一节点、同一范围的 {preview.historyTurns / 2} 轮有效问答；其余 {preview.excludedHistoryTurns} 条消息不作为上下文。</p>
+          <label>输入额度（tokens）<input type="number" aria-label="输入 token 额度" min="1" step="1000" value={inputTokens || ''} disabled={locked} onChange={e => setInputTokens(Number(e.target.value))} /></label>
+          <p>按字符粗估，不是供应商的精确计数。请按模型窗口设置输入额度，并预留回复空间；默认 96,000。</p>
+          <button onClick={exportContext}>下载本次完整上下文</button>
+          <details><summary>包含的 {preview.nodes.length} 个节点</summary>{preview.nodes.map(n => <div key={n.id}><button className="cite node" onClick={() => jump(n.id)}>{n.id}</button> {n.title} · {n.count} 条直接证据</div>)}</details>
+          <details><summary>逐条查看发送记录</summary>{bundle.items.filter(i => i.event).map(i => <div key={i.event}><button className="cite event" onClick={() => evidence(i.event!)}>{i.event}</button> {i.layer === 'material' ? '当前节点' : '此前 / 关联证据'} · {i.omittedChars ? `省略 ${i.omittedChars} 字` : '完整原文'}</div>)}</details>
+        </div>}
+      </details>
+      {preview.blocked && <div className="chat-error">上下文超过输入额度或额度无效，尚未发送。可手动选择历史摘录，或使用更大窗口的模型并在“本次上下文”中调整额度；当前节点原文不会截断。</div>}
       <div className="chat-input">
         <textarea value={draft} rows={2} placeholder={ready ? '问这条轨迹…（Enter 发送，Shift+Enter 换行）' : '先在“接口”里填写模型和 key'} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-        {busy ? <button onClick={() => busy.abort()}>停止</button> : <button className="chat-send" onClick={() => void send()} disabled={!ready || locked || !draft.trim()}>发送</button>}
+        {busy ? <button onClick={() => busy.abort()}>停止</button> : <button className="chat-send" onClick={() => void send()} disabled={!ready || locked || !draft.trim() || preview.blocked}>发送</button>}
       </div>
     </footer>
   </section>;
