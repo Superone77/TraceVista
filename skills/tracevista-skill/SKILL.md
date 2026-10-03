@@ -1,6 +1,6 @@
 ---
 name: tracevista-skill
-description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and return a direct link that opens the loaded TraceVista viewer.
+description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and open it in the TraceVista web viewer.
 ---
 
 # TraceVista
@@ -8,7 +8,13 @@ description: Create, inspect and revise coding-agent trajectory files for TraceV
 Generate standard `.agent-state.json` files that open in [TraceVista](https://tracevista.pages.dev/).
 The skill extracts evidence and authors the state map and reading layer; the viewer handles
 zooming, navigation, details and optional chat. The skill works independently of the viewer's
-source checkout. Its Python scripts use only the standard library and make no model calls.
+source checkout. Its scripts require Python 3.10 or later, use only the standard library
+and make no model calls.
+
+Install the complete `skills/tracevista-skill/` folder from the GitHub repository into the
+project's `.agents/skills/tracevista-skill/` for Codex or `.claude/skills/tracevista-skill/`
+for Claude Code. Repository access is required to download it; the viewer's Node environment
+is not needed. See [opening.md](references/opening.md) for browser use and optional local preview.
 
 ## Core workflow
 
@@ -23,20 +29,21 @@ source checkout. Its Python scripts use only the standard library and make no mo
    --quality-report REPORT`. Review gaps in causes, quotes and decision dependencies;
    never invent evidence to satisfy the report. An older file may be opened without
    `--require-reading-layer`; describe its missing annotations if relevant.
-4. **Create a direct view.** Start `scripts/create_view.py FILE`. The first stdout line
-   gives `url`, the complete JSON path and quality report. Keep this foreground process
-   running in the host's long-lived command session. Use `--viewer-url` for a local or
-   self-hosted engine. Do not hand the user an intermediate HTML page or a second Open button.
-5. **Inspect the real view.** Navigate directly to the returned `url`. It must load the
-   graph automatically, with no additional import click. Check the state overview, one
-   turn or restored path if present, and a raw-record card. See [opening.md](references/opening.md).
+4. **Open the current file.** Open `https://tracevista.pages.dev/` in the user's browser
+   and use **Import trajectory** (older UI: **导入轨迹**) to select the complete JSON just generated. In a loaded viewer, this action is inside the top-left **Viewer menu** (☰). When browser tools
+   support file selection, perform the import. Otherwise provide the file and these
+   manual steps. The default workflow uses the cloud viewer and does not start a local server.
+5. **Inspect the real view.** After importing, confirm the displayed task is the current
+   export, then check the state overview, one turn or restored path if present, and a
+   raw-record card. A bundled example does not validate this file. Report when browser
+   inspection was unavailable. See [opening.md](references/opening.md).
 6. **Keep the latest revision.** Use `scripts/session_state.py save` with the graph and
    available analysis, timeline and quality report. Skip only for a throwaway conversion.
    State is project-scoped by default; retain the reported state directory.
-7. **Deliver.** Make **Open in TraceVista** a link in the chat pointing to the returned
-   `url`, with the complete JSON as a secondary download. Add a preview screenshot when
-   captured and a short account of changes or evidence gaps. This is a local live link:
-   do not call it a permanent cloud share link. Never substitute a bare viewer homepage.
+7. **Deliver.** Return the complete JSON, a link to [TraceVista](https://tracevista.pages.dev/),
+   and whether this file was imported and checked in the browser. If import remains manual,
+   say to click **Import trajectory** and choose the supplied file. Add a preview screenshot when
+   captured and a short account of changes or evidence gaps.
 
 Use absolute script and input paths in actual calls. Resolve `scripts/` relative to this
 skill's directory, not the working directory. Keep generated work under an ignored `.work/`
@@ -48,28 +55,14 @@ directory or a temporary directory. Do not rerun the underlying experiment for c
 # For an existing complete export:
 python3 /absolute/skill/scripts/validate_trace.py /absolute/task.agent-state.json \
   --require-reading-layer --quality-report /absolute/work/reading-quality.json
-
-# Prints one JSON result, then keeps serving until stopped:
-python3 /absolute/skill/scripts/create_view.py /absolute/task.agent-state.json \
-  --out-dir /absolute/work/view --name task
 ```
 
-The helper uses only Python's standard library. It starts a loopback server, chooses an
-available port and prints a short `http://127.0.0.1:PORT/TOKEN/` URL. The page contains a
-full-screen TraceVista frame and automatically passes it the complete file. The viewer
-itself is loaded from `https://tracevista.pages.dev/` by default. There is no overview page,
-popup or second click. The file is not put into the URL or uploaded to a storage service.
+Then import `/absolute/task.agent-state.json` at `https://tracevista.pages.dev/` and inspect
+the loaded graph. The import is held in that browser tab; the homepage address does not
+identify a saved trajectory. Keep the JSON for reopening or revision.
 
-Without `--out-dir`, the helper creates a temporary directory. Keep the command session
-alive while the user reads; retain its process/session identity so it can be stopped later.
-A stopped local server makes this link unavailable. Restart from the saved JSON to get a
-new link. If the environment cannot keep a process running, provide the JSON for manual
-import and explain that limitation instead of claiming a direct link works.
-
-For a running local viewer, use `--viewer-url http://127.0.0.1:8875/`. For file-only output,
-use `--prepare-only`; it does not start a server and does not return a usable viewing URL.
-The helper does not package or start the visualization engine. On loading failure, the
-page offers the complete JSON and a manual-import fallback; do not truncate the data.
+Use `create_view.py` only when a local preview is explicitly requested. Its loopback URL
+and process lifetime are described in [opening.md](references/opening.md#optional-local-preview).
 
 Save available artifacts (omit optional arguments when unavailable):
 
@@ -102,7 +95,7 @@ its paths, so temporary inputs can be removed without breaking later edits.
 4. Only re-extract when inputs changed, the export is incomplete, or redaction needs to
    change. Compare event IDs/text before reusing old citations. Never patch evidence to
    make an interpretation appear supported.
-5. Validate the new file, start a new direct view, inspect the affected view and save a
+5. Validate the new file, import that revision into TraceVista, inspect the affected view and save a
    new session revision. Say the previous export was reused and name what changed.
 
 ## Interpretation and quality
@@ -126,7 +119,7 @@ its paths, so temporary inputs can be removed without breaking later edits.
 - [reading-layer.md](references/reading-layer.md): zoom text, turns, quotes and reading coverage.
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
-- [opening.md](references/opening.md): direct links, local server lifetime and fallback behavior.
+- [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
 - [legacy-canvas.md](references/legacy-canvas.md): only for an explicit stock ThoughtDAG canvas request.
 
 The skill was formerly named `trajectory-to-thoughtdag`. Renaming it does not change the

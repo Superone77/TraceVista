@@ -8,7 +8,10 @@ import RoutedEdge, { type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
+import Instructions from './Instructions';
+import ViewerMenu from './ViewerMenu';
 import './trajectory.css';
+import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
 import { datasetRequest } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
@@ -20,7 +23,7 @@ const shortName = (e: Entity) => e.ladder?.topic ?? e.title.split(/[·:：，,�
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null);
-  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label="选择状态轨迹文件" type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
+  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label="Choose a trajectory file" type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
 function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: File) => void; onHome: () => void }) {
@@ -95,7 +98,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   }, [overview]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || (e.target as HTMLElement)?.closest('input, textarea, button, [contenteditable="true"]')) return;
+      if (e.code !== 'Space' || (e.target as HTMLElement)?.closest('input, textarea, button, select, summary, [contenteditable="true"]')) return;
       e.preventDefault(); setSpaceHeld(true);
     };
     const up = (e: KeyboardEvent) => { if (e.code === 'Space') setSpaceHeld(false); };
@@ -210,15 +213,37 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     a.click(); URL.revokeObjectURL(url);
   }
   return <div className={`reader ${inspectorOpen ? 'inspector-open' : ''}`} aria-label={graph.title}>
-    <div className="toolbar"><div className="zoom-levels" aria-label="缩放细节层级">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div><div className="view-options"><FilePicker label="导入轨迹" onImport={onImport} /><select aria-label="状态关系" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">版本分支</option><option value="chronology">执行顺序</option></select>{hasReading && <button aria-pressed={decisionsOnly} title="折叠连续 3 步以上的常规行为，只留决策、它们依据的观察和产生新状态的操作" onClick={() => { setDecisionsOnly(v => !v); setOpenFolds(new Set()); }}>{decisionsOnly ? '◆ 只看决策' : '◇ 全部行为'}</button>}<button onClick={() => overview(true)}>全图</button><span ref={zoomReadout} className="zoom-readout">44%</span>{hasReading && !readingStatus.ready && <span className="reading-gap-note" title={`缺少摘要：${readingStatus.missing.join("、") || "无"}；缺少历程：${readingStatus.missingJourney ? "是" : "否"}`}>阅读层未完整标注，默认展示全部行为</span>}<label className="input-mode">操作<select aria-label="画布操作方式" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">触控板</option><option value="mouse">鼠标</option></select></label><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>💬 追问</button><button onClick={() => { setSelected(null); setInspectorOpen(true); }}>结构与证据</button><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>详情{inspectorOpen ? ' ×' : ''}</button><details className="display-options"><summary>显示</summary><div><label><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />跨分支连线</label><label><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />未尝试方案</label><div className="display-files"><button onClick={download}>导出完整记录</button><button onClick={onHome}>返回首页</button></div></div></details></div></div>
+    <div className="toolbar">
+      <ViewerMenu>{dismiss => <>
+        <div className="viewer-menu-section">
+          <FilePicker label="Import trajectory" onImport={onImport} />
+          <button onClick={() => { download(); dismiss(); }}>Export complete trace</button>
+          <button onClick={onHome}>Home</button>
+        </div>
+        <div className="viewer-menu-section">
+          <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
+          <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
+          <label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
+          <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>
+        </div>
+        <div className="viewer-menu-section">
+          {hasReading && <label className="viewer-menu-check" title="Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions"><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />Decisions only</label>}
+          <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />Cross-branch links</label>
+          <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />Untried ideas</label>
+          {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>Reading layer incomplete; showing all actions</p>}
+        </div>
+      </>}</ViewerMenu>
+      <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>
+      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
+    </div>
     <main><div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
       {tier === 'states' && graph.journey && (journeyOpen
-        ? <aside className="journey"><div className="journey-head"><b>这一轮的历程</b><button onClick={() => setJourneyOpen(false)}>收起</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
-        : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>历程</button>)}
+        ? <aside className="journey"><div className="journey-head"><b>Run overview</b><button onClick={() => setJourneyOpen(false)}>Collapse</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
+        : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>Overview</button>)}
       {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
-      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />测量改善</span><span><i style={{background:stateTones.worse}} />测量退化</span><span><i style={{background:stateTones.historical}} />最终选择</span><span>↶ 回退用紫色虚线</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ 依据</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
+      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
   </div>;
 }
 
@@ -256,11 +281,11 @@ export default function StateReader() {
     const controller = new AbortController();
     const request = fetch(path, { signal: controller.signal });
     void request
-      .then(r => { if (!r.ok) throw new Error('无法读取轨迹文件，请检查示例是否打包，或导入本地 JSON。'); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error('Could not load the trajectory. Check that the example is included, or import a local JSON file.'); return r.json(); })
       .then(value => { setGraph(parseGraph(value)); setLoading(false); })
       .catch(e => { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, []);
   useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>关闭</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="导入轨迹" onImport={loadFile} />{exampleCatalog.map(d => <a key={d.id} className="welcome-example" href={`?example=${encodeURIComponent(d.id)}`} aria-label={`查看示例：${d.title}`} aria-busy={loading}>{loading ? '读取轨迹…' : '查看示例'}</a>)}</div></div>}</>;
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>Close</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="Import trajectory" onImport={loadFile} />{exampleCatalog.map(d => <a key={d.id} className="welcome-example" href={`?example=${encodeURIComponent(d.id)}`} aria-label="View example" aria-busy={loading}>{loading ? 'Loading…' : 'View example'}</a>)}</div></div><Instructions /></div></div>}</>;
 }

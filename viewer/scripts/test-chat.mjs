@@ -17,7 +17,7 @@ const events = new Map(g.timeline.timeline.map(e => [e.id, e]));
 // The outline names every card by id, carries the informs links and the journey, and stays small.
 const out = outline(g);
 for (const e of [...g.states, ...g.branches, ...g.actions]) assert(out.includes(`[[${e.id}]]`), `${e.id} in outline`);
-assert(out.includes('[[a451]] → [[a458]]') && out.includes('历程'));
+assert(out.includes('[[a451]] → [[a458]]') && out.includes('Journey'));
 assert(out.length < 40000, `outline is ${out.length} chars`);
 
 // Focus includes every preceding raw record in the selected session, including thinking.
@@ -32,7 +32,7 @@ assert.equal(sentEvents.length, new Set(sentEvents).size, 'deduplicated');
 assert(focused.items.some(i => i.node === 's3-rebase'));
 assert(focused.items.some(i => i.node === 's3'));
 assert(focused.items.some(i => i.node === 'a451'));
-assert(focused.messages.at(-1).content.endsWith('问题：为什么回到 v2？'));
+assert(focused.messages.at(-1).content.endsWith('Question: 为什么回到 v2？'));
 assert(focused.system.startsWith(SYSTEM));
 assert(!focused.messages.at(-1).content.includes(g.journey.text), 'prefix excludes retrospective journey');
 for (const e of priorMain) assert(focused.messages.at(-1).content.includes(e.text), `unclipped ${e.id}`);
@@ -90,7 +90,7 @@ assert.equal(compressed.items.find(i => i.event === 'main:4').omittedChars, 0, '
 assert(compressed.messages.at(-1).content.includes('z'.repeat(4000)));
 assert.equal(buildChat(fixture, 'a3', 'why', [], { inputTokens: 1e6 }).preview.blocked, false);
 assert.equal(buildChat(fixture, 'a3', 'why', [], { inputTokens: NaN }).preview.blocked, true);
-assert.throws(() => buildChat(fixture, 'missing', 'why', []), /不存在/);
+assert.throws(() => buildChat(fixture, 'missing', 'why', []), /no longer exists/);
 const pair = (key, text) => [{ role: 'user', text: `ask ${text}`, scopeKey: key }, { role: 'assistant', text: `answer ${text}`, scopeKey: key }];
 const past = [...pair(whole.scopeKey, 'FUTURE_CHAT'), ...pair(bounded.scopeKey, 'SAME_CHAIN'),
   { role: 'user', text: 'ORPHAN', scopeKey: bounded.scopeKey }, { role: 'assistant', text: 'ERROR', error: 'failed', scopeKey: bounded.scopeKey }];

@@ -4,13 +4,13 @@ export const HANDOFF_TIMEOUT_MS = 30_000;
 export interface HandoffRequest { token: string; source: string }
 export type HandoffError = 'invalid-json' | 'invalid-graph' | 'too-large' | 'timeout' | 'unavailable';
 const errorMessages: Record<HandoffError, string> = {
-  'invalid-json': '本地文件不是有效的 JSON，请重新生成或手动导入。',
-  'invalid-graph': '本地文件未通过轨迹格式检查，请修复导出文件后重试。',
-  'too-large': '轨迹超过一键打开的 64 MiB 上限，请使用“导入轨迹”选择本地文件。',
-  timeout: '等待本地文件超时，请重新打开轨迹链接，或使用“导入轨迹”。',
-  unavailable: '无法连接本地页面，请重新打开轨迹链接，或使用“导入轨迹”。',
+  'invalid-json': 'The local file is not valid JSON. Regenerate it or import it manually.',
+  'invalid-graph': 'The local file failed trajectory validation. Fix the export and try again.',
+  'too-large': 'The trajectory exceeds the 64 MiB limit for direct opening. Use Import trajectory to select the local file.',
+  timeout: 'Timed out waiting for the local file. Reopen the trajectory link or use Import trajectory.',
+  unavailable: 'Cannot connect to the local page. Reopen the trajectory link or use Import trajectory.',
 };
-export const HANDOFF_LINK_ERROR = '本地文件打开链接无效，请重新打开轨迹链接，或使用“导入轨迹”。';
+export const HANDOFF_LINK_ERROR = 'Invalid local-file link. Reopen the trajectory link or use Import trajectory.';
 
 /** Opaque file origins and loopback helpers only; arbitrary websites are not import sources. */
 export function isLocalHandoffOrigin(origin: string): boolean {

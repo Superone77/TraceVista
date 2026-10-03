@@ -99,7 +99,7 @@
 .card-title:hover{background:transparent;color:var(--accent);text-decoration:underline}
 .map-card.branch,.map-card.action:not(.tier-raw){display:flex;flex-direction:column}
 .map-card.branch .card-title{font-size:15px}
-.map-card.branch .card-foot,.map-card.action:not(.tier-raw) .card-foot{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:8px;padding-top:6px;font-size:12px;flex-shrink:0;overflow:visible}
+.map-card.branch .card-foot,.map-card.action:not(.tier-raw) .card-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;justify-content:space-between;margin-top:8px;padding-top:6px;font-size:12px;flex-shrink:0;overflow:visible;white-space:normal;overflow-wrap:anywhere}
 .map-card.branch .card-foot .counts{display:flex;gap:7px;font-size:11px;margin:0}
 .map-card.branch .enter-branch{position:static;font-size:12px}
 .map-card.branch.routine{background:#fdfdfd;border-left-color:var(--line-strong);opacity:1}

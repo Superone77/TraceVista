@@ -1,11 +1,31 @@
-# Directly opening a trace
+# Opening a trace in TraceVista
 
-## User-facing result
+## Default: import the current file in the cloud viewer
 
-Return an **Open in TraceVista** link in the chat. Clicking it must show the loaded,
-full-screen visualization, without an intermediate overview page, popup or another button.
-Keep the complete `.agent-state.json` as a secondary artifact. A bare cloud homepage is not
-a direct link to the trace.
+After generating and validating the complete `.agent-state.json`:
+
+1. Open [TraceVista](https://tracevista.pages.dev/) in the user's browser.
+2. Click **Import trajectory** (older UI: **导入轨迹**) and select the current export.
+   On the homepage the button is directly visible; in a loaded viewer, open the top-left
+   **Viewer menu** (☰) first. Use browser tools to do this when they
+   support local file selection. Loading a bundled example is a separate demonstration.
+3. Confirm the task and state overview match this file. Inspect a turn or restored path
+   when present and open a raw-record card to check its evidence.
+4. Return the complete JSON and say what was checked. Include a screenshot if captured.
+
+When browser access or file selection is unavailable, provide the JSON and tell the user
+to open TraceVista, click **Import trajectory**, and choose that file. Describe browser verification
+as pending. No local helper process is needed for this workflow.
+
+The selected file is processed in the browser. Its loaded state belongs to the open tab;
+`https://tracevista.pages.dev/` is the viewer address, not a saved link to that trajectory.
+Reopen the JSON to restore the graph. Optional viewer chat sends selected context to the
+configured model when the user asks a question.
+
+## Optional local preview
+
+For an explicitly requested local preview, use the standard-library helper below. This
+requires Python 3.10 or later and starts a local server; it is not the default cloud import.
 
 ```sh
 python3 /absolute/skill/scripts/create_view.py /absolute/task.agent-state.json \
@@ -18,12 +38,12 @@ Open and test the returned `url` before delivering it. The server selects a free
 default; `--port` can request a specific one. `--prepare-only` writes the JSON and quality
 report without starting a server, and therefore does not return a viewing URL.
 
-The page directly embeds the selected TraceVista engine and automatically passes it the
+The local page embeds the selected TraceVista engine and automatically passes it the
 complete file. Default engine: `https://tracevista.pages.dev/`. A locally running engine can
 be selected with `--viewer-url http://127.0.0.1:8875/`. The skill needs Python's standard
-library; it does not need to clone, build or run the engine's source.
+library; it does not need to build or run the engine's source.
 
-## Lifetime and fallback
+### Lifetime and fallback
 
 - The URL is local to the same machine and works while that helper process runs. Keep its
   command/session identity. Stop it when no longer needed; never kill unrelated servers.
@@ -38,8 +58,7 @@ library; it does not need to clone, build or run the engine's source.
 
 Only the random route for this trace is served, not a filesystem directory. The helper binds
 127.0.0.1, checks Host and returns no-store responses. It does not upload a copy to cloud
-storage. The selected engine's code processes the file in the browser. Optional viewer chat
-sends selected context to the configured model only when the user asks a question.
+storage. The selected engine's code processes the file in the browser.
 
 ## Continuing an edit
 
@@ -50,10 +69,11 @@ checksums and returns paths. Default `.work/tracevista/state` is project-scoped;
 
 For a reading-only correction, patch the existing graph while preserving raw events and IDs.
 For changed structure, edit the analysis and rebuild against the saved timeline. Validate the
-result and start a new direct view from that revision. An old running view still contains its
-original revision, so return the new link explicitly.
+result and import the new file in the cloud viewer. If a local preview was requested, start
+it from the new revision and return its new local URL; an older running view keeps its
+original file.
 
-## Browser protocol (maintainers)
+## Local preview browser protocol (maintainers)
 
 The local page creates a full-viewport iframe whose URL fragment contains
 `tracevista-import=<32–128 hexadecimal characters>&source=<encoded local origin>`.
@@ -70,8 +90,8 @@ Sender verifies `event.source === iframe.contentWindow`, exact viewer origin and
 JSON is sent only to the exact target origin. Receiver uses its parent when framed, otherwise
 its opener for legacy flows; it checks that peer, the declared local source origin and token.
 Only an explicit valid import fragment activates the receiver. The receiver accepts one
-matching import, runs the ordinary graph parser and then acknowledges. Both sides stop
-listening after completion or 30 seconds. Failures do not send raw exception text.
+matching import, runs the ordinary graph parser and then acknowledges. Pending imports
+time out after 30 seconds. Failures do not send raw exception text.
 
 Allowed source origins remain `null` for legacy local files and HTTP(S) loopback origins
 `localhost`, `127.0.0.1` and `[::1]`. A null-origin legacy peer receives only status replies

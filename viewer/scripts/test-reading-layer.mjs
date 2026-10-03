@@ -80,7 +80,7 @@ const layout = layoutGraph(g, 'actions', 'lineage', { fold: true });
 const proj = semanticProjection(g, layout, 'actions');
 assert(proj.nodes.some(n => n.kind === 'fold'));
 for (const e of proj.edges) assert(proj.nodes.some(n => n.id === e.source) && proj.nodes.some(n => n.id === e.target), 'Edges end on visible cards');
-assert(proj.edges.some(e => e.kind === 'informs' && e.source === 'a5' && e.target === 'a6' && e.label === '依据'));
+assert(proj.edges.some(e => e.kind === 'informs' && e.source === 'a5' && e.target === 'a6' && e.label === 'Informs'));
 
 // The bundled Pi example carries a reading layer that says what each step adds.
 const pi = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-infra-r1.agent-state.json', import.meta.url), 'utf8')));
