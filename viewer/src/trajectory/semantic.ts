@@ -16,7 +16,7 @@ export function recordsForAction(g: Graph, action: Action) {
 export interface FoldItem { id: string; title: string; summary: string; events: string[]; state: string; branch: string; actions: Action[] }
 export interface LayoutOptions { fold?: boolean; openFolds?: ReadonlySet<string> }
 export const FOLD_MIN = 3;
-export const BRANCH_H = 290;
+export const BRANCH_H = 350;
 const FOLD_H = 96;
 /** Actions a reader must see when routine steps fold: turns, what informed them, and what changed state. */
 export function keptActions(g: Graph): Set<string> {
@@ -60,12 +60,15 @@ export function stateConnections(g: Graph, mode: StateMode) {
 
 export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lineage', opts: LayoutOptions = {}): Layout {
   const detailed = tier === 'actions' || tier === 'raw';
-  const width = tier === 'states' ? 780 : Math.max(780, 48 + Math.max(1, ...g.states.map(s => g.branches.filter(b => b.state === s.id).length)) * 400);
-  const actionHeight = tier === 'raw' ? 420 : 300;
+  const width = tier === 'states' ? 1240 : Math.max(780, 48 + Math.max(1, ...g.states.map(s => g.branches.filter(b => b.state === s.id).length)) * 400);
+  // At the action tier, the written description is readable without opening Details.
+  // Reserve more room for longer descriptions; very long ones scroll inside the card.
+  const actionHeight = (action: Action) => tier === 'raw' ? 420 : Math.min(640, Math.max(340,
+    160 + Math.ceil([...(action.summary || action.title)].reduce((n, c) => n + (/[\u3400-\u9fff]/.test(c) ? 2 : 1), 0) / 38) * 26));
   const actionTop = 192 + BRANCH_H + 12;
   const keep = keptActions(g);
   const items = new Map(g.branches.map(b => [b.id, branchItems(g, b.id, opts, keep)]));
-  const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight;
+  const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight(item);
   const nodes: MapNode[] = [];
   const connections = stateConnections(g, mode);
   const children = (id: string) => g.states.filter(s => connections.some(t => t.source === id && t.target === s.id));

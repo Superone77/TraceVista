@@ -6,15 +6,15 @@
 ## 打开
 
 直接打开[云端 TraceVista](https://tracevista.pages.dev/)，点击“Import trajectory”选择完整的 `.agent-state.json`。
-原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#5-用-tracevista-skill-生成和修改轨迹)。首页“View example”打开 Pi 实例。
+原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#5-用-tracevista-skill-生成和修改轨迹)。首页“View examples”展开案例列表，点击名称后打开案例。
 
 本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
 
 打开轨迹后仅显示顶部工具栏，品牌、任务标题和副标题不占用画布空间（标签页仍保留任务名称）。顶部保留四层快捷按钮、Details 和 Chat；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。界面使用深浅灰色，轨迹内部的行为、状态和连线保留语义色；详情里的卡片与标签沿用语义色，追问区的警告与错误用红色提示。画布不再显示状态统计与手势提示条。
 
-内置示例：`?example=pi-infra-r1`；由 `viewer/public/examples/index.json` 登记。
+内置示例：`?example=kda-w8a16-r1`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
-生产构建只打包内置示例，排除 local-data。Pi 是当前获准公开的内置示例。
+生产构建只打包内置示例，排除 local-data。KDA W8A16 是当前获准公开的内置示例。
 
 ## 四层缩放
 
@@ -38,7 +38,7 @@
 日常可用触控板捏合缩放、双指平移、拖动或双击深入。只有视图改变，原始数据不被折叠操作修改。
 
 - 各层只为当前可见内容分配空间；隐藏的日志不再把总览拉成长条。切换层级时，保持鼠标下的卡片或其父状态在原位置。
-- 行为摘要卡片高度为 300，原文卡片高度为 420、宽度为 360；长正文在卡片内滚动。
+- 行为层直接显示完整分析说明，卡片高度随文本在 340–640 之间调整；超长说明在卡片内滚动。原文卡片高度为 420、宽度为 360。
 - 默认“Trackpad”：双指平移、捏合或 ⌘/Ctrl + 滚轮缩放。切换到“Mouse”后，滚轮直接缩放。
 - 拖动空白处、卡片边框或标题可平移；按住空格也可以从正文区域拖动画布。正文保留文字选择和独立滚动。
 - 缩放只更新画布变换和一处缩放样式，避免每一帧重新生成全部节点及原始记录。
@@ -85,7 +85,7 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 
 借鉴 ThoughtDAG 的缩放摘要（ladder）、推理标记（move）、condense 折叠和连线避让。文件里没有阅读层时照常显示。
 
-- **随缩放生长的摘要**：状态、分支、行为各有 topic ⊂ takeaway ⊂ brief 三级文字，字号按画布坐标设定。缩放时显示屏幕上字号够大的最深一级，词语逐个变形，不会整段替换。行为卡片放大到约 100% 时，在 brief 下方出现原文引用，点击事件编号可以打开原文。
+- **逐层展开的信息**：全图状态卡片保留 takeaway 和测量结果，不退化为提交编号。状态主题概括具体变化；工作阶段显示方向、结论和原因；行为层直接展示完整分析说明，原始记录在第四层展开。文件仍保留 topic ⊂ takeaway ⊂ brief 及证据摘句，详情区可查看引用。
 - **没有写 ladder 的节点**：用标题和自身摘要生成，并删掉与父节点摘要重复的部分。
 - **推理标记**：✕ 排除、◆ 决定、↪ 转向、? 未决、● 发现。总览中每个状态下方列出它的转向地标，点击即可跳转。没有标记的分支按常规工作显示为灰色。
 - **依据边（informs）**：观察指向它改变的决定，用蓝色虚线表示，详情栏列出“Supporting observations”和“Decisions informed”。分支层只画同一状态内的依据边。
@@ -152,7 +152,7 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 
 仓库根目录：`pnpm test`，`pnpm build`。
 覆盖四层投影、跨层位置保持、跨分支连接、原文完整性与顺序、旧格式兼容、无效输入、
-示例路径以及 Pi 完整导出文件的原文完整性。浏览器内仍需检查真实缩放、滚动与卡片导航。
+示例路径以及 KDA 完整导出文件的原文完整性。浏览器内仍需检查真实缩放、滚动与卡片导航。
 
 ## Generic structure and evidence (optional v1 observations)
 
@@ -179,9 +179,9 @@ outcome categories. They cannot prove that an analyst's semantic interpretation 
 Source evidence remains the authority. Guide/source recognition is authored by the converter,
 not guessed from keyword mentions by the renderer. Existing v1 files without this layer work.
 
-Only the authorized Pi example is bundled. Synthetic data under `viewer/scripts/fixtures/` is
+Only the authorized KDA W8A16 example is bundled. Synthetic data under `viewer/scripts/fixtures/` is
 used only by tests. Ordinary real imports stay in ignored local-data. The viewer contains no
-Pi/LoRA-specific interpretation rules.
+agent/task-specific interpretation rules.
 
 ## 新轨迹的阅读层检查
 
@@ -195,7 +195,7 @@ Pi/LoRA-specific interpretation rules.
 
 默认流程是生成并验证完整 `.agent-state.json`，然后在用户浏览器的 [TraceVista](https://tracevista.pages.dev/) 中点击“Import trajectory”，选择本次生成的文件。有文件选择能力的浏览器工具可以由 agent 完成这一步，再检查状态总览、关键转向和原始记录。
 
-无法操作浏览器时，agent 交付完整 JSON 和手动导入步骤，并说明尚未检查实际渲染。首页地址不会保存某条轨迹；重新打开时选择保存的 JSON。Pi 示例用于了解界面，当前文件的检查需要实际导入该文件。
+无法操作浏览器时，agent 交付完整 JSON 和手动导入步骤，并说明尚未检查实际渲染。首页地址不会保存某条轨迹；重新打开时选择保存的 JSON。KDA 示例用于了解界面，当前文件的检查需要实际导入该文件。
 
 `create_view.py` 保留为显式选择的本地预览工具：它启动本机服务，在页面中加载所选查看器并传入完整文件。返回的 localhost URL 仅在同一台机器、服务运行期间有效。用法及导入协议见 [打开方式](../skills/tracevista-skill/references/opening.md)。
 
@@ -208,3 +208,9 @@ The viewer uses English for navigation, controls, status labels, settings, and e
 `viewer/src/trajectory/interface.css` defines screen-space UI sizes in `rem`: controls and panel text use `.875rem`, captions use `.75rem`. Narrow layouts wrap controls and reposition panels instead of shrinking text. Browser zoom and the user's base font size remain effective. The landing page keeps its larger serif text; only the decorative TraceVista title uses a bounded fluid size.
 
 Canvas card typography remains separate in `trajectory.css`: semantic zoom continues to reveal states, phases, actions and raw records without scaling the surrounding interface.
+
+## Example library
+
+The landing page has one **View examples** button. Hover, focus or click opens a named list; Escape or clicking outside closes it. Entries show their title and optional agent, task and date. The small catalog is bundled with the interface; full trajectory JSON is fetched only after an entry is selected.
+
+`viewer/public/examples/index.json` lists the approved public examples. Update the catalog and its complete JSON files together, then rebuild and deploy. Tests reject unlisted files in the public example directory. The current entry is **Kernel Design Agent (KDA) · W8A16 · 2026-10-02**, with English analyst annotations and unchanged source evidence.

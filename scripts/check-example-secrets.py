@@ -14,7 +14,7 @@ patterns=[
  re.compile(r'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'),
  re.compile(r'(?i)bearer\s+[A-Za-z0-9._-]{20,}'),
 ]
-files=[root/'viewer/public/examples/pi-infra-r1.agent-state.json']
+files=sorted((root/'viewer/public/examples').glob('*.json'))
 failures=[]
 for p in files:
  if not p.is_file():continue

@@ -6,7 +6,7 @@
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
 本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
-以及一份完整导出的 **Pi Infra Harness / LoRA / 20261001-r1** 真实轨迹。
+以及一份完整导出的 **Kernel Design Agent (KDA) / W8A16 / 2026-10-02** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 打开 TraceVista
@@ -31,10 +31,10 @@ pnpm dev
 
 打开：
 
-- **Pi 真实轨迹：** http://127.0.0.1:8875/?example=pi-infra-r1
+- **KDA 真实轨迹：** http://127.0.0.1:8875/?example=kda-w8a16-r1
 - 首页 / 本地 JSON 导入：http://127.0.0.1:8875/
 
-首页也有示例入口。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
+首页的 **View examples ▾** 在悬停、键盘聚焦或点击时展示案例列表；选中后才加载完整 JSON。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
 `trajectory.html` 保留为兼容入口。若 8875 被占用，先停止占用它的开发服务器，或手动用
 `pnpm exec vite --config viewer/vite.config.ts --host 127.0.0.1 --port 8876 --strictPort` 更换端口。
 
@@ -53,38 +53,33 @@ pnpm dev
 触控板默认双指平移、捏合缩放；鼠标模式用滚轮缩放。空白处拖动或按空格拖动画布。
 工具栏的四个层级按钮可以直接跳转。读日志时可选中复制文本。
 
-Pi 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
+KDA 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
 编辑、测试和回退过程在行为层展开，状态连线对应实际发生的变化。
 
 ### 阅读层（借鉴 ThoughtDAG）
 
-Pi 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，32 个转向地标标注了排除、决定、转向或未决，18 条依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
+KDA 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，转向地标标注了排除、决定、转向或未决，31 条依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
 
 工具栏“Chat”可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“Test connection”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
 
-## 3. Pi 示例展示了什么
+## 3. Kernel Design Agent (KDA) example
 
-这轮实验由 DeepSeek Flash / high 在 A100 40GB 上执行 LoRA 优化。549 条原始会话事件、150 次工具调用，整理为
-6 个状态、20 个探索分组、152 个行为；另保留 7 条提交账本 / 独立评分记录。
+This W8A16 run uses Claude Opus 5.5 / high as the main agent and GPT-6-sol / high for two Codex reviews on an A100 40GB. The English reading layer covers 8 system states, 25 work phases and 99 actions. The complete export retains 1,919 main-session records, 63 reviewer records, and 20 explicitly identified controller artifact records.
 
-| 提交 | 主要变化 | 正确性 | 开发评分 |
+| Submission | Candidate | Development correctness | Development speedup |
 |---|---|---|---:|
-| 1 | 分组 Triton shrink / expand | 通过 | 18.671309× |
-| 2 | 直接启动 CompiledKernel + raw stream | 通过 | 33.369200× |
-| 3 | identity 启动缓存 | 通过 | 30.834023× |
-| 4 | 回到第 2 版，再精简特化键 | 通过 | 35.444980× |
+| 1 | v9: fused dequantization and direct launch | Passed | 13.122027× |
+| 2 | v13: bitwise conversion and configuration changes | Passed | 15.784736× |
+| 3 | v14: host dispatch changes | Passed | 15.765494× |
+| 4 | v15: split rules across shapes | Passed | 16.178644× |
+| 5 | v18: precision-path and grid changes | Passed | 20.556049× |
+| 6 | The same v18 code, submitted again | Passed | 15.920750× |
 
-第 3 次提交虽然在复用对象的局部测试中更快，开发评分却降低了约 7.6%。后续 fresh / rotating 对照后，
-agent 回到第 2 版继续修改，得到第 4 版。因此版本树中 3 和 4 是从 2 分出的两个后继，时间顺序仍是 2 → 3 → 4。
-最终选中第 4 版；独立 Oracle **ABBA 为 2.113798×**，独立官方 baseline 为 **34.588125×**。
-页面分别展示开发评分、独立评分和局部计时。
+Submissions 5 and 6 have identical code trees. The lower repeated score is a measurement change, not a code rollback. Finalization selects submission 5's historical best record. The independent correctness suite passes; independent Oracle ABBA speedup is **2.215205×**. The separate runner baseline speedup is **15.938802×** and uses a different comparison protocol. Static reviews still leave a large-shape precision risk, and no third review after the fixes was observed.
 
-发布版仅附带 Pi Infra Harness 示例，展示版本变化与性能优化过程。
+The public library now contains this KDA example. Titles, summaries and analyst notes are English; raw messages, commands, results and evidence attachments are preserved verbatim. This updates the visualization of an existing run; it does not rerun the benchmark.
 
-![Pi 版本树](docs/pi-overview.png)
-
-完整文件：[pi-infra-r1.agent-state.json](viewer/public/examples/pi-infra-r1.agent-state.json)。
-导出文件包含原文和证据附件，支持放大查看与离线分析。
+Complete export: [kda-w8a16-r1.agent-state.json](viewer/public/examples/kda-w8a16-r1.agent-state.json).
 
 ## 4. 验证和部署
 
@@ -105,7 +100,7 @@ pnpm preview
 python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
 
-然后访问 http://127.0.0.1:8000/?example=pi-infra-r1 。
+然后访问 http://127.0.0.1:8000/?example=kda-w8a16-r1 。
 资源使用相对路径，可部署在子目录。字体随构建打包，不依赖在线字体服务。
 `viewer/public/local-data/` 是被忽略的本机数据目录，构建时会排除；
 只有 `viewer/public/examples/` 中明确收录的示例进入构建。
@@ -168,7 +163,7 @@ python3 .agents/skills/tracevista-skill/scripts/validate_trace.py /path/to/task.
 ```
 
 随后在云端查看器点击“Import trajectory”，选择这份 JSON；有浏览器操作能力的 agent 可以完成导入和检查。
-交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 Pi 示例可用于了解界面。
+交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 KDA 示例可用于了解界面。
 需要本地预览时，可按[可选本地预览说明](skills/tracevista-skill/references/opening.md#optional-local-preview)使用 `create_view.py`。
 
 让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从
@@ -182,7 +177,7 @@ python3 .agents/skills/tracevista-skill/scripts/validate_trace.py /path/to/task.
 `--format canvas` 可导出兼容 ThoughtDAG 的旧版画布格式。
 
 新增示例：将生成图放到 `viewer/public/examples/<id>.agent-state.json`，在
-`viewer/public/examples/index.json` 中登记名称和说明，即可获得 `?example=<id>` 入口，无需修改引擎。
+`viewer/public/examples/index.json` 中登记 `id`、`title`、`file`、`description`，可补充 `agent`、`task`、`date` 作为列表副标题，即可获得 `?example=<id>` 入口，无需修改引擎。
 普通个人日志直接从浏览器导入，或放入被忽略的 `viewer/public/local-data/<name>.json` 并用 `?data=<name>` 打开。
 
 ## 6. 目录与本次整理
@@ -198,7 +193,7 @@ pnpm-lock.yaml                    固定前端依赖及完整性
 ```
 
 本次为可复现交付做了四项改动：抽出独立查看器、增加通用示例目录与相对路径加载、
-给编译器增加 `--format state`、将完整 Pi 导出纳入内置示例并校验各层展示与证据完整性。
+给编译器增加 `--format state`、纳入完整真实案例并校验各层展示与证据完整性。
 保留四层缩放、状态树、原文卡片和证据结构。
 
 来源和许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -213,7 +213,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     </fieldset>}
     <div className="chat-list" ref={list}>
       {!turns.length && <div className="chat-empty"><p>Ask about the full trajectory, or select a card on the map to ask about that step.</p>
-        {['Why was commit 4 chosen in the end?', 'Why did commit 3 regress, and how did the agent find out?', 'Which approaches were rejected based only on local timings?'].map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
+        {['Why was the final version chosen?', 'Which evidence changed the agent’s direction?', 'Which conclusions are supported by independent checks?'].map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
       {turns.map(t => <div key={t.id} className={`chat-turn ${t.role}`}>
         {t.role === 'user' && t.focus && <small>Focus <button className="cite node" onClick={() => jump(t.focus!)}>{t.focus}</button></small>}
         <div className="chat-text">{citations(t.text, known).map((p, i) => 'text' in p ? <Rich key={i} text={p.text} />

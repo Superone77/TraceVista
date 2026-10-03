@@ -10,6 +10,7 @@ import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
+import ExampleMenu from './ExampleMenu';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -85,10 +86,12 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     overviewPinned.current = true;
     setSelected(null);
     const { width, height } = layouts.states;
-    const zoom = fitAll ? Math.max(.04, Math.min(.44, (box.width - 64) / width, (box.height - 70) / height)) : .44;
+    const leftInset = journeyOpen && graph.journey && box.width >= 1000 ? Math.min(380, box.width * .38) + 32 : 0;
+    const centerX = (leftInset + box.width) / 2;
     const root = layouts.states.nodes.find(n => n.kind === 'state')!;
-    setView('states', { x: fitAll ? (box.width - width * zoom) / 2 : box.width / 2 - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
-  }, [layouts, setView]);
+    const zoom = Math.max(.04, Math.min(.44, (box.width - leftInset - 64) / (fitAll ? width : root.width), ...(fitAll ? [(box.height - 110) / height] : [])));
+    setView('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
+  }, [layouts, setView, journeyOpen, graph.journey]);
   useEffect(() => {
     const el = canvasRef.current?.querySelector('.react-flow');
     if (!el) return;
@@ -287,5 +290,5 @@ export default function StateReader() {
     return () => controller.abort();
   }, []);
   useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>Close</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="Import trajectory" onImport={loadFile} />{exampleCatalog.map(d => <a key={d.id} className="welcome-example" href={`?example=${encodeURIComponent(d.id)}`} aria-label="View example" aria-busy={loading}>{loading ? 'Loading…' : 'View example'}</a>)}</div></div><Instructions /></div></div>}</>;
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>Close</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => setGraph(null)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="Import trajectory" onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
 }

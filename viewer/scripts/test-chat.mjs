@@ -11,28 +11,29 @@ async function moduleAt(path) {
 }
 const { parseGraph } = await moduleAt('../src/trajectory/model.ts');
 const { outline, buildChat, retrieve, citations, readSSE, SYSTEM, parseModels, canListModels } = await moduleAt('../src/trajectory/chat.ts');
-const g = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-infra-r1.agent-state.json', import.meta.url), 'utf8')));
+const g = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/kda-w8a16-r1.agent-state.json', import.meta.url), 'utf8')));
 const events = new Map(g.timeline.timeline.map(e => [e.id, e]));
 
 // The outline names every card by id, carries the informs links and the journey, and stays small.
 const out = outline(g);
 for (const e of [...g.states, ...g.branches, ...g.actions]) assert(out.includes(`[[${e.id}]]`), `${e.id} in outline`);
-assert(out.includes('[[a451]] → [[a458]]') && out.includes('Journey'));
+const dependency = g.links.find(l => l.kind === 'informs');
+assert(out.includes(`[[${dependency.source}]] → [[${dependency.target}]]`) && out.includes('Journey'));
 assert(out.length < 40000, `outline is ${out.length} chars`);
 
 // Focus includes every preceding raw record in the selected session, including thinking.
-const focused = buildChat(g, 'a458', '为什么回到 v2？', []);
+const focused = buildChat(g, 'a_e1633', '为什么修复精度？', []);
 const sentEvents = focused.items.filter(i => i.event).map(i => i.event);
-const own = g.actions.find(a => a.id === 'a458').events;
+const own = g.actions.find(a => a.id === 'a_e1633').events;
 assert(own.every(id => sentEvents.includes(id)), 'all current-card records are sent');
 const lastOwn = Math.max(...own.map(id => g.timeline.timeline.findIndex(e => e.id === id)));
 const priorMain = g.timeline.timeline.slice(0, lastOwn + 1).filter(e => e.id.startsWith('main:'));
 assert(priorMain.every(e => sentEvents.includes(e.id)), 'entire prior main session, not last six actions');
 assert.equal(sentEvents.length, new Set(sentEvents).size, 'deduplicated');
-assert(focused.items.some(i => i.node === 's3-rebase'));
-assert(focused.items.some(i => i.node === 's3'));
-assert(focused.items.some(i => i.node === 'a451'));
-assert(focused.messages.at(-1).content.endsWith('Question: 为什么回到 v2？'));
+assert(focused.items.some(i => i.node === 'b_v18'));
+assert(focused.items.some(i => i.node === 's4'));
+assert(focused.items.some(i => i.node === 'a_e1578'));
+assert(focused.messages.at(-1).content.endsWith('Question: 为什么修复精度？'));
 assert(focused.system.startsWith(SYSTEM));
 assert(!focused.messages.at(-1).content.includes(g.journey.text), 'prefix excludes retrospective journey');
 for (const e of priorMain) assert(focused.messages.at(-1).content.includes(e.text), `unclipped ${e.id}`);
@@ -40,10 +41,10 @@ assert(focused.preview.estimatedTokens > 0);
 assert.equal(focused.preview.compressedCount, 0);
 
 // Full-run mode deliberately includes all evidence; unscoped old chats cannot leak hindsight.
-const found = retrieve(g, 'CUDA Graph replay 整合收益', new Set());
+const found = retrieve(g, 'fp16 dequant precision', new Set());
 assert(found.length > 0);
 const history = [{ id: '1', role: 'user', text: '旧版全局问答', at: '' }, { id: '2', role: 'assistant', text: '未来结论', at: '' }];
-const open = buildChat(g, null, 'CUDA Graph 为什么删掉？', history);
+const open = buildChat(g, null, '为什么修改 fp16 dequant？', history);
 assert.equal(open.preview.eventCount, g.timeline.timeline.length);
 assert.equal(open.messages.length, 1);
 assert(open.messages.at(-1).content.includes(g.journey.text));
@@ -114,11 +115,11 @@ assert.equal(buildChat(fixture, 'a3', 'why', longDiscussion).preview.historyTurn
 
 // Citations: cards and events become links; an id the record lacks is marked.
 const known = id => g.actions.some(a => a.id === id) ? 'node' : events.has(id) ? 'event' : null;
-const parts = citations('放弃 identity 见 [[a451]] 与 [[main:E451]]，另见 [[zz9]]。', known);
-assert.deepEqual(parts.filter(p => p.id).map(p => [p.id, p.kind]), [['a451', 'node'], ['main:E451', 'event'], ['zz9', 'unknown']]);
-assert.equal(parts.filter(p => 'text' in p).map(p => p.text).join(''), '放弃 identity 见  与 ，另见 。');
-const single = citations('见 [a451] 和 [main:E451]，[1] 是脚注，[main:E99999] 不存在。', known);
-assert.deepEqual(single.filter(p => p.id).map(p => [p.id, p.kind]), [['a451', 'node'], ['main:E451', 'event']], 'single brackets count only for known ids');
+const parts = citations('精度修复 见 [[a_e1578]] 与 [[main:E1578]]，另见 [[zz9]]。', known);
+assert.deepEqual(parts.filter(p => p.id).map(p => [p.id, p.kind]), [['a_e1578', 'node'], ['main:E1578', 'event'], ['zz9', 'unknown']]);
+assert.equal(parts.filter(p => 'text' in p).map(p => p.text).join(''), '精度修复 见  与 ，另见 。');
+const single = citations('见 [a_e1578] 和 [main:E1578]，[1] 是脚注，[main:E99999] 不存在。', known);
+assert.deepEqual(single.filter(p => p.id).map(p => [p.id, p.kind]), [['a_e1578', 'node'], ['main:E1578', 'event']], 'single brackets count only for known ids');
 
 // Streams: both providers, chunks split anywhere, errors surface.
 let text = '';

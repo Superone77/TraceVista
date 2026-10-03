@@ -2,7 +2,7 @@ import { memo, type CSSProperties } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { behaviors, colors, entityColor, stateVisual, observationLabels, factText, moveColors, moveGlyphs, moveLabels, type Move, type Observation, type State, type Action, type Branch, type RawEvent, type ToolMark } from './model';
 import type { FoldItem, MapNode, Tier } from './semantic';
-import { FONTS, type Ladder } from './ladder';
+import { FONTS, levelText, type Ladder } from './ladder';
 import ZoomText, { LadderMorph, type Quote } from './ZoomText';
 import { labels } from './labels';
 import RawRecords from './RawRecords';
@@ -54,13 +54,14 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const color = entityColor(p.item as State | Branch | Action);
   const style = { '--tone': color } as CSSProperties;
   const plaque = (kind: keyof typeof FONTS) => ladder
-    ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} quotes={quotes} onEvidence={evidence} /></div>
+    ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} min={kind === 'branch' ? 2 : 0} quotes={quotes} onEvidence={evidence} /></div>
     : <h2><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button></h2>;
   return <div className={`map-card ${p.kind} tier-${tier} ${selected ? 'chosen' : ''} ${routine ? 'routine' : ''} ${move ? `move-${move}` : ''} ${cited ? 'cited' : ''}`} style={style} data-kind={p.kind} data-entity={p.id}>
     {handles}
     {p.kind === 'state' ? <>
       <div className={tier === 'states' ? 'state-map-summary' : 'state-map-heading'}>
         <div className="state-eyebrow"><span className="state-name">S{ordinal} · {p.item.title}</span><span>{branches} stages · {actions.length} actions</span></div>
+        {tier === 'states' && <button className="nodrag nopan compact-state-reading" onClick={e => { e.stopPropagation(); inspect(p.id); }}><span className="compact-state-id">S{ordinal}</span><span>{ladder ? levelText(ladder, 1) : p.item.title}</span></button>}
         {tier === 'states' ? <button className="nodrag nopan state-open plaque" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{ladder ? <ZoomText ladder={ladder} fonts={FONTS.state} max={2} /> : p.item.title}</button>
           : ladder ? <div className="heading-plaque"><LadderMorph ladder={ladder} level={2} fontSize={FONTS.heading[2]} /></div> : <><h2><button className="nodrag nopan state-open" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{p.item.title}</button></h2><p>{p.item.summary}</p></>}
         <div className="state-assessment"><b>{visual?.label}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ Restored version</span>}{tier === 'states' && <button className="nodrag nopan enter-state" onClick={e => { e.stopPropagation(); enter(p.id); }}>View trace ↗</button>}</div>
@@ -74,10 +75,9 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       <RawRecords records={records} />
     </> : <>
       <div className="card-top"><span>{p.kind === 'action' ? action.behavior : routine ? 'Routine work' : 'Work stage'}<MoveStamp move={move} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? labels[action.actor] ?? action.actor : labels[(p.item as Branch).status]}</span></div>
-      {ladder && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
-      {plaque(p.kind === 'action' ? 'action' : 'branch')}
+      {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
+      {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
       {p.kind === 'action' && skillBadges}{verdicts}
-      {!ladder && p.kind === 'action' && <p className="card-description nodrag nopan nowheel">{p.item.summary}</p>}
       {!ladder && p.kind === 'branch' && <p className="branch-description">{p.item.summary}</p>}
       {p.kind === 'action'
         ? <div className="card-foot"><span>{labels[action.outcome] ?? action.outcome}{tools.length ? ` · ${tools.join(' / ')}` : ''}</span><Fingerprint marks={fingerprint} /><span>{action.events.length} evidence records</span></div>

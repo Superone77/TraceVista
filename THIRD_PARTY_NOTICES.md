@@ -33,7 +33,6 @@ This repository contains the complete version used by the example, including sta
 
 ## Research example
 
-The single complete Pi JSON export is a user-authorized private research example. It includes model/tool
-output and snippets of the task code. The upstream viewer license is not a blanket license
-for the research logs. The user approved publishing this Pi export with TraceVista. Other imports are not bundled. Do not add API
-keys, OAuth tokens, Codex login files, or unreviewed experiment directories.
+The bundled KDA W8A16 JSON export is a user-authorized public research example, with English
+annotations and original model/tool evidence. It includes snippets of the task code. The
+upstream viewer license does not cover the research logs. Other imports are not bundled.

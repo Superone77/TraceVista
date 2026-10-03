@@ -12,6 +12,7 @@ const { branchItems, keptActions, layoutGraph, semanticProjection, FOLD_MIN } = 
 // Ladder levels follow the on-screen font, with hysteresis at each handoff.
 assert.equal(pickLevel(.3, null, FONTS.state), 0, 'Far out, a state shows its topic');
 assert.equal(pickLevel(.44, null, FONTS.state), 1, 'At overview zoom, its takeaway');
+assert.equal(pickLevel(.64, null, FONTS.branch, 3, 2), 2, 'The work-phase tier includes the reason, not only a short takeaway');
 assert.equal(pickLevel(.9, null, FONTS.action), 2, 'Action cards read their brief');
 assert.equal(pickLevel(1.05, null, FONTS.action), 3, 'Closer in, the quotes appear');
 assert.equal(pickLevel(.995, 3, FONTS.action), 3, 'Hysteresis keeps the current level near a boundary');
@@ -45,6 +46,13 @@ const base = { format: 'coding-agent-state-trajectory', version: 1, title: 'fold
   transitions: [{ source: 's0', target: 's1', action: 'a8', label: 'edit', changes: [{ component: 'code', before: 'A', after: 'B' }] }],
   timeline: { timeline: Array.from({ length: 10 }, (_, i) => ({ id: `e${i}`, kind: 'note', text: `event ${i}` })), sources: [] } };
 const plain = parseGraph(base);
+const longDescription = structuredClone(plain);
+longDescription.actions[0].summary = 'A detailed observation and its consequence. '.repeat(15);
+const expandedDescriptions = layoutGraph(longDescription, 'actions');
+const expandedAction = expandedDescriptions.nodes.find(n => n.id === 'a0');
+const nextAction = expandedDescriptions.nodes.find(n => n.id === 'a1');
+assert(expandedAction.height > nextAction.height, 'Long descriptions get room at the action tier');
+assert(nextAction.y >= expandedAction.y + expandedAction.height, 'Expanded descriptions do not overlap the next action');
 base.actions[1].move = 'ruleout';
 base.actions[1].ladder = { topic: 'step', takeaway: 'step 1 ruled out', abstract: [{ event: 'e1', quote: 'event 1' }] };
 base.journey = { text: 'started, ruled out step 1, landed', cites: ['a1'] };
@@ -82,21 +90,21 @@ assert(proj.nodes.some(n => n.kind === 'fold'));
 for (const e of proj.edges) assert(proj.nodes.some(n => n.id === e.source) && proj.nodes.some(n => n.id === e.target), 'Edges end on visible cards');
 assert(proj.edges.some(e => e.kind === 'informs' && e.source === 'a5' && e.target === 'a6' && e.label === 'Informs'));
 
-// The bundled Pi example carries a reading layer that says what each step adds.
-const pi = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-infra-r1.agent-state.json', import.meta.url), 'utf8')));
-const branchOf = new Map(pi.branches.map(b => [b.id, b]));
-assert(pi.branches.every(b => b.ladder), 'Every branch has a ladder');
-assert(pi.states.every(s => s.ladder), 'Every state has a ladder');
+// The bundled KDA example carries a reading layer that says what each step adds.
+const kda = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/kda-w8a16-r1.agent-state.json', import.meta.url), 'utf8')));
+const branchOf = new Map(kda.branches.map(b => [b.id, b]));
+assert(kda.branches.every(b => b.ladder), 'Every branch has a ladder');
+assert(kda.states.every(s => s.ladder), 'Every state has a ladder');
 const squash = s => s.replace(/[\s，。；、,.;]/g, '');
-for (const a of pi.actions.filter(a => a.ladder)) {
+for (const a of kda.actions.filter(a => a.ladder)) {
   const b = branchOf.get(a.branch);
   assert(!squash(a.ladder.takeaway + (a.ladder.reason ?? '')).includes(squash(b.summary)) && a.ladder.takeaway !== b.ladder.takeaway, `${a.id} repeats its branch`);
 }
-const landmarks = [...pi.branches, ...pi.actions].filter(e => landmarkMoves.includes(e.move));
+const landmarks = [...kda.branches, ...kda.actions].filter(e => landmarkMoves.includes(e.move));
 assert(landmarks.length >= 10, 'The run has visible turns');
-const t = new Map(pi.actions.map(a => [a.id, a.t_min]));
-for (const l of pi.links.filter(l => l.kind === 'informs')) assert(t.get(l.source) <= t.get(l.target), `${l.source} informs a later step`);
-const piFolded = layoutGraph(pi, 'actions', 'lineage', { fold: true });
-assert(piFolded.nodes.filter(n => n.kind === 'action').length < pi.actions.length, 'Decision view hides routine runs');
-assert(pi.journey.cites.every(id => [...pi.states, ...pi.branches, ...pi.actions].some(e => e.id === id)));
-console.log(`PASS: ladder levels and nesting, parent-free fallback, tool fingerprint, reading-layer validation, decision folds, Pi reading layer (${landmarks.length} turns, ${pi.links.filter(l => l.kind === 'informs').length} informs)`);
+const t = new Map(kda.actions.map(a => [a.id, a.t_min]));
+for (const l of kda.links.filter(l => l.kind === 'informs')) assert(t.get(l.source) <= t.get(l.target), `${l.source} informs a later step`);
+const kdaFolded = layoutGraph(kda, 'actions', 'lineage', { fold: true });
+assert(kdaFolded.nodes.filter(n => n.kind === 'action').length < kda.actions.length, 'Decision view hides routine runs');
+assert(kda.journey.cites.every(id => [...kda.states, ...kda.branches, ...kda.actions].some(e => e.id === id)));
+console.log(`PASS: ladder levels and nesting, parent-free fallback, tool fingerprint, reading-layer validation, decision folds, KDA reading layer (${landmarks.length} turns, ${kda.links.filter(l => l.kind === 'informs').length} informs)`);

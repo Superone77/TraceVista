@@ -412,10 +412,10 @@ class ViewTests(unittest.TestCase):
         output = prepare_view(self.source, self.folder / 'out')
         self.assertEqual(Path(output['graph']).read_bytes(), raw)
 
-    @unittest.skipUnless((ROOT / 'viewer/public/examples/pi-infra-r1.agent-state.json').exists(),
-                         'The standalone skill does not bundle the repository Pi example')
-    def test_real_pi_example_passes_full_reading_validation(self):
-        example = ROOT / 'viewer/public/examples/pi-infra-r1.agent-state.json'
+    @unittest.skipUnless((ROOT / 'viewer/public/examples/kda-w8a16-r1.agent-state.json').exists(),
+                         'The standalone skill does not bundle the repository KDA example')
+    def test_real_kda_example_passes_full_reading_validation(self):
+        example = ROOT / 'viewer/public/examples/kda-w8a16-r1.agent-state.json'
         raw = example.read_bytes()
         process = subprocess.run([sys.executable, str(SCRIPTS / 'validate_trace.py'), str(example),
                                   '--require-reading-layer'], capture_output=True, text=True)
@@ -423,7 +423,7 @@ class ViewTests(unittest.TestCase):
         result = json.loads(process.stdout)
         self.assertTrue(result['valid'])
         self.assertTrue(result['reading']['ready'])
-        self.assertEqual(result['counts']['actions'], 152)
+        self.assertEqual(result['counts']['actions'], 99)
         self.assertEqual(example.read_bytes(), raw)
 
 

@@ -41,13 +41,13 @@ export const HANDOFF_PX = 15;
 export const HANDOFF_HYST = 1.2;
 
 /** The deepest level whose on-screen font is at least HANDOFF_PX, with hysteresis around the current level. */
-export function pickLevel(zoom: number, current: LadderLevel | null, fonts: LadderFonts, max: LadderLevel = 3): LadderLevel {
-  let best: LadderLevel = 0;
+export function pickLevel(zoom: number, current: LadderLevel | null, fonts: LadderFonts, max: LadderLevel = 3, min: LadderLevel = 0): LadderLevel {
+  let best = Math.min(min, max) as LadderLevel;
   for (const k of [0, 1, 2, 3] as LadderLevel[]) {
     if (k > max) break;
     const px = fonts[k] * zoom;
     const need = current === null ? HANDOFF_PX : k > current ? HANDOFF_PX + HANDOFF_HYST : k === current ? HANDOFF_PX - HANDOFF_HYST : HANDOFF_PX;
-    if (px >= need) best = k;
+    if (px >= need && k > best) best = k;
   }
   return best;
 }
