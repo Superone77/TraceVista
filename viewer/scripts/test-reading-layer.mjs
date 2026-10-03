@@ -12,6 +12,7 @@ const { branchItems, keptActions, layoutGraph, semanticProjection, FOLD_MIN } = 
 // Ladder levels follow the on-screen font, with hysteresis at each handoff.
 assert.equal(pickLevel(.3, null, FONTS.state), 0, 'Far out, a state shows its topic');
 assert.equal(pickLevel(.44, null, FONTS.state), 1, 'At overview zoom, its takeaway');
+assert.equal(pickLevel(.64, null, FONTS.branch, 3, 2), 2, 'The work-phase tier includes the reason, not only a short takeaway');
 assert.equal(pickLevel(.9, null, FONTS.action), 2, 'Action cards read their brief');
 assert.equal(pickLevel(1.05, null, FONTS.action), 3, 'Closer in, the quotes appear');
 assert.equal(pickLevel(.995, 3, FONTS.action), 3, 'Hysteresis keeps the current level near a boundary');
@@ -45,6 +46,13 @@ const base = { format: 'coding-agent-state-trajectory', version: 1, title: 'fold
   transitions: [{ source: 's0', target: 's1', action: 'a8', label: 'edit', changes: [{ component: 'code', before: 'A', after: 'B' }] }],
   timeline: { timeline: Array.from({ length: 10 }, (_, i) => ({ id: `e${i}`, kind: 'note', text: `event ${i}` })), sources: [] } };
 const plain = parseGraph(base);
+const longDescription = structuredClone(plain);
+longDescription.actions[0].summary = 'A detailed observation and its consequence. '.repeat(15);
+const expandedDescriptions = layoutGraph(longDescription, 'actions');
+const expandedAction = expandedDescriptions.nodes.find(n => n.id === 'a0');
+const nextAction = expandedDescriptions.nodes.find(n => n.id === 'a1');
+assert(expandedAction.height > nextAction.height, 'Long descriptions get room at the action tier');
+assert(nextAction.y >= expandedAction.y + expandedAction.height, 'Expanded descriptions do not overlap the next action');
 base.actions[1].move = 'ruleout';
 base.actions[1].ladder = { topic: 'step', takeaway: 'step 1 ruled out', abstract: [{ event: 'e1', quote: 'event 1' }] };
 base.journey = { text: 'started, ruled out step 1, landed', cites: ['a1'] };

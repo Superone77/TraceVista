@@ -123,6 +123,16 @@
 .landmarks button{font-size:calc(10px / var(--map-zoom));line-height:1.4;padding:calc(2px / var(--map-zoom)) calc(6px / var(--map-zoom));border:calc(1px / var(--map-zoom)) solid color-mix(in srgb,var(--move) 45%,white);border-radius:calc(4px / var(--map-zoom));color:var(--move);background:var(--surface);font-weight:650}
 .landmarks span{font-size:calc(10px / var(--map-zoom));color:var(--text-3);align-self:center}
 .canvas[data-compact-overview=true] .landmarks{display:none}
+/* Keep the conclusion and outcome visible even in a fitted state tree. */
+.compact-state-reading{display:none}
+.canvas[data-compact-overview=true] .state-map-summary{align-items:stretch;justify-content:center;gap:calc(3px / var(--map-zoom))}
+.canvas[data-compact-overview=true] .state-map-summary .state-open.plaque{display:none}
+.canvas[data-compact-overview=true] .compact-state-reading{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;flex-shrink:1;text-align:left;border:0;background:transparent;padding:0;font-size:calc(11px / var(--map-zoom));font-weight:550;line-height:1.25;color:var(--text)}
+.compact-state-id{color:var(--text-3);font-weight:400;margin-right:.45em}
+.canvas[data-compact-overview=true] .state-map-summary .state-assessment{display:block;flex-shrink:0;font-size:calc(9px / var(--map-zoom));line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.canvas[data-compact-overview=true] .state-assessment > span{display:none}
+.map-card.action .action-reading{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;cursor:text;user-select:text;margin:6px 0}
+.map-card.action .action-reading p{display:block;-webkit-line-clamp:unset;font-size:16px;line-height:1.6;color:var(--text);white-space:pre-wrap;overflow:visible;overflow-wrap:anywhere;margin:0}
 .journey{position:absolute;top:44px;left:14px;z-index:6;width:min(380px,38%);background:#fffffffa;border:1px solid var(--line);border-radius:11px;padding:13px 16px;box-shadow:0 6px 22px var(--shadow-sm);font-size:13.5px;line-height:1.8;color:var(--text)}
 .journey-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-2)}.journey-head button{font-size:11px;padding:3px 8px}
 .journey p{margin:8px 0 10px}

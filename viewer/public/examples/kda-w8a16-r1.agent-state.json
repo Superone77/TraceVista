@@ -15,7 +15,7 @@
     {
       "id": "s0",
       "title": "Initial product: Python baseline with materialized weights",
-      "summary": "All scratch alternatives remain in this state. The product state changes only after successful installation and submission.",
+      "summary": "The starting Python implementation materializes the full dequantized weight matrix before dense multiplication. The agent explores scratch candidates here; the installed product changes only after a successful installation and submission.",
       "events": [
         "main:E7",
         "controller:E1"
@@ -26,9 +26,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Baseline",
-        "takeaway": "Baseline has not yet been submitted",
-        "reason": "Scratch alternatives remain here until successful product installation and submission.",
+        "topic": "Materialized weights",
+        "takeaway": "Materialized weights leave the initial Python baseline slow before any optimization",
+        "reason": "The baseline expands int8 weights before dense multiplication. Scratch experiments remain here until a candidate is installed and submitted.",
         "abstract": [
           {
             "event": "main:E7",
@@ -40,7 +40,7 @@
     {
       "id": "s1",
       "title": "Submission 1: v9 fused kernel, 13.122×",
-      "summary": "Development correctness passed. Subsequent review and SIMT trials continue from this version.",
+      "summary": "v9 fuses grouped weight dequantization with tensor-core multiplication, combines split K reduction into one kernel, and caches direct launch plans. Development correctness passes at 13.122×; later review and SIMT trials continue from this version.",
       "events": [
         "main:E784",
         "controller:E4",
@@ -52,9 +52,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 1",
-        "takeaway": "Submission 1 reaches 13.12× with fusion and direct launch",
-        "reason": "Development correctness passed; review and SIMT trials continue from this version.",
+        "topic": "Fused dequantization",
+        "takeaway": "Fused dequantization with cached direct launch reaches 13.12× development speedup",
+        "reason": "v9 avoids materializing full weights and combines split K reduction in one kernel; development correctness passes.",
         "abstract": [
           {
             "event": "controller:E4",
@@ -86,7 +86,7 @@
     {
       "id": "s2",
       "title": "Submission 2: v13 bit conversion, 15.785×",
-      "summary": "About 20% above the previous development measurement. This is not the independent result against the Oracle.",
+      "summary": "v13 converts int8 weights using a magic-number bit trick, tunes tile sizes and split K, and removes the tuning override hook. Development speedup is about 20% above the previous measurement; the independent Oracle result is separate.",
       "events": [
         "main:E1217",
         "controller:E6",
@@ -98,9 +98,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 2",
-        "takeaway": "Submission 2 reaches 15.78× through conversion and configuration improvements",
-        "reason": "About 20% above the previous development measurement; the independent Oracle comparison is separate.",
+        "topic": "Bit conversion",
+        "takeaway": "Bit conversion and tile tuning raise development speedup to 15.78×",
+        "reason": "v13 uses a magic number conversion, tunes BLOCK_M and splitting, and removes the tuning override hook. Independent Oracle results remain separate.",
         "abstract": [
           {
             "event": "controller:E6",
@@ -146,9 +146,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 3",
-        "takeaway": "Submission 3 scores 15.77×; host improvements do not raise the score",
-        "reason": "Host microbenchmarks improved; a roughly 0.12% score difference does not establish code regression.",
+        "topic": "Host overhead",
+        "takeaway": "Host overhead falls to 14 µs; development speedup stays near 15.77×",
+        "reason": "v14 uses raw pointers and a shorter wrapper. The score is about 0.12% below submission 2, insufficient to establish regression.",
         "abstract": [
           {
             "event": "controller:E8",
@@ -194,9 +194,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 4",
-        "takeaway": "Submission 4 reaches 16.18× with a modest split rule gain",
-        "reason": "Later review identifies edge cases; v16 and v17 leave the installed product unchanged.",
+        "topic": "Split balancing",
+        "takeaway": "Split balancing improves large square matrices and reaches 16.18× development speedup",
+        "reason": "v15 increases parallelism while retaining long K loops; some wide matrices slow slightly. Later review identifies numerical and grid edge cases.",
         "abstract": [
           {
             "event": "controller:E10",
@@ -242,9 +242,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 5",
-        "takeaway": "Submission 5 reaches 20.56×, a peak not reproduced later",
-        "reason": "The hi/lo path and flat grid address edge cases; unchanged code later scores lower.",
+        "topic": "Numerical edge fixes",
+        "takeaway": "Numerical edge fixes pass local checks; the 20.56× development peak remains unconfirmed",
+        "reason": "v18 adds hi/lo weights and a flat grid. Identical code later scores 15.92×; large shape fp16 risk remains.",
         "abstract": [
           {
             "event": "controller:E12",
@@ -290,9 +290,9 @@
         "final_selection": null
       },
       "ladder": {
-        "topic": "Submission 6",
-        "takeaway": "Submission 6 scores 15.92× on identical code, showing substantial variation",
-        "reason": "Only the submission record changes; the code tree is identical to submission 5.",
+        "topic": "Same code variability",
+        "takeaway": "Same code variability lowers development speedup from 20.56× to 15.92×",
+        "reason": "Submission 6 retests the exact v18 tree from submission 5. Both pass development correctness; there is no code rollback.",
         "abstract": [
           {
             "event": "controller:E14",
@@ -340,9 +340,9 @@
         "final_selection": "finalized submission 5"
       },
       "ladder": {
-        "topic": "Final selection",
-        "takeaway": "Final selection retains submission 5; independent Oracle ABBA reaches 2.215×",
-        "reason": "The development peak is historical. Backend correctness passed; static review coverage gaps remain.",
+        "topic": "Independent Oracle comparison",
+        "takeaway": "Independent Oracle comparison reaches 2.215×; final selection retains submission 5",
+        "reason": "Independent correctness passes. Development 20.56× remains historical, identical code retests at 15.92×, and final fixes receive no further independent review.",
         "abstract": [
           {
             "event": "controller:E19",
@@ -400,9 +400,9 @@
         "main:E89"
       ],
       "ladder": {
-        "topic": "Contract",
-        "takeaway": "Contract and local tests establish the starting point",
-        "reason": "Confirm hardware, editable scope, and baseline; correct test shapes before optimization.",
+        "topic": "W8A16 contract",
+        "takeaway": "W8A16 contract and corrected local tests establish the optimization baseline",
+        "reason": "Only matmul.py is editable. Grouped int8 weights and fp16 activations require fp32 accumulation and fp16 output.",
         "abstract": [
           {
             "event": "main:E5",
@@ -428,9 +428,9 @@
         "main:E107"
       ],
       "ladder": {
-        "topic": "Fusion",
-        "takeaway": "Fusion passes initial tests but launch overhead dominates",
-        "reason": "v1 takes about 30 µs on the GPU and 106 µs on the host.",
+        "topic": "Launch bottleneck",
+        "takeaway": "Launch bottleneck dominates fused v1 despite passing local tests",
+        "reason": "v1 takes about 30 µs on the GPU and 106 µs on the host, motivating a cheaper launch path.",
         "abstract": [
           {
             "event": "main:E95",
@@ -488,9 +488,9 @@
         "main:E280"
       ],
       "ladder": {
-        "topic": "v3",
-        "takeaway": "v3 parameter sweep reaches 22.9 µs",
-        "reason": "Runtime split parameters reduce compilation; the kernel still falls short of bandwidth saturation.",
+        "topic": "Tile configuration",
+        "takeaway": "Tile configuration reaches 22.9 µs but leaves bandwidth unused",
+        "reason": "Runtime split parameters reduce compilation; the best sweep reaches about 731 GB/s with room below the bandwidth ceiling.",
         "abstract": [
           {
             "event": "main:E280",
@@ -522,8 +522,8 @@
         "main:E356"
       ],
       "ladder": {
-        "topic": "Diagnosis",
-        "takeaway": "Diagnosis shifts from NCU to microbenchmarks and IR",
+        "topic": "Blocked profiler",
+        "takeaway": "Blocked profiler redirects diagnosis to memory calibration and compiled IR",
         "reason": "Counter access is denied, so copy calibration and PTX byte load counts guide the next iteration.",
         "abstract": [
           {
@@ -595,9 +595,9 @@
         "main:E733"
       ],
       "ladder": {
-        "topic": "Group processing",
-        "takeaway": "Group processing ablations motivate fused dequantization in v8",
-        "reason": "v6 and v7 remain too slow; v8 reaches about 73 µs and passes local tests, pending numerical review.",
+        "topic": "Fused weight scaling",
+        "takeaway": "Fused weight scaling reaches 73 µs after epilogue and prefetch trials disappoint",
+        "reason": "v8 applies scale and zero before the dot product; local tests pass, while numerical boundaries still need review.",
         "abstract": [
           {
             "event": "main:E544",
@@ -629,9 +629,9 @@
         "main:E778"
       ],
       "ladder": {
-        "topic": "Plan review",
-        "takeaway": "Plan review and v9 heuristics proceed together",
-        "reason": "Shape and tile sweeps continue while the review runs; submission preparation precedes its return.",
+        "topic": "Review during tuning",
+        "takeaway": "Review during tuning checks v8 while main builds v9 launch heuristics",
+        "reason": "Shape and tile sweeps continue while Codex runs; the main agent prepares submission before the background review returns.",
         "abstract": [
           {
             "event": "main:E735",
@@ -652,9 +652,9 @@
         "main:E787"
       ],
       "ladder": {
-        "topic": "Submission 1",
-        "takeaway": "Submission 1 installs v9 and passes development evaluation",
-        "reason": "This first product replacement reaches 13.122×; scratch versions do not create separate system states.",
+        "topic": "First fused submission",
+        "takeaway": "First fused submission installs v9 and passes at 13.122× development speedup",
+        "reason": "This first product replacement combines dequantization, single kernel reduction, and direct launch; scratch variants remain separate experiments.",
         "abstract": [
           {
             "event": "main:E783",
@@ -684,9 +684,9 @@
         "main:E885"
       ],
       "ladder": {
-        "topic": "Large M",
-        "takeaway": "Large M tuning and the first review expose risks",
-        "reason": "Synchronized timings and feedback bring numerical, grid, and cache issues into subsequent work.",
+        "topic": "Large matrix behavior",
+        "takeaway": "Large matrix behavior and first review expose performance and numerical limitations",
+        "reason": "Check synchronized timing and larger M; the reviewer flags fp16 precision and tuning cache risks.",
         "abstract": [
           {
             "event": "main:E819",
@@ -733,9 +733,9 @@
         "main:E1099"
       ],
       "ladder": {
-        "topic": "SIMT",
-        "takeaway": "SIMT stays slow after one fix; another path remains incorrect",
-        "reason": "After prmt, reduction, and group loop trials, the agent abandons this direction and resumes tensor core tuning.",
+        "topic": "Rejected SIMT kernels",
+        "takeaway": "Rejected SIMT kernels remain slower or incorrect after layout and loop repairs",
+        "reason": "The corrected path takes at least 44.3 µs; later two dimensional variants still fail tests, so tensor core tuning resumes.",
         "abstract": [
           {
             "event": "main:E952",
@@ -766,8 +766,8 @@
         "main:E1220"
       ],
       "ladder": {
-        "topic": "v13",
-        "takeaway": "v13 magic number conversion and tiling reach 15.78×",
+        "topic": "Faster weight conversion",
+        "takeaway": "Faster weight conversion and tile selection reach 15.78× development speedup",
         "reason": "The v9 path gains fp16 bit conversion and tuned BLOCK_M and split settings; submission 2 passes.",
         "abstract": [
           {
@@ -860,9 +860,9 @@
         "main:E1446"
       ],
       "ladder": {
-        "topic": "v16",
-        "takeaway": "v16 assembly fusion brings no consistent gain",
-        "reason": "Packed f16x2 passes local tests; timings do not establish an improvement, so the product remains v15.",
+        "topic": "Packed arithmetic",
+        "takeaway": "Packed arithmetic passes local tests without consistent speed gains",
+        "reason": "Packed f16x2 timings remain close to v15 across eight shapes, so the installed product stays unchanged.",
         "abstract": [
           {
             "event": "main:E1446",
@@ -887,9 +887,9 @@
         "main:E1523"
       ],
       "ladder": {
-        "topic": "v17",
-        "takeaway": "v17 looser split limit slows small M",
-        "reason": "The K//512 trial is abandoned; candidate ancestry is recorded and the product remains unchanged.",
+        "topic": "Excessive splitting",
+        "takeaway": "Excessive splitting slows M=1, so v17 is rejected",
+        "reason": "Lowering the minimum K rows per CTA to 512 makes the key case slower; the product remains v15.",
         "abstract": [
           {
             "event": "main:E1499",
@@ -947,9 +947,9 @@
         "main:E1681"
       ],
       "ladder": {
-        "topic": "v18",
-        "takeaway": "v18 fixes some edge cases and submits at 20.56×",
-        "reason": "The first FP32 path returns zeros; hi/lo passes tests. Overflow risk remains in the large shape ordinary path.",
+        "topic": "Precision repair",
+        "takeaway": "Precision repair and flat grid pass counterexamples before the 20.56× development peak",
+        "reason": "The first FP32 path returns zeros; hi/lo passes tests. Overflow risk remains in the ordinary path for large shapes.",
         "abstract": [
           {
             "event": "main:E1581",
@@ -1055,9 +1055,9 @@
         "main:E1918"
       ],
       "ladder": {
-        "topic": "Final selection",
-        "takeaway": "Final selection retains historical submission 5 and identical code",
-        "reason": "After 6 submissions, the finalizer selects the highest development record without a new performance measurement.",
+        "topic": "Retained final code",
+        "takeaway": "Retained final code comes from submission 5, identical to submission 6",
+        "reason": "After six submissions, the finalizer selects the highest development record without changing the implementation or measuring new performance.",
         "abstract": [
           {
             "event": "main:E1916",
@@ -1085,9 +1085,9 @@
       "status": "retained",
       "move": "insight",
       "ladder": {
-        "topic": "Plan review",
-        "takeaway": "Plan review requests changes without a blanket pass",
-        "reason": "The request, reads, risk feedback, and main agent receipt remain separate.",
+        "topic": "Precision and caching",
+        "takeaway": "Precision and caching review flags fp16 risks and a tuning hook",
+        "reason": "The first Codex review identifies overflow and cancellation risks plus an implicit cache key convention; it runs no GPU code.",
         "abstract": [
           {
             "event": "review1:E20",
@@ -1122,9 +1122,9 @@
       "status": "retained",
       "move": "insight",
       "ladder": {
-        "topic": "Code review",
-        "takeaway": "Code review requests changes without a blanket pass",
-        "reason": "The request, reads, risk feedback, and main agent receipt remain separate.",
+        "topic": "Cancellation and grid",
+        "takeaway": "Cancellation and grid counterexamples require numerical and launch repairs",
+        "reason": "Small scales still produce 100% relative error; M=4194241 exceeds grid Y. No independent review follows the later fixes.",
         "abstract": [
           {
             "event": "review2:E41",
@@ -1146,9 +1146,9 @@
       ],
       "status": "retained",
       "ladder": {
-        "topic": "Independent validation",
-        "takeaway": "Independent validation passes; Oracle ABBA reaches 2.215×",
-        "reason": "Four paired blocks use a different baseline from the development peak.",
+        "topic": "Independent Oracle evidence",
+        "takeaway": "Independent Oracle evidence reports correctness PASS and 2.215× paired speedup",
+        "reason": "Four paired blocks use a different baseline from development scores; archived results do not establish correctness for every possible input.",
         "abstract": [
           {
             "event": "controller:E19",
@@ -1173,8 +1173,8 @@
         "main:E5"
       ],
       "ladder": {
-        "topic": "Workflow",
-        "takeaway": "Workflow requires a draft before candidate iterations",
+        "topic": "KDA workflow",
+        "takeaway": "KDA workflow requires a draft before candidate iterations",
         "reason": "KDA instructions and two workflow documents establish the steps; this is document reading, not a native Skill invocation.",
         "abstract": [
           {
@@ -1201,8 +1201,8 @@
         "main:E7"
       ],
       "ladder": {
-        "topic": "Baseline",
-        "takeaway": "Baseline expands full weights and performs dense multiplication",
+        "topic": "Materialized baseline",
+        "takeaway": "Materialized baseline expands int8 weights before dense matrix multiplication",
         "reason": "Only w8a16/matmul.py is editable. Starting commit 09811ef anchors the public numerical contract and preflight identity.",
         "abstract": [
           {
@@ -1229,8 +1229,8 @@
         "main:E11"
       ],
       "ladder": {
-        "topic": "Environment",
-        "takeaway": "Environment confirms A100 and Triton 3.3",
+        "topic": "Hardware and contract",
+        "takeaway": "Hardware and contract establish A100, Triton 3.3, FP32 accumulation, and FP16 output",
         "reason": "The contract requires FP32 accumulation and FP16 output; returned records establish hardware and public constraints.",
         "abstract": [
           {
@@ -1258,8 +1258,8 @@
         "main:E29"
       ],
       "ladder": {
-        "topic": "Draft",
-        "takeaway": "Draft selects fused dequantization and split K",
+        "topic": "Fusion plan",
+        "takeaway": "Fusion plan chooses grouped dequantization and split K before product edits",
         "reason": "Defines objectives, editable scope, custom validation scripts, and promotion criteria before modifying product code.",
         "abstract": [
           {
@@ -1346,8 +1346,8 @@
         "main:E95"
       ],
       "ladder": {
-        "topic": "v1",
-        "takeaway": "v1 fuses dequantization with tensor core computation",
+        "topic": "Fused kernel",
+        "takeaway": "Fused kernel v1 combines dequantization with tensor core computation",
         "reason": "Creates runs/v1.py with general group sizes, split K partial sums, and a separate reduction kernel.",
         "abstract": [
           {
@@ -1375,8 +1375,8 @@
         "main:E99"
       ],
       "ladder": {
-        "topic": "v1",
-        "takeaway": "v1 passes self tests, but small shapes still take about 100 μs",
+        "topic": "Fused kernel timing",
+        "takeaway": "Fused kernel timing stays near 100 µs on small shapes despite correctness",
         "reason": "Local timings beat the expanded weight baseline, but fixed overhead motivates separating CPU and GPU time.",
         "abstract": [
           {
@@ -1464,8 +1464,8 @@
         "main:E139"
       ],
       "ladder": {
-        "topic": "Arguments",
-        "takeaway": "Arguments check covers metadata and actual argument ordering",
+        "topic": "Launch argument layout",
+        "takeaway": "Launch argument layout confirms metadata, grid, stream, and argument ordering",
         "reason": "Inspects how JIT passes grid, stream, function, and arguments to compiled kernels before implementing direct launch.",
         "abstract": [
           {
@@ -1523,8 +1523,8 @@
         "main:E229"
       ],
       "ladder": {
-        "topic": "v2",
-        "takeaway": "v2 combines split K reduction and caches launch plans",
+        "topic": "Atomic reduction",
+        "takeaway": "Atomic reduction and cached launch plans combine split K into one kernel",
         "reason": "A single kernel accumulates atomically; the last CTA writes output and resets workspace. Direct launch reduces Python overhead.",
         "abstract": [
           {
@@ -1582,8 +1582,8 @@
         "main:E280"
       ],
       "ladder": {
-        "topic": "v3",
-        "takeaway": "v3 configuration sweep reaches a best 22.9 μs",
+        "topic": "Tile configuration sweep",
+        "takeaway": "Tile configuration sweep reaches 22.9 µs after moving splits to runtime",
         "reason": "Makes the split count a runtime argument to reduce compilation, then sweeps tiles, warps, and stages; effective bandwidth is about 731 GB/s.",
         "abstract": [
           {
@@ -1612,8 +1612,8 @@
         "main:E289"
       ],
       "ladder": {
-        "topic": "NCU",
-        "takeaway": "NCU first attempt returns no usable metrics",
+        "topic": "Missing profiler metrics",
+        "takeaway": "Missing profiler metrics leave the first NCU attempt inconclusive",
         "reason": "Filtered output is empty. Successful sampling cannot be inferred; the next step inspects the unfiltered error.",
         "abstract": [
           {
@@ -1640,8 +1640,8 @@
         "main:E293"
       ],
       "ladder": {
-        "topic": "NCU",
-        "takeaway": "NCU is blocked by performance counter permissions",
+        "topic": "Counter permission denial",
+        "takeaway": "Counter permission denial blocks NCU and redirects diagnosis",
         "reason": "ERR_NVGPUCTRPERM explicitly reports missing permissions; subsequent diagnosis uses microbenchmarks and compiled IR.",
         "abstract": [
           {
@@ -1670,8 +1670,8 @@
         "main:E324"
       ],
       "ladder": {
-        "topic": "Bandwidth",
-        "takeaway": "Bandwidth calibration reaches about 1.30 to 1.43 TB/s",
+        "topic": "Copy bandwidth ceiling",
+        "takeaway": "Copy bandwidth ceiling measures about 1.30 to 1.43 TB/s",
         "reason": "This measures combined copy read/write bandwidth, not the achieved speed of the target kernel.",
         "abstract": [
           {
@@ -1758,8 +1758,8 @@
         "main:E415"
       ],
       "ladder": {
-        "topic": "v4",
-        "takeaway": "v4 bit conversion passes self tests but still uses byte loads",
+        "topic": "Packed bit conversion",
+        "takeaway": "Packed bit conversion passes tests but retains 32 shared byte loads",
         "reason": "The prmt magic number conversion still compiles to 32 ld.shared.u8 instructions; the intended layout change does not occur.",
         "abstract": [
           {
@@ -1787,8 +1787,8 @@
         "main:E469"
       ],
       "ladder": {
-        "topic": "v5",
-        "takeaway": "v5 packed int32 loads fail for two group sizes",
+        "topic": "Packed load errors",
+        "takeaway": "Packed load errors break v5 at group sizes 48 and 80",
         "reason": "Reconstructing FP16 tiles after int32 loads gives errors around 1.6 to 1.7 for gs=48 and 80, blocking promotion.",
         "abstract": [
           {
@@ -1817,8 +1817,8 @@
         "main:E499"
       ],
       "ladder": {
-        "topic": "v5",
-        "takeaway": "v5 sweep takes about 30 μs, still slower than v3",
+        "topic": "Packed load timing",
+        "takeaway": "Packed load timing remains near 30 µs, slower than v3",
         "reason": "Timing one shape does not resolve the preceding correctness failures at gs=48 and 80.",
         "abstract": [
           {
@@ -1846,8 +1846,8 @@
         "main:E544"
       ],
       "ladder": {
-        "topic": "Skeleton",
-        "takeaway": "Skeleton int8 kernel reaches about 1099 GB/s",
+        "topic": "Bare kernel bandwidth",
+        "takeaway": "Bare kernel bandwidth reaches 1099 GB/s for int8 and 1376 GB/s for FP16",
         "reason": "The FP16 skeleton reaches about 1376 GB/s; the full operator still incurs group processing overhead.",
         "abstract": [
           {
@@ -1876,8 +1876,8 @@
         "main:E584"
       ],
       "ladder": {
-        "topic": "v6",
-        "takeaway": "v6 moves zero point correction after the dot product",
+        "topic": "Group correction",
+        "takeaway": "Group correction after dot passes tests but reaches only 770 GB/s",
         "reason": "The grouped algebraic rewrite passes tests and reaches about 770 GB/s, still below the simplified skeleton.",
         "abstract": [
           {
@@ -1905,8 +1905,8 @@
         "main:E593"
       ],
       "ladder": {
-        "topic": "Ablation",
-        "takeaway": "Ablation removing group processing saves time but breaks numerical semantics",
+        "topic": "Group cost ablation",
+        "takeaway": "Group cost ablation saves time by removing required numerical operations",
         "reason": "Plain dot takes about 63.8 μs with huge error; removing the N mask does not help. These runs only localize costs.",
         "abstract": [
           {
@@ -1936,8 +1936,8 @@
         "main:E633"
       ],
       "ladder": {
-        "topic": "v7",
-        "takeaway": "v7 manual prefetch regresses to about 95 μs",
+        "topic": "Manual prefetch",
+        "takeaway": "Manual prefetch slows v7 to about 95 µs and is abandoned",
         "reason": "Loading the next tile’s scale and zero early brings no gain, and the approach is abandoned.",
         "abstract": [
           {
@@ -1996,8 +1996,8 @@
         "main:E675"
       ],
       "ladder": {
-        "topic": "Comparison",
-        "takeaway": "Comparison finds v3 faster than v6",
+        "topic": "Epilogue comparison",
+        "takeaway": "Epilogue comparison favors v3 at 81.4 µs over v6 at 92.5 µs",
         "reason": "On the same shape, v3 takes 81.4 μs and v6 92.5 μs; removing zero correction is faster but incorrect.",
         "abstract": [
           {
@@ -2027,8 +2027,8 @@
         "main:E733"
       ],
       "ladder": {
-        "topic": "v8",
-        "takeaway": "v8 folded dequantization takes about 73 μs and passes self tests",
+        "topic": "Folded dequantization",
+        "takeaway": "Folded dequantization reaches 73 µs with local error near 3e−4",
         "reason": "Folds scale and zero into FP16 weights before direct accumulation; error is about 3e−4. Later review identifies boundary risks.",
         "abstract": [
           {
@@ -2184,8 +2184,8 @@
         "main:E778"
       ],
       "ladder": {
-        "topic": "First candidate",
-        "takeaway": "First candidate v9 passes self tests",
+        "topic": "Heuristic candidate",
+        "takeaway": "Heuristic candidate v9 passes tests before the first formal submission",
         "reason": "Eight shape timings are recorded, but no formal submission score exists yet.",
         "abstract": [
           {
@@ -2223,8 +2223,8 @@
         "controller:E5"
       ],
       "ladder": {
-        "topic": "Submission one",
-        "takeaway": "Submission one passes with a 13.12× development speedup",
+        "topic": "Fused kernel submission",
+        "takeaway": "Fused kernel submission installs v9 and passes at 13.12× development speedup",
         "reason": "This is a development score and cannot replace independent performance validation.",
         "abstract": [
           {
@@ -2840,8 +2840,8 @@
         "main:E1198"
       ],
       "ladder": {
-        "topic": "v13",
-        "takeaway": "v13 improves large M but regresses on wide N",
+        "topic": "Conversion and tiling",
+        "takeaway": "Conversion and tiling improve large M but regress on wide N",
         "reason": "The M32 large square drops to 102.4 μs; wide N needs a tighter split rule.",
         "abstract": [
           {
@@ -2883,8 +2883,8 @@
         "controller:E7"
       ],
       "ladder": {
-        "topic": "Submission two",
-        "takeaway": "Submission two passes with a 15.78× development speedup",
+        "topic": "Tuned conversion submission",
+        "takeaway": "Tuned conversion submission reaches 15.78× after tightening the split threshold",
         "reason": "After tightening the split threshold, its score exceeds the first submission’s 13.12×.",
         "abstract": [
           {
@@ -3104,8 +3104,8 @@
         "controller:E9"
       ],
       "ladder": {
-        "topic": "Submission three",
-        "takeaway": "Submission three scores 15.77× with no improvement",
+        "topic": "Host optimization score",
+        "takeaway": "Host optimization score stays near 15.77× despite lower wrapper overhead",
         "reason": "The host reduction from 19 to 14 μs does not appear in the development score.",
         "abstract": [
           {
@@ -3258,8 +3258,8 @@
         "controller:E11"
       ],
       "ladder": {
-        "topic": "Submission 4",
-        "takeaway": "Submission 4 passes with a 16.18× development score",
+        "topic": "Balanced split submission",
+        "takeaway": "Balanced split submission installs v15 and reaches 16.18× development speedup",
         "reason": "v15 becomes the current best with 12 submissions remaining; this result contains no independent score.",
         "abstract": [
           {
@@ -3292,8 +3292,8 @@
         "main:E1446"
       ],
       "ladder": {
-        "topic": "v16",
-        "takeaway": "v16 passes correctness checks without a consistent timing gain",
+        "topic": "Packed f16x2 arithmetic",
+        "takeaway": "Packed f16x2 arithmetic passes tests without consistent gains across eight shapes",
         "reason": "Eight shapes remain close to v15; M=16 with 4096×11008 rises from 55.9 to 57.5 μs.",
         "abstract": [
           {
@@ -3329,8 +3329,8 @@
         "main:E1499"
       ],
       "ladder": {
-        "topic": "v17",
-        "takeaway": "v17 splits more finely but slows the key small M case",
+        "topic": "Finer K splitting",
+        "takeaway": "Finer K splitting slows M=1 despite passing local correctness",
         "reason": "For M=1 and K=N=4096, latency rises from 25.4 to 27.5 μs; local correctness still passes.",
         "abstract": [
           {
@@ -3434,8 +3434,8 @@
         "main:E1581"
       ],
       "ladder": {
-        "topic": "Initial v18",
-        "takeaway": "Initial v18 produces seven completely wrong shape results",
+        "topic": "FP32 repair failure",
+        "takeaway": "FP32 repair failure produces zero outputs in seven v18 test shapes",
         "reason": "Zero output from the new FP32 path needs reproduction; the flattened grid still requires its own boundary test.",
         "abstract": [
           {
@@ -3578,8 +3578,8 @@
         "controller:E13"
       ],
       "ladder": {
-        "topic": "Submission 5",
-        "takeaway": "Submission 5 scores 20.56× and still needs verification",
+        "topic": "Unconfirmed development peak",
+        "takeaway": "Unconfirmed development peak reaches 20.56× after v18 correctness passes",
         "reason": "Development correctness passes; the high score is later challenged by a 15.92× resubmission of identical code.",
         "abstract": [
           {
@@ -3928,8 +3928,8 @@
         "review1:E6"
       ],
       "ladder": {
-        "topic": "Task identity",
-        "takeaway": "Task identity confirms w8a16",
+        "topic": "W8A16 task identity",
+        "takeaway": "W8A16 task identity selects the grouped quantized matmul constraints",
         "reason": "The returned identifier matches the public operation in the reviewed candidate.",
         "abstract": [
           {
@@ -4163,8 +4163,8 @@
         "review2:E13"
       ],
       "ladder": {
-        "topic": "Guide loading",
-        "takeaway": "Guide loading is confirmed by a successful retry and returned text",
+        "topic": "Superpowers guide load",
+        "takeaway": "Superpowers guide load succeeds on retry with the full instruction text",
         "reason": "Nested results must be inspected; the outer Script completed message alone is insufficient.",
         "abstract": [
           {
@@ -17615,7 +17615,7 @@
     }
   ],
   "journey": {
-    "text": "Starting from materialized weights, fusion and direct launch remove the initial host bottleneck. Denied NCU access shifts diagnosis to IR and microbenchmarks; packed layouts, SIMT, and prefetching do not win. v13 and split tuning bring development scores near 16×. Two Codex reviews prompt partial numerical and grid fixes in v18. Submission 5 scores 20.56×; identical code later scores 15.92×, and final selection retains that code. Independent correctness passes, with Oracle ABBA speedup of 2.215×. Large-shape numerical risk remains, and the final fixes receive no further independent review.",
+    "text": "Kernel Design Agent (KDA) uses Claude Opus 5.5 to optimize grouped dequantization matrix multiplication, with Codex GPT-6-sol reviews. W8A16 means 8-bit weights and 16-bit activations. Fusion and direct launch remove initial overhead. Blocked NCU counters shift diagnosis to IR and microbenchmarks; SIMT and packed variants do not improve performance. Conversion and split tuning reach about 16× development speedup. Reviews prompt partial numerical and grid fixes. Identical v18 code scores 20.56× then 15.92×, showing variation without rollback. Final selection retains submission 5. Independent correctness passes; Oracle ABBA reaches 2.215×. Large-shape numerical risk remains, without a final independent review.",
     "cites": [
       "s0",
       "b_launch",

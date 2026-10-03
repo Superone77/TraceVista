@@ -37,6 +37,11 @@ Write like this:
   in the same branch). An action's takeaway must not restate its branch's summary.
 - **Name the thing itself**: the number found, the option chosen, the error seen
   ("raw stream: 6.33 → 0.23 µs"), not the activity ("measured cost", "ran a test").
+- State topics describe the actual change or finding, such as "Fused kernel" or
+  "Identical code retest", rather than only "Submission 5" or "Step 3". Keep version
+  numbers in the title. The takeaway combines the change with its measured result or
+  unresolved limit. Branch briefs explain the direction and its evidence; action
+  summaries preserve the concrete operation, observation, and consequence for the next step.
 - Reuse the terms of earlier plaques so a reader scanning down sees the thinking progress.
 - No dash characters inside topic, takeaway or reason; use commas or colons.
 - For the abstract, prefer the agent's visible messages (`note` events) and measurement or
@@ -82,7 +87,9 @@ A graph-level paragraph, read first in the overview (adapted from ThoughtDAG's G
 "journey": {"text": "...", "cites": ["s1", "s3-compare", "s4"]}
 ```
 
-Where the run started, what it ruled out, where it turned, where it landed, what remains open.
+Start by identifying the agent/framework, main and reviewer roles when present, and the
+task it is solving. Explain a task abbreviation when needed to understand the objective.
+Then say where the run started, what it ruled out, where it turned, where it landed, and what remains open.
 Only the turns that mattered. At most 260 CJK characters or 110 words. Cite every entity it
 narrates.
 

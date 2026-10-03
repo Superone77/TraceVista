@@ -86,10 +86,12 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     overviewPinned.current = true;
     setSelected(null);
     const { width, height } = layouts.states;
-    const zoom = fitAll ? Math.max(.04, Math.min(.44, (box.width - 64) / width, (box.height - 70) / height)) : .44;
+    const leftInset = journeyOpen && graph.journey && box.width >= 1000 ? Math.min(380, box.width * .38) + 32 : 0;
+    const centerX = (leftInset + box.width) / 2;
     const root = layouts.states.nodes.find(n => n.kind === 'state')!;
-    setView('states', { x: fitAll ? (box.width - width * zoom) / 2 : box.width / 2 - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
-  }, [layouts, setView]);
+    const zoom = Math.max(.04, Math.min(.44, (box.width - leftInset - 64) / (fitAll ? width : root.width), ...(fitAll ? [(box.height - 110) / height] : [])));
+    setView('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
+  }, [layouts, setView, journeyOpen, graph.journey]);
   useEffect(() => {
     const el = canvasRef.current?.querySelector('.react-flow');
     if (!el) return;

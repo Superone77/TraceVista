@@ -10,9 +10,9 @@ import { ladderPieces, needsSpace, pickLevel, type Ladder, type LadderFonts, typ
 const DUR = 320;
 const EASE = 'cubic-bezier(.2,.7,.2,1)';
 
-function useLadderLevel(fonts: LadderFonts, max: LadderLevel): LadderLevel {
+function useLadderLevel(fonts: LadderFonts, max: LadderLevel, min: LadderLevel): LadderLevel {
   const ref = useRef<LadderLevel | null>(null);
-  return useStore((s) => { ref.current = pickLevel(s.transform[2], ref.current, fonts, max); return ref.current; });
+  return useStore((s) => { ref.current = pickLevel(s.transform[2], ref.current, fonts, max, min); return ref.current; });
 }
 
 export function LadderMorph({ ladder, level, fontSize }: { ladder: Ladder; level: LadderLevel; fontSize: number }) {
@@ -59,10 +59,10 @@ export function LadderMorph({ ladder, level, fontSize }: { ladder: Ladder; level
 export interface Quote { event: string; quote: string }
 
 /** Text level from the live zoom; level 3 keeps the brief and adds the quotes it rests on. */
-export default function ZoomText({ ladder, fonts, quotes = [], max = 3, onEvidence }: {
-  ladder: Ladder; fonts: LadderFonts; quotes?: Quote[]; max?: LadderLevel; onEvidence?: (event: string) => void;
+export default function ZoomText({ ladder, fonts, quotes = [], max = 3, min = 0, onEvidence }: {
+  ladder: Ladder; fonts: LadderFonts; quotes?: Quote[]; max?: LadderLevel; min?: LadderLevel; onEvidence?: (event: string) => void;
 }) {
-  const level = useLadderLevel(fonts, quotes.length ? max : Math.min(max, 2) as LadderLevel);
+  const level = useLadderLevel(fonts, quotes.length ? max : Math.min(max, 2) as LadderLevel, min);
   const textLevel = (level === 3 && quotes.length ? 2 : level) as LadderLevel;
   return <div className="zoom-text" data-zoom-level={level}>
     <LadderMorph ladder={ladder} level={textLevel} fontSize={fonts[Math.min(textLevel, 2) as LadderLevel]} />
