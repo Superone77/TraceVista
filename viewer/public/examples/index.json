@@ -1,8 +1,11 @@
 [
   {
-    "id": "pi-infra-r1",
-    "title": "Pi Infra Harness · LoRA · 20261001-r1",
-    "file": "pi-infra-r1.agent-state.json",
-    "description": "真实轨迹：DeepSeek Flash，4 次提交，含退步、回退后修改与最终选择。"
+    "id": "kda-w8a16-r1",
+    "title": "Kernel Design Agent (KDA)",
+    "file": "kda-w8a16-r1.agent-state.json",
+    "description": "W8A16 kernel optimization with six submissions, two Codex reviews, and an independent Oracle ABBA evaluation.",
+    "agent": "Claude Opus 5.5 + Codex review",
+    "task": "W8A16",
+    "date": "2026-10-02"
   }
 ]

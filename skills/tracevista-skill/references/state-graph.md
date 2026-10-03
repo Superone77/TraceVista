@@ -106,7 +106,7 @@ The reader accepts the canvas backup above or its extracted `stateTrajectory` ob
 Default: state nodes only. Expand a state for branches, expand a branch for actions.
 When endpoints are collapsed, relevant cross-links aggregate onto visible ancestors;
 when opened, links return to the exact action endpoints. Full raw evidence remains searchable.
-Importing and rendering are local. Optional chat sends selected context only when the user invokes it. Ordinary real logs belong in ignored local-data. The explicitly approved private Pi example is bundled separately under examples; publish only examples the user has authorized for that destination.
+Importing and rendering are local. Optional chat sends selected context only when the user invokes it. Ordinary real logs belong in ignored local-data. Explicitly approved examples are bundled separately under examples; publish only examples the user has authorized for that destination.
 
 ## Exploration, review and measurement observations
 
