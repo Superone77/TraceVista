@@ -1,0 +1,189 @@
+/* Screen-space UI stays readable as the viewport changes. Canvas card type is
+   intentionally separate: its size and detail follow the semantic zoom. */
+:root {
+  --ui-text: .875rem;
+  --ui-caption: .75rem;
+  --ui-heading: 1.25rem;
+  --ui-control-height: 2.25rem;
+}
+
+.reader { height: 100dvh; }
+.reader .toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  position: relative;
+  z-index: 20;
+  gap: .5rem 1rem;
+  padding: .5rem 1rem;
+}
+.reader .zoom-levels { flex-wrap: wrap; justify-content: center; gap: .25rem; }
+.reader .toolbar button,
+.reader .toolbar select,
+.reader .toolbar summary {
+  font-size: var(--ui-text);
+  line-height: 1.4;
+  min-height: var(--ui-control-height);
+  padding: .4375rem .625rem;
+}
+.reader .zoom-levels button span { font-size: var(--ui-caption); margin-right: .3125rem; }
+.reader .view-options { justify-self: end; justify-content: flex-end; gap: .375rem .5rem; min-width: 0; }
+.reader .view-options label,
+.reader .zoom-readout,
+.reader .reading-gap-note { font-size: var(--ui-caption); }
+.reader .display-options > div { top: calc(100% + .375rem); min-width: 13rem; }
+.reader .map-legend { flex-wrap: wrap; max-width: calc(100% - 5.25rem); }
+.reader .map-legend span { font-size: var(--ui-caption); }
+
+.viewer-menu { position: relative; justify-self: start; }
+.reader .toolbar .viewer-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: var(--ui-control-height);
+  padding: 0;
+  border: 0;
+  border-radius: .625rem;
+  background: var(--surface-3);
+}
+.reader .toolbar .viewer-menu-trigger[aria-expanded=true] { background: var(--line); }
+.viewer-menu-panel {
+  position: absolute;
+  top: calc(100% + .5rem);
+  left: 0;
+  z-index: 1;
+  width: min(18.5rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 5rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: .5rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  box-shadow: 0 .5rem 2rem var(--shadow-md);
+  font-size: var(--ui-text);
+}
+.viewer-menu-panel[hidden] { display: none; }
+.viewer-menu-section { display: grid; gap: .125rem; }
+.viewer-menu-section + .viewer-menu-section { border-top: 1px solid var(--line); margin-top: .375rem; padding-top: .375rem; }
+.reader .viewer-menu-section button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+.reader .viewer-menu-section button:hover { background: var(--surface-3); }
+.viewer-menu .zoom-readout { text-align: right; }
+.viewer-menu-field { display: grid; gap: .375rem; padding: .5rem .625rem; color: var(--text-2); font-size: var(--ui-caption); }
+.reader .viewer-menu-field select { min-width: 0; width: 100%; font-family: inherit; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); }
+.viewer-menu-check { display: flex; align-items: center; gap: .625rem; min-height: var(--ui-control-height); padding: .375rem .625rem; cursor: pointer; border-radius: .25rem; }
+.viewer-menu-check:hover { background: var(--surface-3); }
+.viewer-menu-check input { margin: 0; accent-color: var(--accent); }
+.viewer-menu .reading-gap-note { max-width: none; margin: .375rem .625rem; }
+
+.reader .inspector { width: 26rem; font-size: var(--ui-text); line-height: 1.7; }
+.reader .inspector h2 { font-size: var(--ui-heading); }
+.reader .inspector h3,
+.reader .inspector button,
+.reader .inspector input,
+.reader .inspector select,
+.reader .inspector .observation p,
+.reader .inspector .ladder-takeaway { font-size: var(--ui-text); }
+.reader .inspector .eyebrow,
+.reader .inspector .snapshot span,
+.reader .inspector .snapshot code,
+.reader .inspector .scope p,
+.reader .inspector .archive p,
+.reader .inspector .branch-action span,
+.reader .inspector .branch-action small,
+.reader .inspector .raw-record-meta,
+.reader .inspector .raw-record-source,
+.reader .inspector .raw-record-error,
+.reader .inspector .raw-hits button,
+.reader .inspector .refs button,
+.reader .inspector .ladder-detail blockquote,
+.reader .inspector .ladder-detail blockquote button { font-size: var(--ui-caption); }
+.reader .inspector .raw pre,
+.reader .inspector .raw-record.call pre,
+.reader .inspector .raw-record.result pre { font-size: .8125rem; }
+.reader .inspector .raw-record pre,
+.reader .inspector .raw-record h3 { font-size: var(--ui-text); }
+.reader .inspector-toolbar button { min-height: var(--ui-control-height); }
+
+.reader .journey { font-size: var(--ui-text); max-height: calc(100% - 7rem); overflow: auto; }
+.reader .journey-head,
+.reader .journey-head button,
+.reader .journey-cites button,
+.reader .journey-pill { font-size: var(--ui-caption); }
+
+.reader .chat-dialog {
+  width: min(29rem, calc(100% - 1.75rem));
+  height: min(42rem, calc(100% - 3.75rem));
+  font-size: var(--ui-text);
+}
+.reader .chat-dialog > header { flex-wrap: wrap; gap: .5rem; padding: .625rem .75rem; }
+.reader .chat-dialog > header span { flex-wrap: wrap; }
+.reader .chat-list { min-height: 6rem; }
+.reader .chat-settings { max-height: 45%; }
+.reader .chat-dialog > footer { max-height: 45%; flex-shrink: 1; }
+.reader .chat-dialog button,
+.reader .chat-settings,
+.reader .chat-settings input,
+.reader .chat-settings select,
+.reader .chat-context-options select,
+.reader .chat-input textarea { font-size: var(--ui-text); }
+.reader .chat-dialog > header button,
+.reader .chat-settings input:not([type=checkbox]),
+.reader .chat-settings select,
+.reader .chat-context-options select { min-height: var(--ui-control-height); }
+.reader .chat-settings label { grid-template-columns: 5rem minmax(0, 1fr); }
+.reader .chat-provider-link,
+.reader .chat-model-status { margin-left: 5.5rem; }
+.reader .chat-turn small,
+.reader .chat-settings p,
+.reader .chat-model-status,
+.reader .chat-provider-link,
+.reader .chat-probe small,
+.reader .chat-focus,
+.reader .chat-focus button,
+.reader .chat-budget,
+.reader .chat-context-preview,
+.reader .chat-context-body button,
+.reader .chat-retrieval,
+.reader .chat-dialog .cite { font-size: var(--ui-caption); }
+.reader .chat-error { font-size: var(--ui-text); }
+.reader .chat-probe button { flex-shrink: 0; }
+.reader .chat-input textarea { min-width: 0; }
+
+/* Reflow panels and controls on narrow screens; do not shrink their text. */
+@media (max-width: 62.5rem) {
+  .reader .inspector { width: min(26rem, calc(100% - 1.5rem)); max-width: none; }
+}
+@media (max-width: 54rem) {
+  .reader .toolbar { grid-template-columns: 1fr auto 1fr; }
+  .reader .viewer-menu { grid-column: 1; grid-row: 1; }
+  .reader .toolbar > .view-options { grid-column: 3; grid-row: 1; flex-wrap: nowrap; }
+  .reader .zoom-levels { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+}
+@media (max-width: 48rem) {
+  .reader .journey { width: min(23.75rem, calc(100% - 1.75rem)); max-height: 42%; }
+  .reader .toolbar { padding: .5rem; }
+  .reader .zoom-levels { width: 100%; }
+  .reader .chat-dialog {
+    position: fixed;
+    z-index: 30;
+    width: min(29rem, calc(100% - 1.75rem));
+    height: min(42rem, calc(100dvh - 1.75rem));
+  }
+  .reader .inspector input,
+  .reader .inspector select,
+  .reader .chat-settings input,
+  .reader .chat-settings select,
+  .reader .chat-context-options select,
+  .reader .chat-input textarea { font-size: 1rem; }
+}
+@media (max-width: 36rem) {
+  .reader .zoom-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

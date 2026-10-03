@@ -6,39 +6,39 @@ export interface ChatMessage { role: 'user' | 'assistant'; content: string }
 export interface ModelInfo { id: string; name?: string; created?: number; contextWindow?: number; maxOutputTokens?: number }
 export interface ProviderPreset {
   label: string; provider: ChatProvider; baseUrl: string; model: string;
-  group: '云端 API' | '本地服务' | '自定义';
+  group: 'Cloud APIs' | 'Local servers' | 'Custom';
   keyUrl?: string; hint?: string; noKey?: boolean; publicModels?: boolean; manualModels?: boolean;
 }
 const cloud = (label: string, baseUrl: string, keyUrl: string, extra: Partial<ProviderPreset> = {}): ProviderPreset =>
-  ({ label, provider: 'openai', baseUrl, model: '', group: '云端 API', keyUrl, ...extra });
+  ({ label, provider: 'openai', baseUrl, model: '', group: 'Cloud APIs', keyUrl, ...extra });
 export const presets: Record<string, ProviderPreset> = {
   anthropic: cloud('Anthropic · Claude', 'https://api.anthropic.com', 'https://console.anthropic.com/settings/keys', { provider: 'anthropic' }),
   openai: cloud('OpenAI', 'https://api.openai.com/v1', 'https://platform.openai.com/api-keys'),
   openrouter: cloud('OpenRouter', 'https://openrouter.ai/api/v1', 'https://openrouter.ai/keys', { publicModels: true }),
   deepseek: cloud('DeepSeek', 'https://api.deepseek.com/v1', 'https://platform.deepseek.com/api_keys'),
   google: cloud('Google AI Studio · Gemini', 'https://generativelanguage.googleapis.com/v1beta/openai', 'https://aistudio.google.com/apikey'),
-  moonshot: cloud('Kimi · 中国区', 'https://api.moonshot.cn/v1', 'https://platform.moonshot.cn/console/api-keys'),
-  'moonshot-intl': cloud('Kimi · 国际区', 'https://api.moonshot.ai/v1', 'https://platform.moonshot.ai/console/api-keys'),
-  zhipu: cloud('智谱 · GLM', 'https://open.bigmodel.cn/api/paas/v4', 'https://open.bigmodel.cn', { hint: '按量 API 地址；订阅专用地址可在“地址”中修改。' }),
-  zai: cloud('Z.ai · GLM', 'https://api.z.ai/api/paas/v4', 'https://z.ai', { hint: '按量 API 地址；请使用该区域签发的 key。' }),
-  qwen: cloud('阿里百炼 · Qwen · 北京', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'https://bailian.console.aliyun.com', { hint: 'Key 与服务地域需一致。' }),
-  'qwen-intl': cloud('阿里百炼 · Qwen · 新加坡', 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', 'https://modelstudio.console.alibabacloud.com', { hint: 'Key 与服务地域需一致。' }),
-  minimax: cloud('MiniMax · 中国区', 'https://api.minimaxi.com/v1', 'https://platform.minimaxi.com', { manualModels: true, hint: '请从控制台填写可用模型 ID；此预设不自动获取模型列表。' }),
-  'minimax-intl': cloud('MiniMax · 国际区', 'https://api.minimax.io/v1', 'https://platform.minimax.io', { manualModels: true, hint: '请从控制台填写可用模型 ID；此预设不自动获取模型列表。' }),
+  moonshot: cloud('Kimi · China', 'https://api.moonshot.cn/v1', 'https://platform.moonshot.cn/console/api-keys'),
+  'moonshot-intl': cloud('Kimi · International', 'https://api.moonshot.ai/v1', 'https://platform.moonshot.ai/console/api-keys'),
+  zhipu: cloud('Zhipu · GLM', 'https://open.bigmodel.cn/api/paas/v4', 'https://open.bigmodel.cn', { hint: 'Pay-as-you-go endpoint. For a subscription endpoint, edit the base URL.' }),
+  zai: cloud('Z.ai · GLM', 'https://api.z.ai/api/paas/v4', 'https://z.ai', { hint: 'Pay-as-you-go endpoint. Use a key issued for this region.' }),
+  qwen: cloud('Alibaba Cloud · Qwen · Beijing', 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'https://bailian.console.aliyun.com', { hint: 'The API key must match the service region.' }),
+  'qwen-intl': cloud('Alibaba Cloud · Qwen · Singapore', 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', 'https://modelstudio.console.alibabacloud.com', { hint: 'The API key must match the service region.' }),
+  minimax: cloud('MiniMax · China', 'https://api.minimaxi.com/v1', 'https://platform.minimaxi.com', { manualModels: true, hint: 'Enter an available model ID from your provider console. This preset does not fetch a model list.' }),
+  'minimax-intl': cloud('MiniMax · International', 'https://api.minimax.io/v1', 'https://platform.minimax.io', { manualModels: true, hint: 'Enter an available model ID from your provider console. This preset does not fetch a model list.' }),
   groq: cloud('Groq', 'https://api.groq.com/openai/v1', 'https://console.groq.com/keys'),
   mistral: cloud('Mistral', 'https://api.mistral.ai/v1', 'https://console.mistral.ai/api-keys'),
-  ollama: { label: 'Ollama', provider: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', model: '', group: '本地服务', noKey: true, hint: '先启动 Ollama 并配置允许查看器来源的跨域访问。' },
-  lmstudio: { label: 'LM Studio', provider: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', model: '', group: '本地服务', noKey: true, hint: '先在 LM Studio 启动本地服务并启用 CORS；如果开启认证，填写对应 key。' },
-  custom: { label: '自定义 · OpenAI 兼容', provider: 'openai', baseUrl: '', model: '', group: '自定义', hint: '填写 API 基础地址，例如 http://127.0.0.1:8000/v1。' },
-  'custom-anthropic': { label: '自定义 · Anthropic 兼容', provider: 'anthropic', baseUrl: '', model: '', group: '自定义', hint: '填写 API 基础地址，支持根地址或以 /v1 结尾的地址。' },
+  ollama: { label: 'Ollama', provider: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', model: '', group: 'Local servers', noKey: true, hint: 'Start Ollama and allow the viewer origin in its CORS settings.' },
+  lmstudio: { label: 'LM Studio', provider: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', model: '', group: 'Local servers', noKey: true, hint: 'Start the local server in LM Studio and enable CORS. If authentication is enabled, enter its API key.' },
+  custom: { label: 'Custom · OpenAI compatible', provider: 'openai', baseUrl: '', model: '', group: 'Custom', hint: 'Enter the API base URL, such as http://127.0.0.1:8000/v1.' },
+  'custom-anthropic': { label: 'Custom · Anthropic compatible', provider: 'anthropic', baseUrl: '', model: '', group: 'Custom', hint: 'Enter the API base URL, either the root URL or a URL ending in /v1.' },
 };
 
 /** Keys belong in headers, never in a URL that can enter history or server logs. */
 export function normalizedBase(value: string): string {
   let u: URL;
-  try { u = new URL(value.trim()); } catch { throw new Error('请填写完整的 http:// 或 https:// 接口地址'); }
+  try { u = new URL(value.trim()); } catch { throw new Error('Enter a complete http:// or https:// API URL.'); }
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash)
-    throw new Error('接口地址只能包含 HTTP(S) 主机和路径；key 请填入独立字段');
+    throw new Error('The API URL may contain only an HTTP(S) host and path. Enter the key in its separate field.');
   return u.href.replace(/\/+$/, '');
 }
 export function presetOf(s: Pick<ChatSettings, 'provider' | 'baseUrl'>): string {
@@ -52,7 +52,7 @@ export function presetOf(s: Pick<ChatSettings, 'provider' | 'baseUrl'>): string 
 export const selectedPreset = (s: ChatSettings) => presets[presetOf(s)];
 export function switchPreset(s: ChatSettings, id: string): ChatSettings {
   const p = presets[id];
-  if (!p) throw new Error('未知供应商');
+  if (!p) throw new Error('Unknown provider.');
   return { provider: p.provider, baseUrl: p.baseUrl, model: '', apiKey: '', remember: s.remember };
 }
 export function changeEndpoint(s: ChatSettings, baseUrl: string): ChatSettings {
@@ -87,14 +87,14 @@ function headers(s: ChatSettings): Record<string, string> {
     : key ? { authorization: `Bearer ${key}` } : {};
 }
 export function safeError(e: unknown, s: ChatSettings): string {
-  let text = e instanceof TypeError ? '无法连接接口：请检查地址、网络，以及服务是否允许浏览器跨域访问（CORS）。' : e instanceof Error ? e.message : String(e);
-  if (s.apiKey.trim()) text = text.split(s.apiKey.trim()).join('[key 已隐藏]');
+  let text = e instanceof TypeError ? 'Cannot connect to the API. Check the URL, network connection, and whether the service allows browser access through CORS.' : e instanceof Error ? e.message : String(e);
+  if (s.apiKey.trim()) text = text.split(s.apiKey.trim()).join('[key hidden]');
   return text.slice(0, 500);
 }
 async function checkResponse(res: Response) {
   if (res.ok) return;
   const body = (await res.text().catch(() => '')).slice(0, 400);
-  const hint = res.status === 401 || res.status === 403 ? 'key 无效、地域不符或没有权限' : res.status === 429 ? '额度不足或请求过于频繁' : res.status === 404 ? '接口路径或模型不存在' : res.statusText;
+  const hint = res.status === 401 || res.status === 403 ? 'Invalid key, region mismatch, or access denied' : res.status === 429 ? 'Quota exceeded or too many requests' : res.status === 404 ? 'API route or model not found' : res.statusText;
   throw new Error(`${res.status} ${hint}：${body}`);
 }
 const positiveTokens = (value: unknown): number | undefined => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
@@ -107,7 +107,7 @@ export function modelBudget(s: Pick<ChatSettings, 'provider' | 'baseUrl' | 'mode
   const maxOutput = positiveTokens(info?.maxOutputTokens);
   const outputTokens = Math.min(s.provider === 'anthropic' ? 4096 : 16384, maxOutput ?? Infinity, contextWindow ? Math.max(1, Math.floor(contextWindow / 2)) : Infinity);
   const inputTokens = contextWindow ? Math.max(1, contextWindow - outputTokens) : 96000;
-  return { contextWindow, outputTokens, inputTokens, source: positiveTokens(info?.contextWindow) ? '模型接口' : officialDeepSeek ? 'DeepSeek 官方文档' : '未知模型的本地默认值' };
+  return { contextWindow, outputTokens, inputTokens, source: positiveTokens(info?.contextWindow) ? 'Model API' : officialDeepSeek ? 'DeepSeek documentation' : 'Local default for unknown models' };
 }
 export function budgetKey(s: Pick<ChatSettings, 'provider' | 'baseUrl' | 'model'>): string {
   let base = s.baseUrl.trim();
@@ -121,7 +121,7 @@ export function restoreInputBudgets(value: unknown): Record<string, number> {
 const NOT_CHAT = /(embedding|whisper|tts|dall-e|moderation|davinci|babbage|transcribe|image|rerank)/i;
 export function parseModels(provider: ChatProvider, baseUrl: string, json: unknown): ModelInfo[] {
   const data = (json as { data?: unknown })?.data;
-  if (!Array.isArray(data)) throw new Error('返回内容里没有模型列表，可以手动填写模型 ID');
+  if (!Array.isArray(data)) throw new Error('The response has no model list. Enter a model ID manually.');
   const seen = new Set<string>();
   const models = data.filter((m): m is Record<string, unknown> => !!m && typeof m.id === 'string' && !!m.id.trim())
     .filter(m => { if (seen.has(m.id as string)) return false; seen.add(m.id as string); return true; })
@@ -138,7 +138,7 @@ export function parseModels(provider: ChatProvider, baseUrl: string, json: unkno
   return chat.some(m => m.created) ? [...chat].sort((a, b) => (b.created ?? 0) - (a.created ?? 0)) : chat;
 }
 export async function listModels(s: ChatSettings, signal?: AbortSignal): Promise<ModelInfo[]> {
-  if (selectedPreset(s).manualModels) throw new Error('此预设请手动填写模型 ID');
+  if (selectedPreset(s).manualModels) throw new Error('Enter a model ID manually for this preset.');
   try {
     const res = await fetch(apiUrl(s, 'models'), { signal, credentials: 'omit', redirect: 'error', headers: headers(s) });
     await checkResponse(res);
@@ -163,14 +163,14 @@ export function readSSE(buffer: string, provider: ChatProvider, onText: (t: stri
     if (typeof text === 'string' && text) { onStatus?.('answering'); onText(text); }
     else if (delta?.reasoning_content || delta?.reasoning || delta?.type === 'thinking_delta') onStatus?.('thinking');
     const stop = provider === 'anthropic' ? delta?.stop_reason : json.choices?.[0]?.finish_reason;
-    if (stop === 'length' || stop === 'max_tokens') throw new Error('模型达到输出长度限制，当前回复不完整；请缩小问题范围或继续追问');
-    if (stop === 'content_filter' || stop === 'refusal') throw new Error('模型拒绝了本次请求或触发内容过滤');
+    if (stop === 'length' || stop === 'max_tokens') throw new Error('The model reached its output limit. The answer is incomplete; narrow the question or ask a follow-up.');
+    if (stop === 'content_filter' || stop === 'refusal') throw new Error('The model refused the request or content filtering was triggered.');
   }
   return rest;
 }
 /** Direct browser request. The optional connection test uses this same transport, with no trajectory. */
 export async function streamChat(s: ChatSettings, system: string, messages: ChatMessage[], onText: (t: string) => void, signal: AbortSignal, onStatus?: (s: StreamStatus) => void, outputTokens = modelBudget(s).outputTokens) {
-  if (!positiveTokens(outputTokens)) throw new Error('回复额度必须为正整数');
+  if (!positiveTokens(outputTokens)) throw new Error('The output allowance must be a positive integer.');
   const body = s.provider === 'anthropic'
     ? { model: s.model.trim(), max_tokens: outputTokens, system, messages, stream: true }
     : { model: s.model.trim(), messages: [{ role: 'system', content: system }, ...messages], stream: true,
@@ -187,9 +187,9 @@ export async function streamChat(s: ChatSettings, system: string, messages: Chat
       const text = s.provider === 'anthropic' ? json.content?.filter((p: { type: string }) => p.type === 'text').map((p: { text: string }) => p.text).join('') : json.choices?.[0]?.message?.content;
       if (typeof text === 'string') { onStatus?.('answering'); append(text); }
       const stop = s.provider === 'anthropic' ? json.stop_reason : json.choices?.[0]?.finish_reason;
-      if (stop === 'length' || stop === 'max_tokens') throw new Error('模型达到输出长度限制，当前回复不完整');
+      if (stop === 'length' || stop === 'max_tokens') throw new Error('The model reached its output limit. The answer is incomplete.');
     } else {
-      if (!res.body) throw new Error('接口没有返回响应正文');
+      if (!res.body) throw new Error('The API returned no response body.');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -202,6 +202,6 @@ export async function streamChat(s: ChatSettings, system: string, messages: Chat
         readSSE(`${buffer}${decoder.decode()}\n`, s.provider, append, onStatus);
       } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
     }
-    if (!hasText) throw new Error('接口已结束，但没有返回回复正文。请更换模型或重试');
+    if (!hasText) throw new Error('The API finished without returning an answer. Try another model or retry.');
   } catch (e) { if (signal.aborted) throw e; throw new Error(safeError(e, s)); }
 }

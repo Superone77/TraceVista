@@ -9,10 +9,14 @@
 以及一份完整导出的 **Pi Infra Harness / LoRA / 20261001-r1** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
-## 1. 克隆并打开示例
+## 1. 打开 TraceVista
 
-需要 **Node.js 24.x、pnpm 11.19.0**。转换新的日志或跑 skill 测试还需要 **Python ≥ 3.10**。
-可以直接使用云端查看器 **https://tracevista.pages.dev/** 并导入文件；也可以按下面步骤本地运行。
+打开[云端查看器](https://tracevista.pages.dev/)，点击“Import trajectory”选择完整的 `.agent-state.json`。
+如果手上是 Claude Code、Codex 或 Pi 的原始日志，先按[第 5 节](#5-用-tracevista-skill-生成和修改轨迹)安装 skill 并转换。
+
+### 本地开发与示例
+
+本地运行引擎需要 **Node.js 24.x、pnpm 11.19.0**。转换日志或跑 skill 测试需要 **Python ≥ 3.10**。
 
 ```bash
 git clone https://github.com/Superone77/trajactory_visualizer.git
@@ -30,7 +34,7 @@ pnpm dev
 - **Pi 真实轨迹：** http://127.0.0.1:8875/?example=pi-infra-r1
 - 首页 / 本地 JSON 导入：http://127.0.0.1:8875/
 
-首页也有示例入口。首次加载先显示状态卡片；点击“全图”查看完整版本树。
+首页也有示例入口。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
 `trajectory.html` 保留为兼容入口。若 8875 被占用，先停止占用它的开发服务器，或手动用
 `pnpm exec vite --config viewer/vite.config.ts --host 127.0.0.1 --port 8876 --strictPort` 更换端口。
 
@@ -43,8 +47,8 @@ pnpm dev
 | 具体行为 | Explore、Plan、Edit、Execute、Verify、Diagnose；执行者身份独立于行为类型 |
 | 原始轨迹 | 原始思考、发言、工具输入和返回；长正文可在卡片内滚动 |
 | 点击卡片 | 右侧详情、版本来源、内部行为、原始证据及跳转 |
-| “版本分支 / 执行顺序” | 分别查看代码来自哪个版本，以及实际先后顺序 |
-| “结构与证据” | 全任务搜索与筛选：探索、Skill、review、经验读写、TODO、测量和独立结论 |
+| “Version tree / Execution order” | 分别查看代码来自哪个版本，以及实际先后顺序 |
+| “Structure & evidence” | 全任务搜索与筛选：探索、Skill、review、经验读写、TODO、测量和独立结论 |
 
 触控板默认双指平移、捏合缩放；鼠标模式用滚轮缩放。空白处拖动或按空格拖动画布。
 工具栏的四个层级按钮可以直接跳转。读日志时可选中复制文本。
@@ -54,9 +58,9 @@ Pi 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最�
 
 ### 阅读层（借鉴 ThoughtDAG）
 
-Pi 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，32 个转向地标标注了排除、决定、转向或未决，18 条依据边从观察指向它改变的决定，总览左侧还有一段历程。"只看决策"模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
+Pi 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，32 个转向地标标注了排除、决定、转向或未决，18 条依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
 
-工具栏"💬 追问"可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“测试回复”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
+工具栏“Chat”可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“Test connection”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
 
 ## 3. Pi 示例展示了什么
 
@@ -112,32 +116,46 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 
 ## 5. 用 tracevista-skill 生成和修改轨迹
 
-可直接让支持 skill 的 coding agent 使用：
+需要 Git、**Python ≥ 3.10** 和这个 GitHub 仓库的访问权限；私有仓库需先登录获准访问的账号。
+在你的项目根目录运行下面的命令，只把 skill 文件夹安装到 Codex 的项目目录：
 
-> 使用 `skills/tracevista-skill/SKILL.md`，将这份日志转换成 TraceVista 文件，
-> 返回点击后就能看到完整轨迹的 TraceVista 链接。后续修改请沿用这份文件和原始证据。
+```bash
+(
+  set -e
+  tracevista_source="$(mktemp -d)"
+  trap 'rm -rf "$tracevista_source"' EXIT
+  git clone --depth 1 https://github.com/Superone77/trajactory_visualizer.git "$tracevista_source/repo"
+  mkdir -p .agents/skills
+  python3 -c 'import shutil, sys; shutil.copytree(sys.argv[1], sys.argv[2])' \
+    "$tracevista_source/repo/skills/tracevista-skill" .agents/skills/tracevista-skill
+)
+```
 
-也可以把整个 `skills/tracevista-skill/` 文件夹复制到你的 agent 的 skill 目录，并用 `$tracevista-skill` 调用。旧名称是 `trajectory-to-thoughtdag`；现有 `.agent-state.json` 文件继续兼容。
+Claude Code 使用相同命令，把两处 `.agents` 换成 `.claude`。已有仓库副本时，也可以直接复制完整的 `skills/tracevista-skill/` 文件夹。
+在项目中启动新的 agent 会话，用 Codex 的 `$tracevista-skill` 或 Claude Code 的 `/tracevista-skill`，附上日志路径并说明：
 
-这个分工类似 Excalidraw：**skill 生成和修改标准文件，云端引擎负责打开和交互**。skill 使用 Python 标准库，可以单独安装，不依赖本仓库的 Node 环境。
+> 将 `/path/to/session.jsonl` 转换为完整的 `.agent-state.json`，保留原文和证据。
+> 在浏览器的 `https://tracevista.pages.dev/` 导入这次生成的文件并检查；如果无法操作浏览器，返回 JSON 和手动导入步骤。后续修改沿用这份文件和证据。
 
-处理流程：
+**skill 生成和修改标准文件，云端引擎负责打开和交互。** skill 只用 Python 标准库，无需安装查看器的 Node 环境。
+
+处理流程如下；脚本命令以 Codex 的项目安装路径为例，Claude Code 对应 `.claude/skills/tracevista-skill/`。
 
 ```text
 原始 Claude / Codex / Pi 日志
     → extract_timeline.py：提取事件和完整原文
     → agent 阅读证据并编写 state-analysis.json：状态、分支、行为和关系
     → build_state_graph.py --format state：验证引用和变化，输出状态 JSON
-    → create_view.py：生成点击即打开完整轨迹的链接
-    → 云端或本地查看器接收文件，逐层查看
+    → 在 https://tracevista.pages.dev/ 导入本次生成的完整 JSON
+    → 检查状态、关键转向和原始记录，交付 JSON
 ```
 
 ```bash
-python3 skills/tracevista-skill/scripts/extract_timeline.py /path/to/session.jsonl \
+python3 .agents/skills/tracevista-skill/scripts/extract_timeline.py /path/to/session.jsonl \
   --out .work/my-run
 
 # 由 agent 阅读 timeline，并编写 state-analysis.json 后执行：
-python3 skills/tracevista-skill/scripts/build_state_graph.py .work/my-run/state-analysis.json \
+python3 .agents/skills/tracevista-skill/scripts/build_state_graph.py .work/my-run/state-analysis.json \
   --timeline .work/my-run/timeline.json --format state --require-reading-layer \
   --quality-report .work/my-run/reading-quality.json --out .work/my-run/task.agent-state.json
 ```
@@ -145,22 +163,17 @@ python3 skills/tracevista-skill/scripts/build_state_graph.py .work/my-run/state-
 对已有导出，无需重新转换：
 
 ```bash
-python3 skills/tracevista-skill/scripts/validate_trace.py /path/to/task.agent-state.json \
+python3 .agents/skills/tracevista-skill/scripts/validate_trace.py /path/to/task.agent-state.json \
   --require-reading-layer
-python3 skills/tracevista-skill/scripts/create_view.py /path/to/task.agent-state.json \
-  --out-dir .work/my-run/view --name task
 ```
 
-命令启动本机服务，先输出 JSON（含 `url`），随后持续运行。打开这个 URL 就直接看到
-自动加载轨迹的全屏 TraceVista，**没有中间概览页，也不用再点一次按钮**。
-默认使用云端可视化引擎；本地测试可加 `--viewer-url http://127.0.0.1:8875/`。
-
-链接仅在这台机器、该服务运行期间有效。轨迹仍保存在完整 JSON 中，不放进网址或上传到存储服务。
-要只生成文件而不启动服务，可加 `--prepare-only`；后续可从保存的 JSON 重新生成直达链接。
+随后在云端查看器点击“Import trajectory”，选择这份 JSON；有浏览器操作能力的 agent 可以完成导入和检查。
+交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 Pi 示例可用于了解界面。
+需要本地预览时，可按[可选本地预览说明](skills/tracevista-skill/references/opening.md#optional-local-preview)使用 `create_view.py`。
 
 让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从
 项目下 `.work/tracevista/state` 恢复；每次保存生成独立修订，保留原始事件与证据 ID。
-完整交互及可选参数见 [skill](skills/tracevista-skill/SKILL.md) 和 [打开方式](skills/tracevista-skill/references/opening.md)。
+完整流程见 [skill](skills/tracevista-skill/SKILL.md) 和 [打开方式](skills/tracevista-skill/references/opening.md)。
 
 多个主 agent / reviewer 会话使用相对路径 manifest，见
 [多 agent 说明](skills/tracevista-skill/references/multi-agent.md)。

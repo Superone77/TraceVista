@@ -1,7 +1,7 @@
 import type { Graph, Entity, Action, ProjectedEdge } from './model';
 
 export type Tier = 'states' | 'branches' | 'actions' | 'raw';
-export const tierLabels: Record<Tier, string> = { states: '系统状态', branches: '工作阶段', actions: '具体行为', raw: '原始轨迹' };
+export const tierLabels: Record<Tier, string> = { states: 'System states', branches: 'Work phases', actions: 'Actions', raw: 'Raw records' };
 export function semanticTier(zoom: number, previous?: Tier): Tier {
   if (previous === 'raw' && zoom >= 1.05 || zoom >= 1.15) return 'raw';
   if (previous === 'actions' && zoom >= .77) return 'actions';
@@ -34,7 +34,7 @@ export function branchItems(g: Graph, branchId: string, opts: LayoutOptions = {}
   let run: Action[] = [];
   const flush = () => {
     const id = run.length ? `fold:${run[0].id}` : '';
-    if (run.length >= FOLD_MIN && !opts.openFolds?.has(id)) out.push({ id, title: `${run.length} 个常规步骤`, summary: run.map(a => a.title).join('；'), events: run.flatMap(a => a.events), state: run[0].state, branch: branchId, actions: run });
+    if (run.length >= FOLD_MIN && !opts.openFolds?.has(id)) out.push({ id, title: `${run.length} routine steps`, summary: run.map(a => a.title).join('；'), events: run.flatMap(a => a.events), state: run[0].state, branch: branchId, actions: run });
     else out.push(...run);
     run = [];
   };
@@ -53,7 +53,7 @@ export interface Layout { nodes: MapNode[]; width: number; height: number; state
 /** Lineage expresses version ancestry; chronological transitions remain intact. */
 export function stateConnections(g: Graph, mode: StateMode) {
   return g.states.flatMap(s => {
-    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: s.lineage.relation === 'restored' ? '恢复此版本' : s.lineage.relation === 'retained' ? '保留并结束' : '基于此版本修改' }];
+    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: s.lineage.relation === 'restored' ? 'Restore this version' : s.lineage.relation === 'retained' ? 'Retain and finish' : 'Derived from this version' }];
     return g.transitions.filter(t => t.target === s.id).map(t => ({ source: t.source, target: t.target, kind: 'transition', label: t.label }));
   });
 }
@@ -73,13 +73,13 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
   const visiting = new Set<string>();
   const spans = new Map<string, number>();
   function span(id: string): number {
-    if (visiting.has(id)) throw new Error('状态关系存在循环');
+    if (visiting.has(id)) throw new Error('State relations contain a cycle');
     if (spans.has(id)) return spans.get(id)!;
     visiting.add(id); const result = Math.max(1, children(id).reduce((n, c) => n + span(c.id), 0));
     visiting.delete(id); spans.set(id, result); return result;
   }
   roots.forEach(s => span(s.id));
-  if (spans.size !== g.states.length) throw new Error('状态关系存在循环');
+  if (spans.size !== g.states.length) throw new Error('State relations contain a cycle');
   const placed = new Set<string>();
   function place(s: Graph['states'][number], left: number, y: number) {
     if (placed.has(s.id)) return;
@@ -111,7 +111,7 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
   const remaining = new Set(g.states.map(s => s.id));
   while (remaining.size) {
     const ready = [...remaining].filter(id => connections.filter(e => e.target === id).every(e => ordered.has(e.source)));
-    if (!ready.length) throw new Error('状态关系存在循环');
+    if (!ready.length) throw new Error('State relations contain a cycle');
     for (const id of ready) {
       const n = nodes.find(n => n.id === id)!;
       const parents = connections.filter(e => e.target === id).map(e => nodes.find(n => n.id === e.source)!);
@@ -153,7 +153,7 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       chain.forEach((n, i) => edges.push({ id: `sequence:${n.id}`, source: i ? chain[i - 1].id : b.id, target: n.id, kind: 'sequence', label: '' }));
     }
   }
-  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: '产生新状态' });
+  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: 'Creates state' });
   if (showLinks) {
     const actions = new Map(g.actions.map(a => [a.id, a]));
     const aggregate = new Map<string, ProjectedEdge>();
@@ -167,7 +167,7 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       const id = `link:${source}:${target}:${l.kind}`;
       const prior = aggregate.get(id);
       if (prior) prior.count = (prior.count ?? 1) + 1;
-      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? '请求审查' : l.kind === 'review_return' ? '审查返回' : l.kind === 'sequence' ? '继续执行' : l.kind === 'informs' ? '依据' : '后续依据' });
+      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? 'Review request' : l.kind === 'review_return' ? 'Review response' : l.kind === 'sequence' ? 'Continues' : l.kind === 'informs' ? 'Informs' : 'Informs later work' });
     }
     edges.push(...aggregate.values());
   }

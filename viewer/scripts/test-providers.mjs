@@ -52,7 +52,7 @@ assert.equal(meta[2].maxOutputTokens, undefined);
 const largeBudget = modelBudget(ds, meta[0]);
 assert.equal(largeBudget.inputTokens, 1032192);
 assert.equal(largeBudget.outputTokens, 16384);
-assert.equal(largeBudget.source, '模型接口');
+assert.equal(largeBudget.source, 'Model API');
 assert.equal(modelBudget(ds).contextWindow, 1048576, 'Official endpoint fallback when discovery is unavailable');
 assert.equal(modelBudget({ ...ds, model: 'unknown' }).contextWindow, undefined);
 assert.equal(modelBudget({ ...ds, baseUrl: 'https://gateway.example/v1' }).inputTokens, 96000);
@@ -112,7 +112,7 @@ try {
   globalThis.fetch = async (_, init) => { assert.deepEqual(init.headers, {}); return response({ data: [] }); };
   await listModels({ ...settings('ollama'), apiKey: '' });
   globalThis.fetch = async () => { throw new Error('must not probe MiniMax'); };
-  await assert.rejects(listModels(settings('minimax')), /手动填写/);
+  await assert.rejects(listModels(settings('minimax')), /model ID manually/);
   // Explicit metadata-derived output reservation reaches the provider.
   globalThis.fetch = async (_, init) => { assert.equal(JSON.parse(init.body).max_tokens, 2048); return response({ choices: [{ message: { content: 'ok' } }] }); };
   await streamChat(ds, '', [], () => {}, new AbortController().signal, undefined, 2048);
@@ -126,9 +126,9 @@ try {
   await streamChat(old, '', [], t => result += t, new AbortController().signal);
   assert.equal(result, 'anthropic json');
   globalThis.fetch = async () => stream('data: {"choices":[{"delta":{"reasoning_content":"not an answer"}}]}\n');
-  await assert.rejects(streamChat(settings('deepseek'), '', [], () => {}, new AbortController().signal), /没有返回回复正文/);
+  await assert.rejects(streamChat(settings('deepseek'), '', [], () => {}, new AbortController().signal), /without returning an answer/);
   globalThis.fetch = async () => stream('data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}\n');
-  await assert.rejects(streamChat(settings('groq'), '', [], () => {}, new AbortController().signal), /不完整/);
+  await assert.rejects(streamChat(settings('groq'), '', [], () => {}, new AbortController().signal), /incomplete/);
   globalThis.fetch = async () => response({ error: { message: 'bad synthetic-test-key' } }, 401);
   await assert.rejects(streamChat(old, '', [], () => {}, new AbortController().signal), e => e.message.includes('401') && !e.message.includes(old.apiKey));
   const controller = new AbortController(); controller.abort();

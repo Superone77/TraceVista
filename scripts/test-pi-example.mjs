@@ -8,8 +8,8 @@ const {layoutGraph,semanticProjection,recordsForAction}=await mod('viewer/src/tr
 const original=JSON.parse(readFileSync(new URL('viewer/public/examples/pi-infra-r1.agent-state.json',root),'utf8'));
 const g=parseGraph(original);
 assert.equal(g.states.find(s=>s.id==='s4').lineage.parent,'s2');
-assert.equal(stateVisual(g.states.find(s=>s.id==='s3')).label,'测量值退化');
-assert.equal(stateVisual(g.states.find(s=>s.id==='s4')).label,'测量值改善');
+assert.equal(stateVisual(g.states.find(s=>s.id==='s3')).label,'Measurement regressed');
+assert.equal(stateVisual(g.states.find(s=>s.id==='s4')).label,'Measurement improved');
 assert.equal(stateVisual(g.states.find(s=>s.id==='s5')).delta,null);
 const projections=[];
 for(const mode of ['lineage','chronology']) for(const tier of ['states','branches','actions','raw']){
