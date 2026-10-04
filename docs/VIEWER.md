@@ -6,7 +6,7 @@
 ## 打开
 
 直接打开[云端 TraceVista](https://tracevista.pages.dev/)，点击“Import trajectory”选择完整的 `.agent-state.json`。
-原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#5-用-tracevista-skill-生成和修改轨迹)。首页“View examples”展开案例列表，点击名称后打开案例。
+原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#bring-your-own-trajectory)。首页“View examples”展开案例列表，点击名称后打开案例。
 
 本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
 
