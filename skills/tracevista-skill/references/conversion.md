@@ -14,6 +14,22 @@ python3 /absolute/skill/scripts/extract_timeline.py --manifest /absolute/work/ma
 ```
 
 The extractor retains full event text, source logs, call IDs, positions and recorded usage.
+Claude Code input also accepts runner logs whose native JSON records have an ISO 8601
+prefix, for example `[2026-06-12T09:03:08Z] {"type":"assistant",...}`. UTC offsets and
+fractional seconds are supported. Use the original runner log directly; do not strip its
+prefixes into a replacement source. The complete original source is retained under the
+same redaction rules, with original line numbers linking events back to it.
+
+For this wrapped format, nonempty runner lines become explicit `status` records with
+`record_type: runner`; malformed JSON remains visible as runner text rather than being
+silently discarded. Native system, result, rate-limit, progress, and unknown record types
+remain status evidence. Native thinking blocks remain `thinking`, and tool IDs continue
+to bind calls and results. `timestamp` retains the native timestamp when present, otherwise
+the wrapper timestamp; `source_timestamp` records the wrapper separately. Lines with no
+timestamp keep an unknown time. Usage comes only from recorded native usage fields.
+Plain runner text, unrecognized JSON, and timestamp-wrapped formats other than Claude Code
+are not accepted as an agent trajectory.
+
 Markdown is a shortened reading aid; inspect full events when a result or explanation matters:
 
 ```sh

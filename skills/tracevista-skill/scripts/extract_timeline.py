@@ -11,6 +11,8 @@ from pathlib import Path
 
 BRIEF = {'user': 1500, 'note': 1500, 'thinking': 1500, 'call': 350, 'result': 350, 'status': 350}
 PART_CHARS = 50_000
+TIMESTAMP_PREFIX = re.compile(
+    r'^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))\][ \t]?(.*)$')
 SECRETS = [
     (re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----', re.S), '[REDACTED PRIVATE KEY]'),
     (re.compile(r'\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{20,}'), '[REDACTED KEY]'),
@@ -79,14 +81,25 @@ def load_rows(text):
     except ValueError: pass
     rows = []
     for line, value in enumerate(text.splitlines(), 1):
-        try: row = json.loads(value)
-        except ValueError: continue
-        if isinstance(row, dict): rows.append(dict(row, _source_line=line))
+        prefix = TIMESTAMP_PREFIX.match(value)
+        wrapped_at = prefix[1] if prefix and stamp(prefix[1]) is not None else None
+        body = prefix[2] if wrapped_at is not None else value
+        try: row = json.loads(body)
+        except ValueError: row = None
+        if isinstance(row, dict):
+            row = dict(row, _source_line=line)
+            if wrapped_at is not None: row['_source_timestamp'] = wrapped_at
+            rows.append(row)
+        elif value.strip():
+            # Only a recognized timestamp-wrapped Claude stream promotes these to
+            # events. Plain text alone must not become a plausible agent trace.
+            rows.append(dict(_source_line=line, _source_runner=body,
+                             _source_timestamp=wrapped_at))
     return rows
 
 
 def detect(rows):
-    for row in rows[:400]:
+    for row in (r for r in rows if '_source_runner' not in r):
         kind = row.get('type')
         if kind in ('session_meta', 'response_item', 'event_msg', 'turn_context'): return 'codex-rollout'
         if kind in ('thread.started', 'turn.started', 'item.completed', 'item.started', 'turn.completed'): return 'codex-exec'
@@ -99,11 +112,18 @@ def detect(rows):
 def extract(text, fmt=None):
     """Return events plus final usage; missing usage is None, never invented zero."""
     rows = load_rows(text); fmt = fmt or detect(rows)
+    wrapped_records = any(row.get('_source_timestamp') is not None and '_source_runner' not in row for row in rows)
+    if wrapped_records and fmt != 'claude-code':
+        raise ValueError('Timestamp-prefixed logs require a recognized Claude Code stream')
+    wrapped_claude = fmt == 'claude-code' and wrapped_records
     events, tokens, seen_usage, calls = [], None, {}, {}
     def add(row, kind, body, tool=None, error=False, **extra):
         e = dict(kind=kind, text=body, tool=tool, error=error, tokens_in=tokens,
-                 timestamp=row.get('timestamp'), source_line=row.get('_source_line'),
+                 timestamp=row.get('timestamp') if row.get('timestamp') is not None else row.get('_source_timestamp'),
+                 source_line=row.get('_source_line'),
                  source_index=row.get('_source_index'), **extra)
+        if row.get('_source_timestamp') is not None:
+            e['source_timestamp'] = row['_source_timestamp']
         events.append(e)
         return e
     def add_usage(key, usage, fields):
@@ -117,16 +137,23 @@ def extract(text, fmt=None):
             delta += value - prev.get(field, 0); prev[field] = value
         tokens = (tokens or 0) + delta
     for ri, row in enumerate(rows):
+        if '_source_runner' in row:
+            if wrapped_claude:
+                add(row, 'status', row['_source_runner'], record_type='runner')
+            continue
         typ = row.get('type'); item = row.get('item') or {}; msg = row.get('message') or {}
         if fmt == 'claude-code':
             if typ in ('assistant', 'user'):
                 if typ == 'assistant':
                     add_usage(msg.get('id') or ('row', ri), msg.get('usage') or {},
                               ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
-                content = msg.get('content', [])
+                content = msg.get('content') or []
                 if isinstance(content, str): content = [{'type':'text', 'text':content}]
+                before = len(events)
                 for bi, c in enumerate(content):
-                    if not isinstance(c, dict): continue
+                    if not isinstance(c, dict):
+                        add(row, 'status', compact(c), block=bi, role=typ)
+                        continue
                     k = c.get('type'); common = dict(block=bi, role=typ, event_id=row.get('uuid'), model=msg.get('model'))
                     if k == 'text': add(row, 'note' if typ == 'assistant' else 'user', c.get('text',''), **common)
                     elif k == 'thinking': add(row, 'thinking', c.get('thinking',''), **common)
@@ -136,7 +163,12 @@ def extract(text, fmt=None):
                     elif k == 'tool_result':
                         add(row, 'result', text_of(c.get('content')), tool=calls.get(c.get('tool_use_id')),
                             error=bool(c.get('is_error')), call_id=c.get('tool_use_id'), **common)
-            elif typ in ('result', 'system', 'error'):
+                    else: add(row, 'status', compact(c), **common)
+                if len(events) == before:
+                    add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}))
+            else:
+                # Preserve rate limits, progress notifications and future native
+                # records rather than silently omitting unrecognized types.
                 add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}), error=bool(row.get('is_error')))
         elif fmt == 'codex-exec':
             if typ == 'turn.completed':
@@ -191,7 +223,7 @@ def extract(text, fmt=None):
     times = [stamp(e['timestamp']) for e in events if stamp(e['timestamp']) is not None]
     start = min(times) if times else None
     for i,e in enumerate(events,1):
-        now=stamp(e.pop('timestamp')); e.update(id=f'E{i}', t_min=None if now is None or start is None else round((now-start)/60, 2))
+        now=stamp(e['timestamp']); e.update(id=f'E{i}', t_min=None if now is None or start is None else round((now-start)/60, 2))
     return events, tokens, fmt
 
 

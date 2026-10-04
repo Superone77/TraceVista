@@ -7,5 +7,14 @@
     "agent": "Claude Opus 5.5 + Codex review",
     "task": "W8A16",
     "date": "2026-10-02"
+  },
+  {
+    "id": "posttrainbench-fable5-aime",
+    "title": "PostTrainBench",
+    "file": "posttrainbench-fable5-aime.agent-state.json",
+    "description": "AIME 2025 post-training with supervised fine-tuning and checkpoint averaging.",
+    "agent": "Fable 5 Max · Claude Code",
+    "task": "AIME 2025 · Qwen3-4B",
+    "date": "Selected 2026-10-04"
   }
 ]

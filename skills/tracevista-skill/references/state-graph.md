@@ -85,6 +85,9 @@ snapshot restoration. Do not infer ancestry from a worse score alone.
 Optional `states[].assessment` supplies the measured metric, value, comparison value/state,
 higherIsBetter, correctness, measurement (`measured` or `historical`) and note. Compare only
 matching measurement scopes and protocols. Historical final selection is not a fresh result.
+`correctness` is an optional boolean for an explicitly observed correctness check. Omit it
+when only a task score or accuracy measurement is available. A successful evaluator call
+does not establish correctness, and an accuracy below 100% is not a failed correctness gate.
 Executed alternatives that are later abandoned remain branch `status: attempted` and use an
 exploration observation with `disposition: rejected`; branch `rejected` means untried.
 

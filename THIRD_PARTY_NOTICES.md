@@ -31,8 +31,31 @@ documentation. Its proxy, OAuth and subscription bridges are not included.
 (base commit `e0c1221a4d45c9c006dc7cc6d5f2805e2f3e8cde` plus local state/observation changes).
 This repository contains the complete version used by the example, including standalone-export changes. It does not depend on access to the older private repository.
 
-## Research example
+## Research examples
 
 The bundled KDA W8A16 JSON export is a user-authorized public research example, with English
 annotations and original model/tool evidence. It includes snippets of the task code. The
 upstream viewer license does not cover the research logs. Other imports are not bundled.
+
+### PostTrainBench
+
+The bundled `posttrainbench-fable5-aime.agent-state.json` is derived from the
+[PostTrainBench Agent Traces dataset](https://huggingface.co/datasets/aisa-group/PostTrainBench-Trajectories)
+published by the AI Safety and Alignment Group, ELLIS Institute Tübingen and MPI-IS,
+under Apache License 2.0. A copy is included at
+[LICENSES/PostTrainBench-Apache-2.0.txt](LICENSES/PostTrainBench-Apache-2.0.txt).
+
+Source: Fable 5 Max / Claude Code, AIME 2025, Qwen3-4B-Base, run 1, job `17337591`,
+at dataset revision `386b3034fa26f0f1b3ae3bfded99b791f0b254a6`:
+[original run and evaluation artifacts](https://huggingface.co/datasets/aisa-group/PostTrainBench-Trajectories/tree/386b3034fa26f0f1b3ae3bfded99b791f0b254a6/claude_non_api_max_claude-fable-5_1m__10h_run1/aime2025_Qwen_Qwen3-4B-Base_17337591).
+Selected for this library on 2026-10-04.
+
+Modifications: the source trace and evaluation artifacts are repackaged as one TraceVista
+JSON export, with English analyst annotations, state/checkpoint relationships, work phases,
+actions and evidence references. Original messages, commands, results and attached evidence
+retain their source text. The 30% archived final score, 23.3% pooled development score and
+current v1.2 aggregate are recorded separately.
+
+Project: [PostTrainBench](https://posttrainbench.com/), by Ben Rank, Hardik Bhatnagar,
+Ameya Prabhu, Shira Eisenberg, Karina Nguyen, Matthias Bethge and Maksym Andriushchenko.
+Paper: [PostTrainBench: Can LLM Agents Automate LLM Post-Training?](https://arxiv.org/abs/2603.08640), ICML 2026.

@@ -6,7 +6,7 @@
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
 本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
-以及一份完整导出的 **Kernel Design Agent (KDA) / W8A16 / 2026-10-02** 真实轨迹。
+以及完整导出的 **Kernel Design Agent (KDA) / W8A16** 和 **PostTrainBench / Fable 5 / AIME 2025** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 打开 TraceVista
@@ -32,6 +32,7 @@ pnpm dev
 打开：
 
 - **KDA 真实轨迹：** http://127.0.0.1:8875/?example=kda-w8a16-r1
+- **PostTrainBench 真实轨迹：** http://127.0.0.1:8875/?example=posttrainbench-fable5-aime
 - 首页 / 本地 JSON 导入：http://127.0.0.1:8875/
 
 首页的 **View examples ▾** 在悬停、键盘聚焦或点击时展示案例列表；选中后才加载完整 JSON。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
@@ -77,9 +78,26 @@ This W8A16 run uses Claude Opus 5.5 / high as the main agent and GPT-6-sol / hig
 
 Submissions 5 and 6 have identical code trees. The lower repeated score is a measurement change, not a code rollback. Finalization selects submission 5's historical best record. The independent correctness suite passes; independent Oracle ABBA speedup is **2.215205×**. The separate runner baseline speedup is **15.938802×** and uses a different comparison protocol. Static reviews still leave a large-shape precision risk, and no third review after the fixes was observed.
 
-The public library now contains this KDA example. Titles, summaries and analyst notes are English; raw messages, commands, results and evidence attachments are preserved verbatim. This updates the visualization of an existing run; it does not rerun the benchmark.
+Titles, summaries and analyst notes are English; raw messages, commands, results and evidence attachments are preserved verbatim. This updates the visualization of an existing run; it does not rerun the benchmark.
 
 Complete export: [kda-w8a16-r1.agent-state.json](viewer/public/examples/kda-w8a16-r1.agent-state.json).
+
+### PostTrainBench example
+
+Selected on **2026-10-04** from the public [PostTrainBench trajectories](https://huggingface.co/datasets/aisa-group/PostTrainBench-Trajectories), this run uses **Fable 5 Max / Claude Code / 1M context** to post-train **Qwen3-4B-Base on AIME 2025**, with one H100 and a ten-hour budget: run 1, job `17337591`. The final model averages three checkpoints (`checkpoint-980`, `checkpoint-1120`, and `final`) from supervised fine-tuning on decontaminated AceReason data into `soup_last3`.
+
+| Result | Score | Scope |
+|---|---:|---|
+| Selected checkpoint soup | 23.3% | Pooled development evaluations recorded in the trace |
+| Archived final result | 30.0% | Published single-run `metrics.json` |
+| Fable 5 / Qwen3-4B / AIME 2025 | 21.0% | Current v1.2 aggregate |
+| Qwen3-4B-Base reference | 3.33% | Official published base-model baseline |
+
+At selection time, Fable 5 ranked **#5 overall (37.27% ± 1.65%)** on the [v1.2 leaderboard](https://posttrainbench.com/) and was the highest-ranked agent with trajectories in this public corpus. The selected run led the corpus's unflagged AIME 2025 / Qwen3-4B entries. Current global leader Fable 5.1 had no published trajectory there. The archived 30% result predates v1.2's multi-seed reevaluation; its contamination, model identity, API-use, and benchmark-lookup judgments report no violation.
+
+The export adds English state, work-phase and action annotations while preserving source messages and evidence. Source revision: `386b3034fa26f0f1b3ae3bfded99b791f0b254a6`; dataset license: Apache 2.0. Attribution and modification details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Complete export: [posttrainbench-fable5-aime.agent-state.json](viewer/public/examples/posttrainbench-fable5-aime.agent-state.json).
 
 ## 4. 验证和部署
 
