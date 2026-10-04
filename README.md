@@ -11,7 +11,7 @@ Zoom out to follow the story. Zoom in to read the original work. Ask questions a
 
 </div>
 
-[![TraceVista showing Pi Agent's kernel optimization run, with its task overview, candidate versions, a regressed branch, and final selection](docs/images/tracevista-overview.png)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![Animated TraceVista walkthrough: explore the state tree, inspect a work phase, open individual actions, and read the original tool calls and results](docs/images/tracevista-demo.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## One run. Four levels of detail.
 
