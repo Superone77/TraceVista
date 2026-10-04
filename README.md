@@ -11,8 +11,6 @@ Zoom out to follow the story. Zoom in to read the original work. Ask questions a
 
 </div>
 
-[![Animated TraceVista walkthrough: explore the state tree, inspect a work phase, open individual actions, and read the original tool calls and results](docs/images/tracevista-demo.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
 ## One run. Four levels of detail.
 
 A coding session can contain hundreds of messages, edits, and tool calls. TraceVista gives that work a structure you can explore:
@@ -28,11 +26,21 @@ A coding session can contain hundreds of messages, edits, and tool calls. TraceV
 
 Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its details and follow its evidence.
 
+[![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
 ## Follow the decisions
 
 See what the agent tried, what it learned, and what happened next. Decision markers highlight discoveries, rejected ideas, pivots, and open questions. **Decisions only** folds routine steps so the important turns stand out.
 
 Switch between **Version tree** and **Execution order** to follow both code ancestry and the sequence of work. Restored versions, abandoned candidates, and final selections stay visible. Measurements sit alongside the states they describe.
+
+[![Comparing the version tree with execution order and inspecting a regressed candidate](docs/images/version-history.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+## Go straight to the evidence
+
+Open a card's details, then read the original messages, code, tool calls, and results behind it. Follow the agent's explanation all the way to the recorded work.
+
+[![Opening action details, reading the original tool call, and checking its result](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Bring the main agent and its reviewers into one map. Follow a review request through feedback, revisions, and another round of checks. Inspect skill use, knowledge reuse, TODOs, and measurements in **Structure & evidence**.
 
@@ -43,6 +51,8 @@ Select a node, open **Chat**, and ask about that step or the run around it:
 > Why did the agent abandon this approach? What evidence led to the next version?
 
 **Smart context** first reads node summaries and an index of the raw records, then selects the records to read in full. Answers include clickable citations that take you back to the relevant nodes and events.
+
+[![Preparing a question about the selected node, choosing its context scope, and inspecting the Smart context summary index](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
 
