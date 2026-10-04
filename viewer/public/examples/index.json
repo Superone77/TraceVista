@@ -9,26 +9,26 @@
   },
   {
     "id": "posttrainbench-fable5-aime",
-    "title": "PostTrainBench",
+    "title": "Claude Code · Post Training",
     "file": "posttrainbench-fable5-aime.agent-state.json",
     "description": "AIME 2025 post-training with supervised fine-tuning and checkpoint averaging.",
-    "agent": "Fable 5 Max · Claude Code",
+    "agent": "Fable 5 Max",
     "task": "AIME 2025 · Qwen3-4B"
   },
   {
     "id": "inferencebench-serving-recovery",
-    "title": "InferenceBench",
+    "title": "Codex · Model Serving",
     "file": "inferencebench-serving-recovery.agent-state.json",
     "description": "Serving optimization with scheduler trials, startup recovery and a reverted FlashInfer sampling experiment.",
-    "agent": "GPT-5.5 High · Codex",
+    "agent": "GPT-5.5 High",
     "task": "Mistral-7B inference · Scenario D"
   },
   {
     "id": "swe-rebench-kafka-retry",
-    "title": "SWE-rebench",
+    "title": "OpenHands · Bug Fixing",
     "file": "swe-rebench-kafka-retry.agent-state.json",
     "description": "Kafka connection retry repair whose passing self-tests disagree with the published task outcome.",
-    "agent": "Qwen3-Coder-480B · OpenHands",
+    "agent": "Qwen3-Coder-480B",
     "task": "kafka-python · Connection error loop"
   }
 ]
