@@ -1,12 +1,11 @@
 [
   {
-    "id": "kda-w8a16-r1",
-    "title": "Kernel Design Agent (KDA)",
-    "file": "kda-w8a16-r1.agent-state.json",
-    "description": "W8A16 kernel optimization with six submissions, two Codex reviews, and an independent Oracle ABBA evaluation.",
-    "agent": "Claude Opus 5.5 + Codex review",
-    "task": "W8A16",
-    "date": "2026-10-02"
+    "id": "pi-agent-lora",
+    "title": "Pi Agent · Kernel Optimization",
+    "file": "pi-agent-lora.agent-state.json",
+    "description": "Multi-LoRA kernel optimization with direct launches, a rejected identity cache and independent Oracle ABBA evaluation.",
+    "agent": "DeepSeek Flash · High thinking",
+    "task": "Multi-LoRA shrink / expand"
   },
   {
     "id": "posttrainbench-fable5-aime",
@@ -14,8 +13,7 @@
     "file": "posttrainbench-fable5-aime.agent-state.json",
     "description": "AIME 2025 post-training with supervised fine-tuning and checkpoint averaging.",
     "agent": "Fable 5 Max · Claude Code",
-    "task": "AIME 2025 · Qwen3-4B",
-    "date": "Selected 2026-10-04"
+    "task": "AIME 2025 · Qwen3-4B"
   },
   {
     "id": "inferencebench-serving-recovery",
@@ -23,8 +21,7 @@
     "file": "inferencebench-serving-recovery.agent-state.json",
     "description": "Serving optimization with scheduler trials, startup recovery and a reverted FlashInfer sampling experiment.",
     "agent": "GPT-5.5 High · Codex",
-    "task": "Mistral-7B inference · Scenario D",
-    "date": "Selected 2026-10-04"
+    "task": "Mistral-7B inference · Scenario D"
   },
   {
     "id": "swe-rebench-kafka-retry",
@@ -32,7 +29,6 @@
     "file": "swe-rebench-kafka-retry.agent-state.json",
     "description": "Kafka connection retry repair whose passing self-tests disagree with the published task outcome.",
     "agent": "Qwen3-Coder-480B · OpenHands",
-    "task": "kafka-python · Connection error loop",
-    "date": "Selected 2026-10-04"
+    "task": "kafka-python · Connection error loop"
   }
 ]

@@ -6,7 +6,7 @@
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
 本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
-以及完整导出的 **KDA、PostTrainBench、InferenceBench 和 SWE-rebench** 真实轨迹。
+以及完整导出的 **Pi Agent、PostTrainBench、InferenceBench 和 SWE-rebench** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 打开 TraceVista
@@ -31,7 +31,7 @@ pnpm dev
 
 打开：
 
-- **KDA 真实轨迹：** http://127.0.0.1:8875/?example=kda-w8a16-r1
+- **Pi Agent · Kernel Optimization：** http://127.0.0.1:8875/?example=pi-agent-lora
 - **PostTrainBench 真实轨迹：** http://127.0.0.1:8875/?example=posttrainbench-fable5-aime
 - **InferenceBench 推理服务优化：** http://127.0.0.1:8875/?example=inferencebench-serving-recovery
 - **SWE-rebench Kafka 修复：** http://127.0.0.1:8875/?example=swe-rebench-kafka-retry
@@ -56,33 +56,33 @@ pnpm dev
 触控板默认双指平移、捏合缩放；鼠标模式用滚轮缩放。空白处拖动或按空格拖动画布。
 工具栏的四个层级按钮可以直接跳转。读日志时可选中复制文本。
 
-KDA 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
+Pi Agent 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
 编辑、测试和回退过程在行为层展开，状态连线对应实际发生的变化。
 
 ### 阅读层（借鉴 ThoughtDAG）
 
-KDA 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，转向地标标注了排除、决定、转向或未决，31 条依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
+Pi Agent 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，转向地标标注了排除、决定、转向或未决，依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
 
 工具栏“Chat”可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“Test connection”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
 
-## 3. Kernel Design Agent (KDA) example
+## 3. Pi Agent · Kernel Optimization
 
-This W8A16 run uses Claude Opus 5.5 / high as the main agent and GPT-6-sol / high for two Codex reviews on an A100 40GB. The English reading layer covers 8 system states, 25 work phases and 99 actions. The complete export retains 1,919 main-session records, 63 reviewer records, and 20 explicitly identified controller artifact records.
+**Pi Agent / DeepSeek Flash / high thinking** optimizes the batched multi-LoRA shrink → expand path in vLLM. It must preserve numerical behavior within 2% relative tolerance using fp16 inputs and fp32 accumulation, and may edit only three declared Triton operation files. The recorded environment is an **NVIDIA A100-SXM4-40GB**, Python 3.10.12, PyTorch 2.7.1+cu126 and Triton 3.3.1. The task allows **90 minutes and at most 16 submissions**; this trace records about 44.63 minutes and four submissions.
 
-| Submission | Candidate | Development correctness | Development speedup |
-|---|---|---|---:|
-| 1 | v9: fused dequantization and direct launch | Passed | 13.122027× |
-| 2 | v13: bitwise conversion and configuration changes | Passed | 15.784736× |
-| 3 | v14: host dispatch changes | Passed | 15.765494× |
-| 4 | v15: split rules across shapes | Passed | 16.178644× |
-| 5 | v18: precision-path and grid changes | Passed | 20.556049× |
-| 6 | The same v18 code, submitted again | Passed | 15.920750× |
+The agent replaces per-adapter Python loops with grouped Triton kernels, then finds host launch overhead and switches to direct CompiledKernel launch and raw stream acquisition. An identity-cache candidate regresses, so it returns to submission 2's code and improves the specialization key. Submission 4 becomes the final selection. The English view includes 6 system states, 20 work phases and 152 actions, with all 556 source and assessment records retained.
 
-Submissions 5 and 6 have identical code trees. The lower repeated score is a measurement change, not a code rollback. Finalization selects submission 5's historical best record. The independent correctness suite passes; independent Oracle ABBA speedup is **2.215205×**. The separate runner baseline speedup is **15.938802×** and uses a different comparison protocol. Static reviews still leave a large-shape precision risk, and no third review after the fixes was observed.
+| Result | Value | Scope |
+|---|---:|---|
+| Submission 1 | 18.671309× | Development baseline |
+| Submission 2 | 33.369200× | Development baseline |
+| Submission 3, identity cache | 30.834023× | Development baseline |
+| Submission 4, selected | 35.444980× | Development baseline |
+| Independent Oracle ABBA | 2.113798× | Frozen Oracle, four paired blocks |
+| Independent official-baseline check | 34.588125× | Separate official baseline |
 
-Titles, summaries and analyst notes are English; raw messages, commands, results and evidence attachments are preserved verbatim. This updates the visualization of an existing run; it does not rerun the benchmark.
+All four development submissions and the independent correctness check pass. The two independent speedups use different references and remain separate. This revises the visualization of the existing 2026-10-01 run; it does not rerun the optimization. Display labels use **Pi Agent**; historical names and commands inside original evidence remain unchanged.
 
-Complete export: [kda-w8a16-r1.agent-state.json](viewer/public/examples/kda-w8a16-r1.agent-state.json).
+Complete export: [pi-agent-lora.agent-state.json](viewer/public/examples/pi-agent-lora.agent-state.json).
 
 ### PostTrainBench example
 
@@ -140,7 +140,7 @@ pnpm preview
 python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
 
-然后访问 http://127.0.0.1:8000/?example=kda-w8a16-r1 。
+然后访问 http://127.0.0.1:8000/?example=pi-agent-lora 。
 资源使用相对路径，可部署在子目录。字体随构建打包，不依赖在线字体服务。
 `viewer/public/local-data/` 是被忽略的本机数据目录，构建时会排除；
 只有 `viewer/public/examples/` 中明确收录的示例进入构建。
@@ -203,7 +203,7 @@ python3 .agents/skills/tracevista-skill/scripts/validate_trace.py /path/to/task.
 ```
 
 随后在云端查看器点击“Import trajectory”，选择这份 JSON；有浏览器操作能力的 agent 可以完成导入和检查。
-交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 KDA 示例可用于了解界面。
+交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 Pi Agent 示例可用于了解界面。
 需要本地预览时，可按[可选本地预览说明](skills/tracevista-skill/references/opening.md#optional-local-preview)使用 `create_view.py`。
 
 让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从

@@ -13,7 +13,7 @@ const commands=[
  [process.execPath,['viewer/scripts/test-providers.mjs']],
  [process.execPath,['viewer/scripts/test-handoff.mjs']],
  [process.execPath,['scripts/test-datasets.mjs']],
- [process.execPath,['scripts/test-kda-example.mjs']],
+ [process.execPath,['scripts/test-pi-example.mjs']],
  [process.execPath,['scripts/test-posttrainbench-example.mjs']],
  [process.execPath,['scripts/test-benchmark-examples.mjs']],
  ['python3',['scripts/check-example-secrets.py']],

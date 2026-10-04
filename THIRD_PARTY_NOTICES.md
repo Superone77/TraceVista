@@ -33,9 +33,11 @@ This repository contains the complete version used by the example, including sta
 
 ## Research examples
 
-The bundled KDA W8A16 JSON export is a user-authorized public research example, with English
-annotations and original model/tool evidence. It includes snippets of the task code. The
-upstream viewer license does not cover the research logs. Other imports are not bundled.
+The bundled Pi Agent multi-LoRA JSON export is a user-authorized public research example,
+with English annotations and original model/tool evidence. It includes task-code excerpts
+with their original vLLM copyright and Apache-2.0 headers. The upstream viewer license
+does not cover the research logs. Other imports are not bundled. The presentation is named
+Pi Agent; historical harness names inside original evidence remain unchanged.
 
 ### PostTrainBench
 
