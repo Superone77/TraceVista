@@ -18,17 +18,21 @@ export interface RecordItem {
 export interface State extends RecordItem {
   snapshot: Record<string, string | null>;
   lineage?: { parent: string; relation: 'derived' | 'restored' | 'retained'; reason: string; events: string[] };
-  assessment?: { metric: string; unit?: string; value: number; previous?: number; previousState?: string; higherIsBetter: boolean; tolerance: number; correctness: boolean; measurement: 'measured' | 'historical'; note: string };
+  assessment?: { metric: string; unit?: string; value: number; previous?: number; previousState?: string; higherIsBetter: boolean; tolerance: number; correctness?: boolean; measurement: 'measured' | 'historical'; note: string };
 }
 /** How a state reads against its parent. One place for the tone, so cards, details and legend agree. */
 export const stateTones = {
   none: '#5f727c', failed: '#b3343c', historical: '#7a51a8', first: '#44708f',
   same: '#776f52', better: '#17765c', worse: '#b8453f',
 } as const;
+/** A measured score does not imply a separate binary correctness verdict. */
+export function correctnessLabel(value?: boolean) {
+  return value === true ? 'PASS' : value === false ? 'FAIL' : 'Not assessed';
+}
 export function stateVisual(state: State) {
   const m = state.assessment;
   if (!m) return { color: stateTones.none, label: 'No comparable measurement', delta: null };
-  if (!m.correctness) return { color: stateTones.failed, label: 'Correctness failed', delta: null };
+  if (m.correctness === false) return { color: stateTones.failed, label: 'Correctness failed', delta: null };
   if (m.measurement === 'historical') return { color: stateTones.historical, label: 'Final selection · not remeasured', delta: null };
   if (m.previous == null || m.previous === 0) return { color: stateTones.first, label: 'First measurement', delta: null };
   const delta = (m.value / m.previous - 1) * 100;
@@ -238,7 +242,7 @@ export function parseGraph(value: unknown): Graph {
     const seen = new Set<string>(); let p: State | undefined = s;
     while (p) { if (seen.has(p.id)) throw new Error('Version lineage contains a cycle'); seen.add(p.id); p = p.lineage ? states.get(p.lineage.parent) : undefined; }
     const m = s.assessment;
-    if (m && (!Number.isFinite(m.value) || m.previous != null && !Number.isFinite(m.previous) || !Number.isFinite(m.tolerance) || m.tolerance < 0 || m.previousState && !states.has(m.previousState) || !['measured', 'historical'].includes(m.measurement))) throw new Error('Invalid state measurement fields');
+    if (m && (!Number.isFinite(m.value) || m.previous != null && !Number.isFinite(m.previous) || !Number.isFinite(m.tolerance) || m.tolerance < 0 || m.previousState && !states.has(m.previousState) || m.correctness !== undefined && typeof m.correctness !== 'boolean' || !['measured', 'historical'].includes(m.measurement))) throw new Error('Invalid state measurement fields');
   }
   for (const s of g.states) if (!s.snapshot || typeof s.snapshot !== 'object' || Array.isArray(s.snapshot) || Object.values(s.snapshot).some(v => v !== null && typeof v !== 'string')) throw new Error(`${s.id} must have a state snapshot containing text or null values`);
   for (const b of g.branches) if (!states.has(b.state) || !['attempted', 'retained', 'proposed', 'rejected'].includes(b.status)) throw new Error('Invalid branch state or status');

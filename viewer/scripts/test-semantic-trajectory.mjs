@@ -5,7 +5,7 @@ async function moduleAt(path) {
   const code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
   return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 }
-const { parseGraph, stateVisual } = await moduleAt('../src/trajectory/model.ts');
+const { parseGraph, stateVisual, stateTones, correctnessLabel } = await moduleAt('../src/trajectory/model.ts');
 const raw = { format: 'coding-agent-state-trajectory', version: 1, title: 'Fix a parser', scope: 'parser source and test results',
   states: [{ id: 'before', title: 'Failing', events: ['read'], snapshot: { source: 'a' } }, { id: 'after', title: 'Patched', events: ['edit'], snapshot: { source: 'b' } }],
   branches: [{ id: 'fix', state: 'before', title: 'Patch parser', status: 'retained', events: ['edit'] }, { id: 'review', state: 'before', title: 'Independent check', status: 'attempted', events: ['check'] }],
@@ -112,4 +112,19 @@ assert.equal(stateVisual(metric).label,'Measurement regressed');
 assert(Math.abs(stateVisual(metric).delta + 10) < 1e-8);
 metric.assessment.measurement='historical';
 assert.equal(stateVisual(metric).delta,null,'Final selection must not masquerade as a new benchmark');
+const scoreOnly=structuredClone(raw);
+scoreOnly.states[0].assessment={metric:'accuracy',value:30,previous:20,higherIsBetter:true,tolerance:0,measurement:'measured',note:'Accuracy only; no binary correctness check'};
+const importedScore=parseGraph(scoreOnly).states[0];
+assert.equal(importedScore.assessment.correctness,undefined,'Import must not invent a correctness verdict');
+assert.deepEqual(stateVisual(importedScore),{color:stateTones.better,label:'Measurement improved',delta:50},'Unknown correctness keeps the score comparison and its tone');
+assert.equal(correctnessLabel(importedScore.assessment.correctness),'Not assessed','The details must not label unassessed correctness PASS or FAIL');
+importedScore.assessment.correctness=true;
+assert.equal(correctnessLabel(importedScore.assessment.correctness),'PASS','Existing positive correctness verdicts remain compatible');
+importedScore.assessment.correctness=false;
+assert.equal(correctnessLabel(importedScore.assessment.correctness),'FAIL');
+assert.deepEqual(stateVisual(importedScore),{color:stateTones.failed,label:'Correctness failed',delta:null},'An explicit failure still overrides a higher score');
+for(const value of ['false',null,0]){
+ scoreOnly.states[0].assessment.correctness=value;
+ assert.throws(()=>parseGraph(scoreOnly),/measurement fields/,'Only an optional boolean is a correctness verdict');
+}
 console.log('PASS: neutral format, compact overview, four zoom tiers, anchored reflow, precise cross-links, literal raw text and order, containment, evidence retention, invalid input');

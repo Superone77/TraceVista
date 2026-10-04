@@ -6,7 +6,7 @@
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
 本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
-以及一份完整导出的 **Kernel Design Agent (KDA) / W8A16 / 2026-10-02** 真实轨迹。
+以及完整导出的 **Pi Agent、PostTrainBench、InferenceBench 和 SWE-rebench** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 打开 TraceVista
@@ -31,7 +31,10 @@ pnpm dev
 
 打开：
 
-- **KDA 真实轨迹：** http://127.0.0.1:8875/?example=kda-w8a16-r1
+- **Pi Agent · Kernel Optimization：** http://127.0.0.1:8875/?example=pi-agent-lora
+- **PostTrainBench 真实轨迹：** http://127.0.0.1:8875/?example=posttrainbench-fable5-aime
+- **InferenceBench 推理服务优化：** http://127.0.0.1:8875/?example=inferencebench-serving-recovery
+- **SWE-rebench Kafka 修复：** http://127.0.0.1:8875/?example=swe-rebench-kafka-retry
 - 首页 / 本地 JSON 导入：http://127.0.0.1:8875/
 
 首页的 **View examples ▾** 在悬停、键盘聚焦或点击时展示案例列表；选中后才加载完整 JSON。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
@@ -53,33 +56,70 @@ pnpm dev
 触控板默认双指平移、捏合缩放；鼠标模式用滚轮缩放。空白处拖动或按空格拖动画布。
 工具栏的四个层级按钮可以直接跳转。读日志时可选中复制文本。
 
-KDA 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
+Pi Agent 示例的状态卡片跟踪已提交候选的 Git tree、提交编号和最终选中状态。
 编辑、测试和回退过程在行为层展开，状态连线对应实际发生的变化。
 
 ### 阅读层（借鉴 ThoughtDAG）
 
-KDA 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，转向地标标注了排除、决定、转向或未决，31 条依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
+Pi Agent 示例带有完整的阅读层：每个状态、分支以及大多数行为都写了随缩放生长的摘要，转向地标标注了排除、决定、转向或未决，依据边从观察指向它改变的决定，总览左侧还有一段历程。“Decisions only”模式下，常规步骤会折叠起来。说明见 [查看器文档](docs/VIEWER.md)，写作规范见 [reading-layer.md](skills/tracevista-skill/references/reading-layer.md)。
 
 工具栏“Chat”可以用自己的 key 直接从浏览器问这条轨迹，回答会引用节点和原始事件，并在地图上高亮被引用的卡片。默认关闭，私有轨迹使用前请先确认数据方同意。 支持 Anthropic、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax 等供应商与本地模型，可获取模型列表或手填 ID，并用“Test connection”检查连接。详见 [模型接口设置](docs/VIEWER.md#供应商与模型列表)。
 
-## 3. Kernel Design Agent (KDA) example
+## 3. Pi Agent · Kernel Optimization
 
-This W8A16 run uses Claude Opus 5.5 / high as the main agent and GPT-6-sol / high for two Codex reviews on an A100 40GB. The English reading layer covers 8 system states, 25 work phases and 99 actions. The complete export retains 1,919 main-session records, 63 reviewer records, and 20 explicitly identified controller artifact records.
+**Pi Agent / DeepSeek Flash / high thinking** optimizes the batched multi-LoRA shrink → expand path in vLLM. It must preserve numerical behavior within 2% relative tolerance using fp16 inputs and fp32 accumulation, and may edit only three declared Triton operation files. The recorded environment is an **NVIDIA A100-SXM4-40GB**, Python 3.10.12, PyTorch 2.7.1+cu126 and Triton 3.3.1. The task allows **90 minutes and at most 16 submissions**; this trace records about 44.63 minutes and four submissions.
 
-| Submission | Candidate | Development correctness | Development speedup |
-|---|---|---|---:|
-| 1 | v9: fused dequantization and direct launch | Passed | 13.122027× |
-| 2 | v13: bitwise conversion and configuration changes | Passed | 15.784736× |
-| 3 | v14: host dispatch changes | Passed | 15.765494× |
-| 4 | v15: split rules across shapes | Passed | 16.178644× |
-| 5 | v18: precision-path and grid changes | Passed | 20.556049× |
-| 6 | The same v18 code, submitted again | Passed | 15.920750× |
+The agent replaces per-adapter Python loops with grouped Triton kernels, then finds host launch overhead and switches to direct CompiledKernel launch and raw stream acquisition. An identity-cache candidate regresses, so it returns to submission 2's code and improves the specialization key. Submission 4 becomes the final selection. The English view includes 6 system states, 20 work phases and 152 actions, with all 556 source and assessment records retained.
 
-Submissions 5 and 6 have identical code trees. The lower repeated score is a measurement change, not a code rollback. Finalization selects submission 5's historical best record. The independent correctness suite passes; independent Oracle ABBA speedup is **2.215205×**. The separate runner baseline speedup is **15.938802×** and uses a different comparison protocol. Static reviews still leave a large-shape precision risk, and no third review after the fixes was observed.
+| Result | Value | Scope |
+|---|---:|---|
+| Submission 1 | 18.671309× | Development baseline |
+| Submission 2 | 33.369200× | Development baseline |
+| Submission 3, identity cache | 30.834023× | Development baseline |
+| Submission 4, selected | 35.444980× | Development baseline |
+| Independent Oracle ABBA | 2.113798× | Frozen Oracle, four paired blocks |
+| Independent official-baseline check | 34.588125× | Separate official baseline |
 
-The public library now contains this KDA example. Titles, summaries and analyst notes are English; raw messages, commands, results and evidence attachments are preserved verbatim. This updates the visualization of an existing run; it does not rerun the benchmark.
+All four development submissions and the independent correctness check pass. The two independent speedups use different references and remain separate. This revises the visualization of the existing 2026-10-01 run; it does not rerun the optimization. Display labels use **Pi Agent**; historical names and commands inside original evidence remain unchanged.
 
-Complete export: [kda-w8a16-r1.agent-state.json](viewer/public/examples/kda-w8a16-r1.agent-state.json).
+Complete export: [pi-agent-lora.agent-state.json](viewer/public/examples/pi-agent-lora.agent-state.json).
+
+### PostTrainBench example
+
+Selected on **2026-10-04** from the public [PostTrainBench trajectories](https://huggingface.co/datasets/aisa-group/PostTrainBench-Trajectories), this run uses **Fable 5 Max / Claude Code / 1M context** to post-train **Qwen3-4B-Base on AIME 2025**, with one H100 and a ten-hour budget: run 1, job `17337591`. The final model averages three checkpoints (`checkpoint-980`, `checkpoint-1120`, and `final`) from supervised fine-tuning on decontaminated AceReason data into `soup_last3`.
+
+| Result | Score | Scope |
+|---|---:|---|
+| Selected checkpoint soup | 23.3% | Pooled development evaluations recorded in the trace |
+| Archived final result | 30.0% | Published single-run `metrics.json` |
+| Fable 5 / Qwen3-4B / AIME 2025 | 21.0% | Current v1.2 aggregate |
+| Qwen3-4B-Base reference | 3.33% | Official published base-model baseline |
+
+At selection time, Fable 5 ranked **#5 overall (37.27% ± 1.65%)** on the [v1.2 leaderboard](https://posttrainbench.com/) and was the highest-ranked agent with trajectories in this public corpus. The selected run led the corpus's unflagged AIME 2025 / Qwen3-4B entries. Current global leader Fable 5.1 had no published trajectory there. The archived 30% result predates v1.2's multi-seed reevaluation; its contamination, model identity, API-use, and benchmark-lookup judgments report no violation.
+
+The export adds English state, work-phase and action annotations while preserving source messages and evidence. Source revision: `386b3034fa26f0f1b3ae3bfded99b791f0b254a6`; dataset license: Apache 2.0. Attribution and modification details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Complete export: [posttrainbench-fable5-aime.agent-state.json](viewer/public/examples/posttrainbench-fable5-aime.agent-state.json).
+
+### InferenceBench example
+
+**Codex / GPT-5.5 High** optimizes an OpenAI-compatible server for **Mistral-7B-Instruct-v0.3** in **Scenario D**, which asks for balanced latency, throughput and quality. The dataset specifies one H100 80GB and a two-hour budget; run `run_0155` records 02:05:00 elapsed.
+
+The selected trace includes a token-accounting correction, scheduler experiments, readiness-gated warmup and rejection of a FlashInfer sampling change after its small throughput gain came with worse tails and startup behavior. Development measurements used concurrency 4; the final harness used concurrency 1, so their throughput values are not directly comparable. The published final burst profile reports: **144.514 generated tokens/s**, 96/96 successful requests, and an **MMLU-Pro quality gate pass** (32% accuracy versus 25.5% baseline, threshold ratio 0.95). The published final file contains only the burst profile; these values are not a newly measured speedup or proof of improvement on every workload.
+
+Source: [InferenceBench-Trajectories](https://huggingface.co/datasets/aisa-group/InferenceBench-Trajectories), revision `ea68d73df80985099ef58b342e50c465214d6e7b`, Apache 2.0. This is an annotated existing run; no serving experiment was rerun.
+
+Complete export: [inferencebench-serving-recovery.agent-state.json](viewer/public/examples/inferencebench-serving-recovery.agent-state.json).
+
+### SWE-rebench example
+
+**OpenHands 0.54.0 / Qwen3-Coder-480B-A35B-Instruct** works on **dpkp/kafka-python issue 1312**, where a Kafka consumer repeatedly reconnects after connection errors and floods its logs. The agent makes three source edits for DNS backoff, then changes the verification harness and its attempt counter while leaving target code unchanged. The recorded environment is Linux, Python 3.6.13 and pytest 7.0.1. The dataset publishes a general configuration file; hardware and a per-run wall-clock budget are not recorded for this selected trace.
+
+The point of this example is the difference between self-tests and the external task outcome: 24 connection and 28 async-client tests pass locally, and the final revised simulation reports 35 calls in five seconds. The public row reports **`resolved=0`**, **`gen_tests_correct=0`**, and **`pred_passes_gen_tests=1`**. These flags mean the run was not accepted as solving the task, its generated test did not satisfy the dataset's test-validity check, and the patch passed that generated test. The flags do not explain the exact reason for the task failure; the viewer does not invent one.
+
+Source: [Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), revision `35455389ab51bf5e2306bfd436ef72d0f98bf882`, trajectory `chatcmpl-86805430c534a25711dc2c50c473619c`, CC BY 4.0. Complete messages, tools, patch and recorded outcome metadata remain in the export.
+
+Complete export: [swe-rebench-kafka-retry.agent-state.json](viewer/public/examples/swe-rebench-kafka-retry.agent-state.json).
 
 ## 4. 验证和部署
 
@@ -100,7 +140,7 @@ pnpm preview
 python3 -m http.server 8000 --bind 127.0.0.1 --directory dist
 ```
 
-然后访问 http://127.0.0.1:8000/?example=kda-w8a16-r1 。
+然后访问 http://127.0.0.1:8000/?example=pi-agent-lora 。
 资源使用相对路径，可部署在子目录。字体随构建打包，不依赖在线字体服务。
 `viewer/public/local-data/` 是被忽略的本机数据目录，构建时会排除；
 只有 `viewer/public/examples/` 中明确收录的示例进入构建。
@@ -137,7 +177,7 @@ Claude Code 使用相同命令，把两处 `.agents` 换成 `.claude`。已有�
 处理流程如下；脚本命令以 Codex 的项目安装路径为例，Claude Code 对应 `.claude/skills/tracevista-skill/`。
 
 ```text
-原始 Claude / Codex / Pi 日志
+原始 Claude / Codex / Pi / InferenceBench / SWE-rebench 日志
     → extract_timeline.py：提取事件和完整原文
     → agent 阅读证据并编写 state-analysis.json：状态、分支、行为和关系
     → build_state_graph.py --format state：验证引用和变化，输出状态 JSON
@@ -163,7 +203,7 @@ python3 .agents/skills/tracevista-skill/scripts/validate_trace.py /path/to/task.
 ```
 
 随后在云端查看器点击“Import trajectory”，选择这份 JSON；有浏览器操作能力的 agent 可以完成导入和检查。
-交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 KDA 示例可用于了解界面。
+交付时保留完整 JSON，并说明是否实际检查了当前轨迹。网页中的 Pi Agent 示例可用于了解界面。
 需要本地预览时，可按[可选本地预览说明](skills/tracevista-skill/references/opening.md#optional-local-preview)使用 `create_view.py`。
 
 让 agent 用 `session_state.py save --graph FILE` 保存当前版本，后续“修改刚才那份轨迹”会从
