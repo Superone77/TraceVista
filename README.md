@@ -52,7 +52,7 @@ Select a node, open **Chat**, and ask about that step or the run around it:
 
 **Smart context** first reads node summaries and an index of the raw records, then selects the records to read in full. Answers include clickable citations that take you back to the relevant nodes and events.
 
-[![Preparing a question about the selected node, choosing its context scope, and inspecting the Smart context summary index](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![A real model answer with Smart context: inspect the selected records, click a cited action to jump to it, and open an original measurement from the answer](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
 
