@@ -1,6 +1,6 @@
 ---
 name: tracevista-skill
-description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and open it in the TraceVista web viewer.
+description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, InferenceBench traces and SWE-rebench rows, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and open it in the TraceVista web viewer.
 ---
 
 # TraceVista

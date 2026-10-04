@@ -15,6 +15,7 @@ const commands=[
  [process.execPath,['scripts/test-datasets.mjs']],
  [process.execPath,['scripts/test-kda-example.mjs']],
  [process.execPath,['scripts/test-posttrainbench-example.mjs']],
+ [process.execPath,['scripts/test-benchmark-examples.mjs']],
  ['python3',['scripts/check-example-secrets.py']],
 ];
 for(const [command,args] of commands){
@@ -22,4 +23,4 @@ for(const [command,args] of commands){
  if(p.error)throw p.error;
  if(p.status!==0)process.exit(p.status??1);
 }
-console.log('PASS: skill, viewer, bundled datasets, self-contained KDA and PostTrainBench exports and example scan');
+console.log('PASS: skill, viewer, bundled datasets, self-contained benchmark exports and example scan');

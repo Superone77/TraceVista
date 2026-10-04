@@ -6,7 +6,7 @@
 点击卡片，右侧展示描述、内部行为、代码来源、时间关系、测量和原始证据。
 
 本仓库包含受 ThoughtDAG 启发、基于 React Flow 开发的独立可视化引擎、`tracevista-skill` 转换 skill，
-以及完整导出的 **Kernel Design Agent (KDA) / W8A16** 和 **PostTrainBench / Fable 5 / AIME 2025** 真实轨迹。
+以及完整导出的 **KDA、PostTrainBench、InferenceBench 和 SWE-rebench** 真实轨迹。
 工具面向不同 coding agent 和任务，任务描述及证据保存在导出数据中。
 
 ## 1. 打开 TraceVista
@@ -33,6 +33,8 @@ pnpm dev
 
 - **KDA 真实轨迹：** http://127.0.0.1:8875/?example=kda-w8a16-r1
 - **PostTrainBench 真实轨迹：** http://127.0.0.1:8875/?example=posttrainbench-fable5-aime
+- **InferenceBench 推理服务优化：** http://127.0.0.1:8875/?example=inferencebench-serving-recovery
+- **SWE-rebench Kafka 修复：** http://127.0.0.1:8875/?example=swe-rebench-kafka-retry
 - 首页 / 本地 JSON 导入：http://127.0.0.1:8875/
 
 首页的 **View examples ▾** 在悬停、键盘聚焦或点击时展示案例列表；选中后才加载完整 JSON。首次加载先显示状态卡片；在 Viewer menu 中点击“Fit view”查看完整版本树。
@@ -99,6 +101,26 @@ The export adds English state, work-phase and action annotations while preservin
 
 Complete export: [posttrainbench-fable5-aime.agent-state.json](viewer/public/examples/posttrainbench-fable5-aime.agent-state.json).
 
+### InferenceBench example
+
+**Codex / GPT-5.5 High** optimizes an OpenAI-compatible server for **Mistral-7B-Instruct-v0.3** in **Scenario D**, which asks for balanced latency, throughput and quality. The dataset specifies one H100 80GB and a two-hour budget; run `run_0155` records 02:05:00 elapsed.
+
+The selected trace includes a token-accounting correction, scheduler experiments, readiness-gated warmup and rejection of a FlashInfer sampling change after its small throughput gain came with worse tails and startup behavior. Development measurements used concurrency 4; the final harness used concurrency 1, so their throughput values are not directly comparable. The published final burst profile reports: **144.514 generated tokens/s**, 96/96 successful requests, and an **MMLU-Pro quality gate pass** (32% accuracy versus 25.5% baseline, threshold ratio 0.95). The published final file contains only the burst profile; these values are not a newly measured speedup or proof of improvement on every workload.
+
+Source: [InferenceBench-Trajectories](https://huggingface.co/datasets/aisa-group/InferenceBench-Trajectories), revision `ea68d73df80985099ef58b342e50c465214d6e7b`, Apache 2.0. This is an annotated existing run; no serving experiment was rerun.
+
+Complete export: [inferencebench-serving-recovery.agent-state.json](viewer/public/examples/inferencebench-serving-recovery.agent-state.json).
+
+### SWE-rebench example
+
+**OpenHands 0.54.0 / Qwen3-Coder-480B-A35B-Instruct** works on **dpkp/kafka-python issue 1312**, where a Kafka consumer repeatedly reconnects after connection errors and floods its logs. The agent makes three source edits for DNS backoff, then changes the verification harness and its attempt counter while leaving target code unchanged. The recorded environment is Linux, Python 3.6.13 and pytest 7.0.1. The dataset publishes a general configuration file; hardware and a per-run wall-clock budget are not recorded for this selected trace.
+
+The point of this example is the difference between self-tests and the external task outcome: 24 connection and 28 async-client tests pass locally, and the final revised simulation reports 35 calls in five seconds. The public row reports **`resolved=0`**, **`gen_tests_correct=0`**, and **`pred_passes_gen_tests=1`**. These flags mean the run was not accepted as solving the task, its generated test did not satisfy the dataset's test-validity check, and the patch passed that generated test. The flags do not explain the exact reason for the task failure; the viewer does not invent one.
+
+Source: [Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), revision `35455389ab51bf5e2306bfd436ef72d0f98bf882`, trajectory `chatcmpl-86805430c534a25711dc2c50c473619c`, CC BY 4.0. Complete messages, tools, patch and recorded outcome metadata remain in the export.
+
+Complete export: [swe-rebench-kafka-retry.agent-state.json](viewer/public/examples/swe-rebench-kafka-retry.agent-state.json).
+
 ## 4. 验证和部署
 
 ```bash
@@ -155,7 +177,7 @@ Claude Code 使用相同命令，把两处 `.agents` 换成 `.claude`。已有�
 处理流程如下；脚本命令以 Codex 的项目安装路径为例，Claude Code 对应 `.claude/skills/tracevista-skill/`。
 
 ```text
-原始 Claude / Codex / Pi 日志
+原始 Claude / Codex / Pi / InferenceBench / SWE-rebench 日志
     → extract_timeline.py：提取事件和完整原文
     → agent 阅读证据并编写 state-analysis.json：状态、分支、行为和关系
     → build_state_graph.py --format state：验证引用和变化，输出状态 JSON

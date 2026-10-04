@@ -73,12 +73,69 @@ def compact(value):
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
 
+def swe_rows(value):
+    """Recognize a saved SWE-rebench row, not arbitrary chat-shaped JSON."""
+    if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and value[k]
+            for k in ('trajectory_id', 'instance_id', 'repo')):
+        return None
+    trajectory = value.get('trajectory')
+    if not isinstance(trajectory, list) or not trajectory:
+        raise ValueError('SWE-rebench trajectory must be a nonempty message list')
+    rows = []
+    for i, message in enumerate(trajectory):
+        if isinstance(message, str):
+            try: message = json.loads(message)
+            except ValueError: raise ValueError('Invalid serialized SWE-rebench message at index '+str(i))
+        if not isinstance(message, dict) or message.get('role') not in ('system','developer','user','assistant','tool'):
+            raise ValueError('Invalid SWE-rebench message role at index '+str(i))
+        content = message.get('content')
+        if content is not None and not isinstance(content, (str, list)):
+            raise ValueError('Invalid SWE-rebench message content at index '+str(i))
+        tool_calls = message.get('tool_calls')
+        if tool_calls is not None and not isinstance(tool_calls, list):
+            raise ValueError('Invalid SWE-rebench tool_calls at index '+str(i))
+        for call in tool_calls or []:
+            fn = call.get('function') if isinstance(call, dict) else None
+            if not isinstance(fn, dict) or not isinstance(fn.get('name'), str) or 'arguments' not in fn:
+                raise ValueError('Invalid SWE-rebench tool call at index '+str(i))
+        rows.append(dict(message, _source_format='swe-rebench', _source_index=i,
+                         _source_pointer='/trajectory/'+str(i)))
+    return rows
+
+
+def inferencebench_rows(rows):
+    """A complete indexed normalized trace is required for auto-detection."""
+    if not rows or not all(isinstance(r.get('i'), int) and not isinstance(r['i'], bool)
+            and r['i'] >= 0 and r.get('role') in ('system','developer','user','assistant','tool')
+            and isinstance(r.get('type'), str) for r in rows):
+        return False
+    indices = [r['i'] for r in rows]
+    if indices != sorted(set(indices)): return False
+    known = False
+    for row in rows:
+        kind = row['type']
+        if kind in ('text','thinking','reasoning'):
+            if not isinstance(row.get('text'), str): return False
+            known = True
+        elif kind == 'tool_call':
+            if not isinstance(row.get('tool_name'), str) or 'tool_input' not in row: return False
+            known = True
+        elif kind == 'tool_result':
+            if 'tool_output' not in row: return False
+            known = True
+        elif kind in ('init','status'):
+            known = True
+    return known
+
+
 def load_rows(text):
     try:
         whole = json.loads(text)
+        benchmark = swe_rows(whole)
+        if benchmark is not None: return benchmark
         if isinstance(whole, list):
             return [dict(row, _source_index=i) for i, row in enumerate(whole) if isinstance(row, dict)]
-    except ValueError: pass
+    except json.JSONDecodeError: pass
     rows = []
     for line, value in enumerate(text.splitlines(), 1):
         prefix = TIMESTAMP_PREFIX.match(value)
@@ -99,6 +156,8 @@ def load_rows(text):
 
 
 def detect(rows):
+    if rows and all(r.get('_source_format') == 'swe-rebench' for r in rows): return 'swe-rebench'
+    if inferencebench_rows(rows): return 'inferencebench'
     for row in (r for r in rows if '_source_runner' not in r):
         kind = row.get('type')
         if kind in ('session_meta', 'response_item', 'event_msg', 'turn_context'): return 'codex-rollout'
@@ -124,6 +183,8 @@ def extract(text, fmt=None):
                  source_index=row.get('_source_index'), **extra)
         if row.get('_source_timestamp') is not None:
             e['source_timestamp'] = row['_source_timestamp']
+        if row.get('_source_pointer') is not None:
+            e['source_pointer'] = row['_source_pointer']
         events.append(e)
         return e
     def add_usage(key, usage, fields):
@@ -142,7 +203,54 @@ def extract(text, fmt=None):
                 add(row, 'status', row['_source_runner'], record_type='runner')
             continue
         typ = row.get('type'); item = row.get('item') or {}; msg = row.get('message') or {}
-        if fmt == 'claude-code':
+        if fmt == 'inferencebench':
+            # Keep a one-to-one mapping to the dataset's normalized records.
+            # Missing native IDs must not be reconstructed by adjacent pairing.
+            row = dict(row, _source_index=row['i'])
+            meta = row.get('meta') if isinstance(row.get('meta'), dict) else {}
+            call_id = next((v for v in (row.get('call_id'), row.get('tool_call_id'),
+                           row.get('tool_use_id'), meta.get('call_id'), meta.get('tool_call_id'),
+                           meta.get('tool_use_id')) if isinstance(v, str) and v), None)
+            common = dict(role=row['role'], record_type=typ, model=row.get('model'),
+                          event_id=row.get('id'), call_id=call_id)
+            if typ == 'tool_call':
+                if call_id: calls[call_id] = row['tool_name']
+                add(row, 'call', compact(row['tool_input']), tool=row['tool_name'], **common)
+            elif typ == 'tool_result':
+                add(row, 'result', compact(row['tool_output']), tool=row.get('tool_name') or calls.get(call_id),
+                    error=bool(row.get('is_error')), **common)
+            elif typ in ('text','thinking','reasoning'):
+                kind = 'thinking' if typ in ('thinking','reasoning') else 'note' if row['role']=='assistant' else 'user' if row['role']=='user' else 'status'
+                add(row, kind, row['text'], **common)
+            else:
+                body = row.get('text') if isinstance(row.get('text'), str) else compact({k:v for k,v in row.items() if not k.startswith('_source')})
+                add(row, 'status', body, **common)
+        elif fmt == 'swe-rebench':
+            role = row['role']; before = len(events)
+            common = dict(role=role, event_id=row.get('id'), model=row.get('model'))
+            if role == 'assistant':
+                add_usage(row.get('id') or ('row', ri), row.get('usage') or {}, ('prompt_tokens',))
+            content = row.get('content')
+            blocks = content if isinstance(content, list) else [content]
+            for bi, block in enumerate(blocks):
+                if block in (None, '') and role != 'tool': continue
+                kind = 'result' if role=='tool' else 'note' if role=='assistant' else 'user' if role=='user' else 'status'
+                if isinstance(block, dict) and block.get('type') not in ('text','input_text','output_text'):
+                    kind = 'status'
+                    body = compact(block)
+                else: body = text_of(block)
+                add(row, kind, body, tool=row.get('name') or calls.get(row.get('tool_call_id')) if role=='tool' else None,
+                    call_id=row.get('tool_call_id') if role=='tool' else None,
+                    error=bool(row.get('is_error')), block=bi, **common)
+            for bi, call in enumerate(row.get('tool_calls') or []):
+                fn=call['function']; call_id=call.get('id')
+                if call_id: calls[call_id]=fn['name']
+                e=add(row, 'call', compact(fn['arguments']), tool=fn['name'], call_id=call_id,
+                      block=bi, **common)
+                e['source_pointer']=row['_source_pointer']+'/tool_calls/'+str(bi)
+            if len(events)==before:
+                add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}), **common)
+        elif fmt == 'claude-code':
             if typ in ('assistant', 'user'):
                 if typ == 'assistant':
                     add_usage(msg.get('id') or ('row', ri), msg.get('usage') or {},

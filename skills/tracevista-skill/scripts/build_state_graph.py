@@ -3,6 +3,7 @@
 import argparse
 import copy
 import json
+import math
 from pathlib import Path
 
 from observations import validate_observations
@@ -11,6 +12,31 @@ from ladder import validate_reading_layer, reading_quality, write_private_json
 
 BEHAVIORS = ('Explore', 'Plan', 'Edit', 'Execute', 'Verify', 'Diagnose')
 LINK_KINDS = ('sequence', 'informs', 'review_request', 'review_return')
+
+
+def validate_state_assessment(state, states):
+    """Reject measurements the viewer cannot render, before emitting a file."""
+    assessment = state.get('assessment')
+    if assessment is None:
+        return
+    prefix = str(state['id']) + ': '
+    if not isinstance(assessment, dict):
+        raise ValueError(prefix + 'assessment must be an object')
+    if 'comparisonValue' in assessment or 'comparisonState' in assessment:
+        raise ValueError(prefix + 'assessment comparison fields must use previous and previousState')
+    def finite(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if not finite(assessment.get('value')) or not finite(assessment.get('tolerance')) or assessment['tolerance'] < 0:
+        raise ValueError(prefix + 'assessment needs finite value and nonnegative tolerance')
+    if assessment.get('previous') is not None and not finite(assessment['previous']):
+        raise ValueError(prefix + 'assessment previous must be a finite number')
+    previous_state = assessment.get('previousState')
+    if previous_state is not None and (not isinstance(previous_state, str) or previous_state and previous_state not in states):
+        raise ValueError(prefix + 'assessment previousState must name a known state')
+    if 'correctness' in assessment and not isinstance(assessment['correctness'], bool):
+        raise ValueError(prefix + 'assessment correctness must be boolean or omitted when unknown')
+    if assessment.get('measurement') not in ('measured', 'historical'):
+        raise ValueError(prefix + 'assessment measurement must be measured or historical')
 
 
 def compile_graph(analysis, timeline):
@@ -41,6 +67,7 @@ def compile_graph(analysis, timeline):
     for state in states.values():
         if not state.get('snapshot'):
             raise ValueError(f"{state['id']}: missing tracked snapshot")
+        validate_state_assessment(state, states)
     for branch in branches.values():
         if branch.get('state') not in states:
             raise ValueError(f"{branch['id']}: unknown state")

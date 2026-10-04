@@ -16,5 +16,23 @@
     "agent": "Fable 5 Max · Claude Code",
     "task": "AIME 2025 · Qwen3-4B",
     "date": "Selected 2026-10-04"
+  },
+  {
+    "id": "inferencebench-serving-recovery",
+    "title": "InferenceBench",
+    "file": "inferencebench-serving-recovery.agent-state.json",
+    "description": "Serving optimization with scheduler trials, startup recovery and a reverted FlashInfer sampling experiment.",
+    "agent": "GPT-5.5 High · Codex",
+    "task": "Mistral-7B inference · Scenario D",
+    "date": "Selected 2026-10-04"
+  },
+  {
+    "id": "swe-rebench-kafka-retry",
+    "title": "SWE-rebench",
+    "file": "swe-rebench-kafka-retry.agent-state.json",
+    "description": "Kafka connection retry repair whose passing self-tests disagree with the published task outcome.",
+    "agent": "Qwen3-Coder-480B · OpenHands",
+    "task": "kafka-python · Connection error loop",
+    "date": "Selected 2026-10-04"
   }
 ]

@@ -59,3 +59,35 @@ current v1.2 aggregate are recorded separately.
 Project: [PostTrainBench](https://posttrainbench.com/), by Ben Rank, Hardik Bhatnagar,
 Ameya Prabhu, Shira Eisenberg, Karina Nguyen, Matthias Bethge and Maksym Andriushchenko.
 Paper: [PostTrainBench: Can LLM Agents Automate LLM Post-Training?](https://arxiv.org/abs/2603.08640), ICML 2026.
+
+### InferenceBench
+
+The bundled `inferencebench-serving-recovery.agent-state.json` is derived from
+[InferenceBench-Trajectories](https://huggingface.co/datasets/aisa-group/InferenceBench-Trajectories),
+published by the AI Safety and Alignment Group, ELLIS Institute Tübingen and MPI-IS, under
+Apache License 2.0. The same license text is preserved at
+[LICENSES/PostTrainBench-Apache-2.0.txt](LICENSES/PostTrainBench-Apache-2.0.txt).
+
+Source: `run_0155`, dataset revision `ea68d73df80985099ef58b342e50c465214d6e7b`,
+[original trace and recorded results](https://huggingface.co/datasets/aisa-group/InferenceBench-Trajectories/tree/ea68d73df80985099ef58b342e50c465214d6e7b/runs/run_0155).
+Project authors: Jehyeok Yeon, Ben Rank and Maksym Andriushchenko.
+
+Modifications: complete published records are packaged as a TraceVista JSON with English
+analyst annotations, state changes, work phases, actions, measurement scopes and evidence
+references. No benchmark was rerun. Selected on 2026-10-04.
+
+### SWE-rebench OpenHands trajectories
+
+The bundled `swe-rebench-kafka-retry.agent-state.json` is adapted from
+[Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories)
+by Maria Trofimova, Anton Shevtsov, Badertdinov Ibragim, Konstantin Pyaev, Simon Karasik
+and Alexander Golubev, under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+
+Source revision: `35455389ab51bf5e2306bfd436ef72d0f98bf882`; trajectory
+`chatcmpl-86805430c534a25711dc2c50c473619c`, task `dpkp__kafka-python-1312`.
+The trace contains source-code excerpts from [dpkp/kafka-python](https://github.com/dpkp/kafka-python).
+
+Modifications: complete published messages, tool definitions, patch and outcome metadata
+are repackaged with English TraceVista annotations and evidence-linked state/action maps.
+Agent self-tests and the published task verdict are distinguished. This visualization was
+created on 2026-10-04; it does not imply endorsement by the dataset or software authors.

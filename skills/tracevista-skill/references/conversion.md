@@ -30,6 +30,31 @@ timestamp keep an unknown time. Usage comes only from recorded native usage fiel
 Plain runner text, unrecognized JSON, and timestamp-wrapped formats other than Claude Code
 are not accepted as an agent trajectory.
 
+Two public benchmark formats can also be passed directly to the same command:
+
+- **InferenceBench normalized `trace.jsonl`**: each indexed `{i, role, type, ...}` record
+  becomes one event, in source order. `source_line` identifies the original JSONL line and
+  `source_index` retains its recorded `i`. Text, thinking, tool input/output, initialization,
+  status and future record types remain available. Tool inputs and structured outputs are
+  preserved without interpreting nested content as a second conversation. Native call IDs
+  are retained when supplied; adjacent calls and outputs without IDs are not assigned
+  invented IDs or timestamps. Missing usage remains unknown.
+- **SWE-rebench / OpenHands saved dataset row**: save the complete row with
+  `trajectory_id`, `instance_id`, `repo` and `trajectory`. Messages may be JSON objects or
+  serialized JSON strings. Assistant text and tool calls become separate events; native
+  `tool_call_id` values bind outputs to calls. Exact function-argument strings are retained.
+  `source_index` is the zero-based message index, and `source_pointer` identifies the
+  message or its tool call inside `/trajectory`. Nonempty content blocks and unknown
+  blocks remain visible. The archive retains the whole dataset row, including tool
+  definitions, patch, outcome flags and unknown metadata. Dataset `resolved` and test
+  flags are external assessment evidence, not inferred runtime tool errors.
+
+Use the benchmark's original file or saved complete dataset row as the source archive,
+not a hand-reformatted replacement. Check dataset revision, license, task/configuration
+and any truncation before selecting an example. Explain the agent, task, model, environment
+and recorded constraints in the overview; explicitly mark configuration fields that the
+source does not provide. Neither adapter reconstructs omitted messages or model reasoning.
+
 Markdown is a shortened reading aid; inspect full events when a result or explanation matters:
 
 ```sh
