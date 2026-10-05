@@ -69,11 +69,8 @@ export default function HierarchyView({ graph, expanded, selected, focus, toggle
   const quotes = (entity: Entity) => (entity.ladder?.abstract ?? []).map((q, i) => <blockquote key={i}>{q.quote} <button onClick={() => evidence(q.event)}>{q.event}</button></blockquote>);
   return <div ref={root} className="hierarchy-view" aria-label="Expandable trajectory">
     <div className="hierarchy-content">
-      <div className="hierarchy-intro"><span className="hierarchy-kicker">TRAJECTORY / HIERARCHY</span><h1>{graph.title}</h1>
-        <p>Expand a card to read its children in place. Collapse it to return to the parent.</p>
-        <span className="hierarchy-meta">{graph.states.length} states · {graph.branches.length} work phases · {graph.actions.length} actions · {graph.coverage.raw_events} raw records</span>
-      </div>
-      {graph.journey && <details className="hierarchy-overview"><summary>Run overview · Analyst notes</summary><p>{graph.journey.text}</p><div className="hierarchy-references">{graph.journey.cites.map(id => <span key={id}>{reference(id)}</span>)}</div></details>}
+      <div className="hierarchy-intro"><h1>{graph.title}</h1></div>
+      {graph.journey && <details className="hierarchy-overview" open><summary>Run overview</summary><p>{graph.journey.text}</p><div className="hierarchy-references">{graph.journey.cites.map(id => <span key={id}>{reference(id)}</span>)}</div></details>}
       <div className="hierarchy-states">{graph.states.map(state => {
         const phases = index.phases.get(state.id)!;
         return <Section key={state.id} entity={state} level="state" count={phases.length} unit="work phases" expanded={expanded.has(state.id)} selected={selected === state.id} toggle={() => toggle(state.id)} inspect={() => inspect(state.id)}>
