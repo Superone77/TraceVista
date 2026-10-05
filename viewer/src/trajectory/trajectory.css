@@ -86,7 +86,7 @@
 
 /* Reading layer: zoom ladders, epistemic moves, folds and the journey (after ThoughtDAG). */
 .ladder-text{line-height:1.32;font-weight:620;color:var(--ink);letter-spacing:-.2px}
-.ladder-text span{display:inline-block;white-space:pre-wrap;will-change:transform}
+.ladder-text span{white-space:pre-wrap}.ladder-text span.ink{display:inline-block;will-change:transform}.ladder-text span.ink-new{display:inline}
 .ladder-text .ink-new{color:var(--text-2);font-weight:480}
 .zoom-text{display:flex;flex-direction:column;gap:10px;height:100%;min-height:0}
 .plaque{flex:1;min-height:0;overflow:hidden;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}

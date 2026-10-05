@@ -41,13 +41,16 @@ export function LadderMorph({ ladder, level, fontSize }: { ladder: Ladder; level
   }, [level, fontSize, ladder]);
 
   // A surviving word keeps its own span (it slides by id); a run of arriving words is one span (it only fades).
+  // Only surviving words are inline blocks (a transform needs a box); an arriving run stays inline, so it
+  // wraps word by word instead of dropping to the next line as one block.
   const segments: { id: string; text: string; skeleton: boolean }[] = [];
   items.forEach((p, n) => {
     const glue = n + 1 < items.length && needsSpace(p.text, p.space, items[n + 1].text) ? ' ' : '';
     const isSkeleton = skeleton ? skeleton.has(p.id) : true;
     const last = segments[segments.length - 1];
     // Closing punctuation rides with the word before it, so a line never starts with "，" or "。".
-    if (last && /^[，。、；：！？,.;:!?）)」』”]+$/.test(p.text)) last.text += p.text + glue;
+    // A free piece carries its own trailing space (", "), so test it without that space.
+    if (last && /^[，。、；：！？,.;:!?）)」』”]+$/.test(p.text.trimEnd())) last.text += p.text + glue;
     else if (!isSkeleton && last && !last.skeleton) last.text += p.text + glue;
     else segments.push({ id: p.id, text: p.text + glue, skeleton: isSkeleton });
   });

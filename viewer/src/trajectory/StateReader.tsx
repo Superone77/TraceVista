@@ -50,11 +50,15 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const [journeyOpen, setJourneyOpen] = useState(true);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  // With both panels open the dock shows one at a time: details or chat, each at full height.
+  const [front, setFront] = useState<'details' | 'chat'>('details');
+  const chatFront = useRef(false); chatFront.current = chatOpen && front === 'chat';
+  const showDetails = useCallback(() => { setInspectorOpen(true); setFront('details'); }, []);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
   const pendingJump = useRef<string | null>(null);
-  const inspect = useCallback((id: string) => { overviewPinned.current = false; setSelected(id); setInspectorOpen(true); }, []);
+  const inspect = useCallback((id: string) => { overviewPinned.current = false; setSelected(id); setInspectorOpen(true); if (!chatFront.current) setFront('details'); }, []);
   const expand = useCallback((foldId: string) => setOpenFolds(s => new Set(s).add(foldId)), []);
-  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); setInspectorOpen(true); }, []);
+  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); showDetails(); }, [showDetails]);
   const layouts = useMemo(() => Object.fromEntries((['states', 'branches', 'actions', 'raw'] as Tier[]).map(t => [t, layoutGraph(graph, t, stateMode, { fold: decisionsOnly, openFolds })])) as Record<Tier, ReturnType<typeof layoutGraph>>, [graph, stateMode, decisionsOnly, openFolds]);
   const layout = layouts[tier];
   const projected = useMemo(() => {
@@ -92,13 +96,35 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const zoom = Math.max(.04, Math.min(.44, (box.width - leftInset - 64) / (fitAll ? width : root.width), ...(fitAll ? [(box.height - 110) / height] : [])));
     setView('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
   }, [layouts, setView, journeyOpen, graph.journey]);
+  const selectedRef = useRef<string | null>(null); selectedRef.current = selected;
+  const layoutRef = useRef(layout); layoutRef.current = layout;
+  const journeyTucked = useRef(false);
   useEffect(() => {
     const el = canvasRef.current?.querySelector('.react-flow');
     if (!el) return;
-    const observer = new ResizeObserver(() => { if (overviewPinned.current) overview(); });
+    let last = el.getBoundingClientRect();
+    const observer = new ResizeObserver(() => {
+      const box = el.getBoundingClientRect();
+      // The run overview covers a third of a narrow map: tuck it away while a side panel takes the room, bring it back after.
+      if (box.width < 1000) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
+      else if (journeyTucked.current) { journeyTucked.current = false; setJourneyOpen(true); }
+      if (overviewPinned.current) overview();
+      else if (last.width > 0 && last.height > 0 && (box.width !== last.width || box.height !== last.height)) {
+        // Keep what was in the middle of the map in the middle, then make sure the selected card is still on screen.
+        const v = rf.getViewport();
+        let x = v.x + (box.width - last.width) / 2, y = v.y + (box.height - last.height) / 2;
+        const card = layoutRef.current.nodes.find(n => n.id === selectedRef.current);
+        if (card) {
+          const left = x + card.x * v.zoom, right = left + Math.min(card.width * v.zoom, box.width - 32);
+          if (right > box.width - 16) x -= right - (box.width - 16); else if (left < 16) x += 16 - left;
+        }
+        void rf.setViewport({ x, y, zoom: v.zoom });
+      }
+      last = box;
+    });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [overview]);
+  }, [overview, rf]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || (e.target as HTMLElement)?.closest('input, textarea, button, select, summary, [contenteditable="true"]')) return;
@@ -144,9 +170,33 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     overviewPinned.current = false;
     setSelected(id); setProposed(true);
     const zoom = next === 'raw' ? 1.2 : next === 'actions' ? .96 : .64;
-    const x = p.x + p.width / 2;
-    const y = p.kind === 'state' ? p.y + 140 : p.y + Math.min(p.height / 2, (box.height - 70) / (2 * zoom));
-    setView(next, { x: box.width / 2 - x * zoom, y: box.height / 2 - y * zoom, zoom });
+    const TOP = 24; // screen pixels between the toolbar and the first card
+    const laneOf = (n: { kind: string; id: string; item: unknown }) => n.kind === 'branch' ? n.id : n.kind === 'action' || n.kind === 'fold' ? (n.item as Action | FoldItem).branch : undefined;
+    let view: Viewport;
+    if (next === 'branches') {
+      // The state's heading and its row of phases from the top; on a row wider than the screen, the target phase in the middle.
+      const state = p.kind === 'state' ? p : layouts.branches.nodes.find(n => n.id === p!.parentId) ?? p;
+      const phase = layouts.branches.nodes.find(n => n.kind === 'branch' && n.id === laneOf(entity));
+      const cx = state.width * zoom <= box.width - 48 || !phase ? state.x + state.width / 2 : phase.x + phase.width / 2;
+      view = { x: box.width / 2 - cx * zoom, y: TOP - state.y * zoom, zoom };
+    } else {
+      // A lane: its phase card on top with the actions below it. A target further down, or any record view, starts at the target.
+      const lane = layouts[next].nodes.find(n => n.kind === 'branch' && n.id === laneOf(p!));
+      const card = p.kind === 'action' || p.kind === 'fold';
+      let top = lane?.y ?? p.y;
+      if (card && (next === 'raw' || (p.y + Math.min(p.height, 360) - top) * zoom > box.height - TOP - 16)) top = p.y - 16;
+      // Across: as many of this state's lanes as fit, starting from its first, with the target lane always on screen.
+      const column = lane ?? p;
+      const lanes = layouts[next].nodes.filter(n => n.kind === 'branch' && n.parentId === column.parentId);
+      const span = box.width / zoom, pad = 24 / zoom;
+      let left = column.x + column.width / 2 - span / 2;
+      if (lanes.length) {
+        const lo = Math.min(...lanes.map(n => n.x)) - pad, hi = Math.max(...lanes.map(n => n.x + n.width)) + pad;
+        left = hi - lo <= span ? (lo + hi) / 2 - span / 2 : Math.min(Math.max(lo, column.x + column.width + pad - span), column.x - pad);
+      }
+      view = { x: -left * zoom, y: TOP - top * zoom, zoom };
+    }
+    setView(next, view);
   }, [layouts, setView]);
   useEffect(() => { const id = pendingJump.current; if (id && layouts.raw.nodes.some(n => n.id === id)) { pendingJump.current = null; moveTo(id); } }, [layouts, moveTo]);
   const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
@@ -205,7 +255,9 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     const view = rf.getViewport();
     const cy = ((box?.height ?? 0) / 2 - view.y) / view.zoom;
-    const nearest = layout.nodes.filter(n => n.kind === 'state').sort((a, b) => Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
+    // Nothing selected: the state nearest the middle of the screen, preferring one with phases to show.
+    const hasPhases = (id: string) => graph.branches.some(b => b.state === id);
+    const nearest = layout.nodes.filter(n => n.kind === 'state').sort((a, b) => Number(hasPhases(b.id)) - Number(hasPhases(a.id)) || Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
     const stateId = p?.kind === 'state' ? p.id : p?.parentId ?? nearest?.id ?? graph.states[0].id;
     moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next);
   }
@@ -225,7 +277,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
         </div>
         <div className="viewer-menu-section">
           <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
-          <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
+          <button onClick={() => { setSelected(null); showDetails(); dismiss(); }}>Structure &amp; evidence</button>
           <label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
           <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>
         </div>
@@ -237,7 +289,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
         </div>
       </>}</ViewerMenu>
       <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>
-      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
+      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>Details</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>Chat</button></div>
     </div>
     <main><div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
@@ -245,8 +297,17 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       {tier === 'states' && graph.journey && (journeyOpen
         ? <aside className="journey"><div className="journey-head"><b>Run overview</b><button onClick={() => setJourneyOpen(false)}>Collapse</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
         : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>Overview</button>)}
-      {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
-      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
+      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div></div>
+      {/* Details and chat share one dock beside the map: opening the second never narrows the map again, and nothing covers it.
+          The hidden panel stays mounted, so a chat request in flight survives a look at the details. */}
+      {(inspectorOpen || chatOpen) && <div className="side-dock" data-front={inspectorOpen && chatOpen ? front : inspectorOpen ? 'details' : 'chat'}>
+        {inspectorOpen && chatOpen && <div className="dock-tabs" role="tablist" aria-label="Side panel">
+          <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>Details</button>
+          <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>Chat</button>
+        </div>}
+        {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
+        {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
+      </div>}</main>
   </div>;
 }
 

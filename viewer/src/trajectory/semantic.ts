@@ -90,7 +90,8 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
     const x0 = left + ((spans.get(s.id)! - 1) * (width + 120)) / 2;
     const branches = g.branches.filter(b => b.state === s.id);
     const depth = Math.max(0, ...branches.map(b => items.get(b.id)!.reduce((h, item) => h + itemHeight(item) + 24, 0)));
-    const height = tier === 'states' ? 380 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
+    // A state with no recorded phases keeps only its heading below the overview, not an empty lane's height.
+    const height = tier === 'states' ? 380 : !branches.length ? 228 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
     nodes.push({ id: s.id, kind: 'state', item: s, x: x0, y, width, height });
     const startX = x0 + (width - branches.length * 400 + 40) / 2;
     if (tier !== 'states') branches.forEach((b, lane) => {

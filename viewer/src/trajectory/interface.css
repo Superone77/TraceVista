@@ -157,9 +157,21 @@
 .reader .chat-probe button { flex-shrink: 0; }
 .reader .chat-input textarea { min-width: 0; }
 
+/* Details and chat share one dock beside the map. Both open: tabs on top, one panel at full height; the map keeps its width. */
+.reader .side-dock { flex: none; width: 28rem; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); }
+.reader .side-dock > .inspector { position: static; width: auto; max-width: none; flex: 1 1 0; min-height: 0; border: 0; box-shadow: none; }
+.reader .side-dock > .chat-dialog { position: relative; inset: auto; z-index: auto; width: auto; height: auto; flex: 1 1 0; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+.reader .side-dock[data-front=chat] > .inspector,
+.reader .side-dock[data-front=details] > .chat-dialog { display: none; }
+.reader .dock-tabs { display: flex; gap: .25rem; padding: .5rem .75rem; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.reader .dock-tabs button { flex: 1; font-size: var(--ui-text); min-height: var(--ui-control-height); border-color: transparent; background: transparent; color: var(--text-2); }
+.reader .dock-tabs button[aria-selected=true] { background: var(--surface); border-color: var(--line-strong); color: var(--text); font-weight: 600; }
+
 /* Reflow panels and controls on narrow screens; do not shrink their text. */
 @media (max-width: 62.5rem) {
   .reader .inspector { width: min(26rem, calc(100% - 1.5rem)); max-width: none; }
+  /* A narrow map cannot spare the width: the dock floats over its right edge instead. */
+  .reader .side-dock { position: absolute; top: 0; right: 0; bottom: 0; z-index: 12; width: min(28rem, calc(100% - 1.5rem)); box-shadow: -8px 0 24px var(--shadow-lg); }
 }
 @media (max-width: 54rem) {
   .reader .toolbar { grid-template-columns: 1fr auto 1fr; }
