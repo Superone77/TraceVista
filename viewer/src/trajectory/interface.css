@@ -165,7 +165,8 @@
   .reader .toolbar { grid-template-columns: 1fr auto 1fr; }
   .reader .viewer-menu { grid-column: 1; grid-row: 1; }
   .reader .toolbar > .view-options { grid-column: 3; grid-row: 1; flex-wrap: nowrap; }
-  .reader .zoom-levels { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .reader .zoom-levels, .reader .hierarchy-levels { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+  .reader .toolbar > .view-options button { white-space: nowrap; }
 }
 @media (max-width: 48rem) {
   .reader .journey { width: min(23.75rem, calc(100% - 1.75rem)); max-height: 42%; }

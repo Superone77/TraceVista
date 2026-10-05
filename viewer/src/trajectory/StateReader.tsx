@@ -11,6 +11,8 @@ import ChatDialog from './ChatDialog';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
+import HierarchyView from './HierarchyView';
+import { revealHierarchy, toggleHierarchy } from './hierarchy';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -31,6 +33,9 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const rf = useReactFlow<CardNode, Edge>();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [hierarchy, setHierarchy] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [hierarchyFocus, setHierarchyFocus] = useState<{ id: string; revision: number } | null>(null);
   const [tier, setTier] = useState<Tier>('states');
   const tierRef = useRef<Tier>('states');
   const zoomReadout = useRef<HTMLSpanElement>(null);
@@ -93,13 +98,15 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     setView('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
   }, [layouts, setView, journeyOpen, graph.journey]);
   useEffect(() => {
+    if (hierarchy) return;
     const el = canvasRef.current?.querySelector('.react-flow');
     if (!el) return;
     const observer = new ResizeObserver(() => { if (overviewPinned.current) overview(); });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [overview]);
+  }, [overview, hierarchy]);
   useEffect(() => {
+    if (hierarchy) return;
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || (e.target as HTMLElement)?.closest('input, textarea, button, select, summary, [contenteditable="true"]')) return;
       e.preventDefault(); setSpaceHeld(true);
@@ -108,7 +115,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const blur = () => setSpaceHeld(false);
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
-  }, []);
+  }, [hierarchy]);
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     // Updating one CSS variable avoids rebuilding every node and its raw records per frame.
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
@@ -125,6 +132,12 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     setView(next, rebaseViewport(layouts[previous], layouts[next], viewport, point));
   }, [layouts, setView]);
   const moveTo = useCallback((id: string, desired?: Tier) => {
+    if (hierarchy) {
+      setExpanded(open => revealHierarchy(graph, open, id));
+      setSelected(id);
+      setHierarchyFocus(previous => ({ id, revision: (previous?.revision ?? 0) + 1 }));
+      return;
+    }
     const entity = layouts.raw.nodes.find(n => n.id === id);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     if (!entity) {
@@ -147,7 +160,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const x = p.x + p.width / 2;
     const y = p.kind === 'state' ? p.y + 140 : p.y + Math.min(p.height / 2, (box.height - 70) / (2 * zoom));
     setView(next, { x: box.width / 2 - x * zoom, y: box.height / 2 - y * zoom, zoom });
-  }, [layouts, setView]);
+  }, [layouts, setView, hierarchy, graph]);
   useEffect(() => { const id = pendingJump.current; if (id && layouts.raw.nodes.some(n => n.id === id)) { pendingJump.current = null; moveTo(id); } }, [layouts, moveTo]);
   const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
   const byId = useMemo(() => new Map<string, Entity>(all.map(e => [e.id, e])), [all]);
@@ -224,29 +237,34 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
           <button onClick={onHome}>Home</button>
         </div>
         <div className="viewer-menu-section">
-          <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
+          {hierarchy ? <button onClick={() => { setExpanded(new Set()); setHierarchyFocus(null); dismiss(); }}>Collapse all</button>
+            : <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>}
           <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
-          <label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
+          {!hierarchy && <><label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
           <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>
+          </>}
         </div>
-        <div className="viewer-menu-section">
+        {!hierarchy && <div className="viewer-menu-section">
           {hasReading && <label className="viewer-menu-check" title="Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions"><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />Decisions only</label>}
           <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />Cross-branch links</label>
           <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />Untried ideas</label>
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>Reading layer incomplete; showing all actions</p>}
-        </div>
+        </div>}
       </>}</ViewerMenu>
-      <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>
-      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
+      {hierarchy ? <div className="hierarchy-levels" aria-label="Hierarchy levels">{Object.values(tierLabels).map(label => <span key={label}>{label}</span>)}</div>
+        : <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>}
+      <div className="view-options"><button onClick={() => setHierarchy(value => !value)}>{hierarchy ? 'Map view' : 'Hierarchy view'}</button><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
     </div>
-    <main><div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
+    <main><div className={`canvas ${hierarchy ? 'hierarchy-canvas' : ''} ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}>{hierarchy
+      ? <HierarchyView graph={graph} expanded={expanded} selected={selected} focus={hierarchyFocus} toggle={id => { setExpanded(open => toggleHierarchy(open, id)); setSelected(id); }} inspect={inspect} reveal={moveTo} evidence={evidence} />
+      : <ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
-    </ReactFlow>
-      {tier === 'states' && graph.journey && (journeyOpen
+    </ReactFlow>}
+      {!hierarchy && tier === 'states' && graph.journey && (journeyOpen
         ? <aside className="journey"><div className="journey-head"><b>Run overview</b><button onClick={() => setJourneyOpen(false)}>Collapse</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
         : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>Overview</button>)}
       {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
-      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
+      {!hierarchy && <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div>}</div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
   </div>;
 }
 

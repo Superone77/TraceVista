@@ -1,0 +1,52 @@
+.hierarchy-view { flex: 1; min-width: 0; height: 100%; overflow: auto; overflow-anchor: none; background: var(--surface-2); }
+.hierarchy-content { max-width: 1060px; margin: auto; padding: 32px 32px 80px; }
+.hierarchy-intro { margin: 0 0 24px; }
+.hierarchy-kicker { font-size: 11px; letter-spacing: .12em; color: var(--text-3); }
+.hierarchy-intro h1 { font-size: 25px; line-height: 1.4; margin: 10px 0; overflow-wrap: anywhere; }
+.hierarchy-intro p, .hierarchy-footnote { font-size: 13px; line-height: 1.7; color: var(--text-2); }
+.hierarchy-meta { font-size: 12px; line-height: 1.6; color: var(--text-3); overflow-wrap: anywhere; }
+.hierarchy-levels { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+.hierarchy-levels span:not(:last-child)::after { content: '›'; margin-left: 7px; color: var(--text-3); }
+.hierarchy-overview { padding: 14px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 24px; font-size: 14px; line-height: 1.8; }
+.hierarchy-overview summary { cursor: pointer; font-weight: 600; }
+.hierarchy-states { display: grid; gap: 18px; }
+.hierarchy-node { min-width: 0; border: 1px solid var(--line); border-left: 3px solid var(--node-color); border-radius: 10px; background: var(--surface); scroll-margin-block: 16px; }
+.hierarchy-node.selected { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+.hierarchy-heading { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px 8px; }
+.hierarchy-toggle { flex: 1; display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 0; text-align: left; background: transparent; border: 0; border-radius: 4px; color: inherit; }
+.hierarchy-toggle:hover { background: transparent; color: var(--accent); }
+.hierarchy-toggle:disabled { opacity: 1; cursor: default; }
+.hierarchy-toggle:focus-visible, .hierarchy-reference:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.hierarchy-chevron { width: 14px; flex-shrink: 0; font-size: 19px; line-height: 26px; }
+.hierarchy-heading-text { display: grid; gap: 5px; min-width: 0; }
+.hierarchy-heading-text strong { font-size: 17px; line-height: 1.6; font-weight: 600; overflow-wrap: anywhere; }
+.hierarchy-count { font-size: 12px; color: var(--text-2); line-height: 1.7; }
+.hierarchy-details { padding: 5px 9px; font-size: 12px; flex-shrink: 0; }
+.hierarchy-summary { margin: 0 18px 16px 44px; color: var(--text-2); font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hierarchy-children { margin: 0 18px 18px 28px; display: grid; gap: 12px; border-left: 1px solid var(--line-strong); padding-left: 16px; }
+.hierarchy-children[hidden] { display: none; }
+.hierarchy-phase { background: var(--surface-2); }
+.hierarchy-action .hierarchy-heading-text strong { font-size: 15px; }
+.hierarchy-action .hierarchy-children { margin: 0; padding: 0; border: 0; }
+.hierarchy-evidence { padding: 16px; border-top: 1px solid var(--line); min-width: 0; }
+.hierarchy-evidence h3 { font-size: 13px; font-weight: 600; margin: 16px 0 10px; }
+.hierarchy-relation { font-size: 12px; line-height: 1.7; color: var(--text-2); margin: 6px 0; }
+.hierarchy-relation p { margin: 4px 0 12px; white-space: pre-wrap; }
+.hierarchy-reference { font-size: 12px; padding: 3px 7px; text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+.hierarchy-references { display: flex; flex-wrap: wrap; gap: 6px; }
+.hierarchy-quotes blockquote { border-left: 2px solid var(--line-strong); padding-left: 12px; margin: 10px 0; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hierarchy-quotes button { font-size: 11px; padding: 2px 5px; }
+.hierarchy-evidence .raw-records { max-height: 480px; overflow: auto; padding: 0 4px 4px 0; }
+.hierarchy-evidence .raw-record h3 { font-size: 13px; }
+.hierarchy-evidence .raw-record pre { font-size: 12px; line-height: 1.7; }
+.hierarchy-evidence .raw-record-meta, .hierarchy-evidence .raw-record-source { font-size: 11px; }
+.hierarchy-footnote { margin-top: 24px; }
+@media (max-width: 700px) {
+  .hierarchy-content { padding: 20px 12px 48px; }
+  .hierarchy-heading { padding: 12px 10px 8px; gap: 6px; }
+  .hierarchy-heading-text strong { font-size: 15px; }
+  .hierarchy-children { margin: 0 8px 12px 10px; padding-left: 8px; }
+  .hierarchy-summary { margin-left: 36px; margin-right: 10px; }
+  .hierarchy-evidence { padding: 10px; }
+  .hierarchy-levels { font-size: 11px; gap: 4px; }
+}
