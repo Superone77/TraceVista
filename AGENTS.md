@@ -8,7 +8,7 @@
 
 ## Branch and review workflow
 
-- Treat `main` as the integration branch. Make every change on a separate `feat/*`, `fix/*`, or `chore/*` branch and open a pull request into `main`.
+- Treat `main` as the integration branch. Work on a development branch; local edits, experiments, previews, and commits may stay local. Completing a change does not by itself require pushing or opening a PR. Push when the user requests or has authorized remote delivery. When preparing to integrate changes into `main`, open a pull request.
 - Wait for the user's explicit approval of the PR before merging. Never approve a PR on the user's behalf, enable auto-merge before approval, push directly to `main`, or bypass the local pre-push hook.
 - `Superone77` is the designated code owner. GitHub does not allow a PR author to approve their own PR: when using the owner's login to create PRs, wait for the user's explicit review/approval in this chat. Do not report it as a GitHub approving review. A separate submitter identity is needed for GitHub-native owner approval.
 - Install the local guard in a fresh clone with `pnpm setup:hooks`. GitHub-side protection must be independently enabled and verified; a local hook or CODEOWNERS file alone does not enforce remote approval.
