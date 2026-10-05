@@ -24,9 +24,9 @@ A coding session can contain hundreds of messages, edits, and tool calls. TraceV
 | **Actions** | Explore, Plan, Edit, Execute, Verify, and Diagnose—with descriptions, outcomes, and who did the work. |
 | **Raw records** | Original messages, recorded reasoning, tool inputs and outputs, and reviewer feedback. |
 
-Start with **Hierarchy view**: expand a state to read its work phases, then actions and raw records, while keeping the surrounding work visible. Each card opens independently and remembers its expanded children when collapsed. **Run overview** starts open with the task and configuration.
+Start with **Map view**: pan and zoom through the run, or jump between levels with the toolbar. Open **Details** for descriptions, version origins, measurements, and evidence. **Run overview** starts open with the task and configuration.
 
-Open **Details** for descriptions, version origins, measurements, and evidence. Switch to **Map view** to pan and zoom through the same run, or jump between levels with the toolbar. Reference links open the target's path in the hierarchy. Nesting shows containment; version ancestry and execution order remain separate relations.
+Switch to **Hierarchy view** to expand a state into work phases, actions and raw records, while keeping the surrounding work visible. Each card opens independently and remembers its expanded children when collapsed. Reference links open the target's path in the hierarchy. Nesting shows containment; version ancestry and execution order remain separate relations.
 
 [![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 

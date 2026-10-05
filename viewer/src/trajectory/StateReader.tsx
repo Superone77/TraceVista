@@ -12,7 +12,7 @@ import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import HierarchyView from './HierarchyView';
-import { revealHierarchy, toggleHierarchy } from './hierarchy';
+import { expandHierarchyToTier, revealHierarchy, toggleHierarchy } from './hierarchy';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -33,8 +33,9 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const rf = useReactFlow<CardNode, Edge>();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [hierarchy, setHierarchy] = useState(true);
+  const [hierarchy, setHierarchy] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [hierarchyTier, setHierarchyTier] = useState<Tier | null>('states');
   const [hierarchyFocus, setHierarchyFocus] = useState<{ id: string; revision: number } | null>(null);
   const [tier, setTier] = useState<Tier>('states');
   const tierRef = useRef<Tier>('states');
@@ -134,6 +135,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const moveTo = useCallback((id: string, desired?: Tier) => {
     if (hierarchy) {
       setExpanded(open => revealHierarchy(graph, open, id));
+      setHierarchyTier(null);
       setSelected(id);
       setHierarchyFocus(previous => ({ id, revision: (previous?.revision ?? 0) + 1 }));
       return;
@@ -213,6 +215,12 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     });
   }, [projected, layout, tier, selected]);
   function showTier(next: Tier) {
+    if (hierarchy) {
+      setExpanded(expandHierarchyToTier(graph, next));
+      setHierarchyTier(next);
+      setHierarchyFocus(null);
+      return;
+    }
     if (next === 'states') { overview(); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
@@ -237,7 +245,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
           <button onClick={onHome}>Home</button>
         </div>
         <div className="viewer-menu-section">
-          {hierarchy ? <button onClick={() => { setExpanded(new Set()); setHierarchyFocus(null); dismiss(); }}>Collapse all</button>
+          {hierarchy ? <button onClick={() => { showTier('states'); dismiss(); }}>Collapse all</button>
             : <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>}
           <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
           {!hierarchy && <><label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
@@ -251,12 +259,14 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>Reading layer incomplete; showing all actions</p>}
         </div>}
       </>}</ViewerMenu>
-      {hierarchy ? <div className="hierarchy-levels" aria-label="Hierarchy levels">{Object.values(tierLabels).map(label => <span key={label}>{label}</span>)}</div>
-        : <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>}
+      <div className="zoom-levels" aria-label={hierarchy ? 'Hierarchy detail levels' : 'Zoom detail levels'}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => {
+        const active = (hierarchy ? hierarchyTier : tier) === t;
+        return <button key={t} className={active ? 'active' : ''} aria-pressed={active} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>;
+      })}</div>
       <div className="view-options"><button onClick={() => setHierarchy(value => !value)}>{hierarchy ? 'Map view' : 'Hierarchy view'}</button><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
     </div>
     <main><div className={`canvas ${hierarchy ? 'hierarchy-canvas' : ''} ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}>{hierarchy
-      ? <HierarchyView graph={graph} expanded={expanded} selected={selected} focus={hierarchyFocus} toggle={id => { setExpanded(open => toggleHierarchy(open, id)); setSelected(id); }} inspect={inspect} reveal={moveTo} evidence={evidence} />
+      ? <HierarchyView graph={graph} expanded={expanded} selected={selected} focus={hierarchyFocus} toggle={id => { setExpanded(open => toggleHierarchy(open, id)); setHierarchyTier(null); setSelected(id); }} inspect={inspect} reveal={moveTo} evidence={evidence} />
       : <ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>}

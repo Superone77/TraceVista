@@ -1,4 +1,17 @@
 import type { Graph } from './model';
+import type { Tier } from './semantic';
+
+/** Open the parents needed to display a level, closing deeper disclosure. */
+export function expandHierarchyToTier(graph: Graph, tier: Tier): Set<string> {
+  const next = new Set<string>();
+  if (tier === 'states') return next;
+  for (const state of graph.states) next.add(state.id);
+  if (tier === 'branches') return next;
+  for (const branch of graph.branches) next.add(branch.id);
+  if (tier === 'actions') return next;
+  for (const action of graph.actions) next.add(action.id);
+  return next;
+}
 
 /** Reveal just the target's containment path; state ancestry is a separate relation. */
 export function revealHierarchy(graph: Graph, expanded: ReadonlySet<string>, id: string): Set<string> {

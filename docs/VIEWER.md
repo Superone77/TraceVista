@@ -10,16 +10,17 @@
 
 本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
 
-打开轨迹后默认使用层级视图，顶部只保留任务标题，Run overview 默认展开。右上角 Map view / Hierarchy view 切换关系图与层级视图，Details 和 Chat 在两种视图中均可使用；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。
+打开轨迹后默认使用 Map view。右上角 Map view / Hierarchy view 切换关系图与层级视图，Details 和 Chat 在两种视图中均可使用；层级视图顶部只保留任务标题，Run overview 默认展开。导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。
 
 内置示例：`?example=pi-agent-lora`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
 生产构建只打包内置示例，排除 local-data。当前案例由公开案例目录统一登记。
 
-## 原地逐层展开（默认）
+## 原地逐层展开（Hierarchy view）
 
 状态 → 工作阶段 → 行动 → 原始记录按所属关系嵌套。点击卡片标题或三角箭头独立展开、收起下一层，不自动移动或缩放视口；其他节点保持原样。父节点收起后，再打开会恢复先前展开的子项。
 
+- 顶部四个层级按钮在两种视图中都可用。层级视图中，System states 收起全部子项，Work phases 展开全部状态，Actions 再展开工作阶段，Raw records 再展开行动原文；切回浅层时收起更深层。手动展开或引用定位后，可再次点击按钮统一展开深度。
 - 标题按钮支持 Tab 聚焦和 Enter / Space 切换，Details 单独打开分析和证据面板。
 - 原始记录仅在对应行动展开后渲染，收起不删除数据，也不影响完整导出。
 - 引用按钮标有 ↗，明确定位到目标并打开其父状态、工作阶段及对应行动；这些引用仍保留原始关系类型和依据。
