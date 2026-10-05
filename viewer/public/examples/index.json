@@ -30,5 +30,13 @@
     "description": "Kafka connection retry repair whose passing self-tests disagree with the published task outcome.",
     "agent": "Qwen3-Coder-480B",
     "task": "kafka-python · Connection error loop"
+  },
+  {
+    "id": "literesearcher-affiliations",
+    "title": "Tongyi DeepResearch · Literature Research",
+    "file": "literesearcher-affiliations.agent-state.json",
+    "description": "Cross-paper affiliation research with empty-PDF recovery, author-block comparison and query refinement.",
+    "agent": "Tongyi DeepResearch teacher",
+    "task": "Two journal articles · Shared author affiliation"
   }
 ]
