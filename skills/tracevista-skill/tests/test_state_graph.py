@@ -29,6 +29,33 @@ def fixture():
 
 
 class StateGraphTests(unittest.TestCase):
+    def test_valid_assessments_keep_comparison_and_unknown_correctness(self):
+        analysis, timeline = fixture()
+        assessment = {'metric':'Latency','unit':'ms','value':2.5,'previous':3.0,
+                      'previousState':'s0','higherIsBetter':False,'tolerance':0,
+                      'measurement':'measured','note':'Same protocol'}
+        analysis['states'][1]['assessment'] = assessment
+        graph = compile_graph(analysis, timeline)
+        self.assertEqual(graph['states'][1]['assessment'], assessment)
+        self.assertNotIn('correctness', graph['states'][1]['assessment'])
+
+    def test_viewer_incompatible_assessments_fail_before_export(self):
+        valid = {'metric':'Latency','value':2.5,'higherIsBetter':False,'tolerance':0,
+                 'measurement':'measured','note':'Same protocol'}
+        invalid = [
+            {k:v for k,v in valid.items() if k!='tolerance'},
+            dict(valid, tolerance=-1), dict(valid, tolerance=float('nan')),
+            dict(valid, value=True), dict(valid, previous='3.0'),
+            dict(valid, previousState='unknown'), dict(valid, correctness=None),
+            dict(valid, measurement='estimated'),
+            dict(valid, comparisonValue=3.0, comparisonState='s0'),
+        ]
+        for assessment in invalid:
+            analysis, timeline = fixture()
+            analysis['states'][1]['assessment'] = assessment
+            with self.subTest(assessment=assessment), self.assertRaisesRegex(ValueError, 'assessment'):
+                compile_graph(analysis, timeline)
+
     def test_cli_state_and_legacy_outputs_retain_evidence(self):
         analysis, timeline = fixture()
         with tempfile.TemporaryDirectory() as folder:

@@ -14,6 +14,47 @@ python3 /absolute/skill/scripts/extract_timeline.py --manifest /absolute/work/ma
 ```
 
 The extractor retains full event text, source logs, call IDs, positions and recorded usage.
+Claude Code input also accepts runner logs whose native JSON records have an ISO 8601
+prefix, for example `[2026-06-12T09:03:08Z] {"type":"assistant",...}`. UTC offsets and
+fractional seconds are supported. Use the original runner log directly; do not strip its
+prefixes into a replacement source. The complete original source is retained under the
+same redaction rules, with original line numbers linking events back to it.
+
+For this wrapped format, nonempty runner lines become explicit `status` records with
+`record_type: runner`; malformed JSON remains visible as runner text rather than being
+silently discarded. Native system, result, rate-limit, progress, and unknown record types
+remain status evidence. Native thinking blocks remain `thinking`, and tool IDs continue
+to bind calls and results. `timestamp` retains the native timestamp when present, otherwise
+the wrapper timestamp; `source_timestamp` records the wrapper separately. Lines with no
+timestamp keep an unknown time. Usage comes only from recorded native usage fields.
+Plain runner text, unrecognized JSON, and timestamp-wrapped formats other than Claude Code
+are not accepted as an agent trajectory.
+
+Two public benchmark formats can also be passed directly to the same command:
+
+- **InferenceBench normalized `trace.jsonl`**: each indexed `{i, role, type, ...}` record
+  becomes one event, in source order. `source_line` identifies the original JSONL line and
+  `source_index` retains its recorded `i`. Text, thinking, tool input/output, initialization,
+  status and future record types remain available. Tool inputs and structured outputs are
+  preserved without interpreting nested content as a second conversation. Native call IDs
+  are retained when supplied; adjacent calls and outputs without IDs are not assigned
+  invented IDs or timestamps. Missing usage remains unknown.
+- **SWE-rebench / OpenHands saved dataset row**: save the complete row with
+  `trajectory_id`, `instance_id`, `repo` and `trajectory`. Messages may be JSON objects or
+  serialized JSON strings. Assistant text and tool calls become separate events; native
+  `tool_call_id` values bind outputs to calls. Exact function-argument strings are retained.
+  `source_index` is the zero-based message index, and `source_pointer` identifies the
+  message or its tool call inside `/trajectory`. Nonempty content blocks and unknown
+  blocks remain visible. The archive retains the whole dataset row, including tool
+  definitions, patch, outcome flags and unknown metadata. Dataset `resolved` and test
+  flags are external assessment evidence, not inferred runtime tool errors.
+
+Use the benchmark's original file or saved complete dataset row as the source archive,
+not a hand-reformatted replacement. Check dataset revision, license, task/configuration
+and any truncation before selecting an example. Explain the agent, task, model, environment
+and recorded constraints in the overview; explicitly mark configuration fields that the
+source does not provide. Neither adapter reconstructs omitted messages or model reasoning.
+
 Markdown is a shortened reading aid; inspect full events when a result or explanation matters:
 
 ```sh

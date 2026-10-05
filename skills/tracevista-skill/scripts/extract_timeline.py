@@ -11,6 +11,8 @@ from pathlib import Path
 
 BRIEF = {'user': 1500, 'note': 1500, 'thinking': 1500, 'call': 350, 'result': 350, 'status': 350}
 PART_CHARS = 50_000
+TIMESTAMP_PREFIX = re.compile(
+    r'^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))\][ \t]?(.*)$')
 SECRETS = [
     (re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----', re.S), '[REDACTED PRIVATE KEY]'),
     (re.compile(r'\bsk-(?:ant-|proj-)?[A-Za-z0-9_\-]{20,}'), '[REDACTED KEY]'),
@@ -71,22 +73,92 @@ def compact(value):
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
 
 
+def swe_rows(value):
+    """Recognize a saved SWE-rebench row, not arbitrary chat-shaped JSON."""
+    if not isinstance(value, dict) or not all(isinstance(value.get(k), str) and value[k]
+            for k in ('trajectory_id', 'instance_id', 'repo')):
+        return None
+    trajectory = value.get('trajectory')
+    if not isinstance(trajectory, list) or not trajectory:
+        raise ValueError('SWE-rebench trajectory must be a nonempty message list')
+    rows = []
+    for i, message in enumerate(trajectory):
+        if isinstance(message, str):
+            try: message = json.loads(message)
+            except ValueError: raise ValueError('Invalid serialized SWE-rebench message at index '+str(i))
+        if not isinstance(message, dict) or message.get('role') not in ('system','developer','user','assistant','tool'):
+            raise ValueError('Invalid SWE-rebench message role at index '+str(i))
+        content = message.get('content')
+        if content is not None and not isinstance(content, (str, list)):
+            raise ValueError('Invalid SWE-rebench message content at index '+str(i))
+        tool_calls = message.get('tool_calls')
+        if tool_calls is not None and not isinstance(tool_calls, list):
+            raise ValueError('Invalid SWE-rebench tool_calls at index '+str(i))
+        for call in tool_calls or []:
+            fn = call.get('function') if isinstance(call, dict) else None
+            if not isinstance(fn, dict) or not isinstance(fn.get('name'), str) or 'arguments' not in fn:
+                raise ValueError('Invalid SWE-rebench tool call at index '+str(i))
+        rows.append(dict(message, _source_format='swe-rebench', _source_index=i,
+                         _source_pointer='/trajectory/'+str(i)))
+    return rows
+
+
+def inferencebench_rows(rows):
+    """A complete indexed normalized trace is required for auto-detection."""
+    if not rows or not all(isinstance(r.get('i'), int) and not isinstance(r['i'], bool)
+            and r['i'] >= 0 and r.get('role') in ('system','developer','user','assistant','tool')
+            and isinstance(r.get('type'), str) for r in rows):
+        return False
+    indices = [r['i'] for r in rows]
+    if indices != sorted(set(indices)): return False
+    known = False
+    for row in rows:
+        kind = row['type']
+        if kind in ('text','thinking','reasoning'):
+            if not isinstance(row.get('text'), str): return False
+            known = True
+        elif kind == 'tool_call':
+            if not isinstance(row.get('tool_name'), str) or 'tool_input' not in row: return False
+            known = True
+        elif kind == 'tool_result':
+            if 'tool_output' not in row: return False
+            known = True
+        elif kind in ('init','status'):
+            known = True
+    return known
+
+
 def load_rows(text):
     try:
         whole = json.loads(text)
+        benchmark = swe_rows(whole)
+        if benchmark is not None: return benchmark
         if isinstance(whole, list):
             return [dict(row, _source_index=i) for i, row in enumerate(whole) if isinstance(row, dict)]
-    except ValueError: pass
+    except json.JSONDecodeError: pass
     rows = []
     for line, value in enumerate(text.splitlines(), 1):
-        try: row = json.loads(value)
-        except ValueError: continue
-        if isinstance(row, dict): rows.append(dict(row, _source_line=line))
+        prefix = TIMESTAMP_PREFIX.match(value)
+        wrapped_at = prefix[1] if prefix and stamp(prefix[1]) is not None else None
+        body = prefix[2] if wrapped_at is not None else value
+        try: row = json.loads(body)
+        except ValueError: row = None
+        if isinstance(row, dict):
+            row = dict(row, _source_line=line)
+            if wrapped_at is not None: row['_source_timestamp'] = wrapped_at
+            rows.append(row)
+        elif value.strip():
+            # Only a recognized timestamp-wrapped Claude stream promotes these to
+            # events. Plain text alone must not become a plausible agent trace.
+            rows.append(dict(_source_line=line, _source_runner=body,
+                             _source_timestamp=wrapped_at))
     return rows
 
 
 def detect(rows):
-    for row in rows[:400]:
+    if rows and all(r.get('_source_format') == 'swe-rebench' for r in rows): return 'swe-rebench'
+    if inferencebench_rows(rows): return 'inferencebench'
+    for row in (r for r in rows if '_source_runner' not in r):
         kind = row.get('type')
         if kind in ('session_meta', 'response_item', 'event_msg', 'turn_context'): return 'codex-rollout'
         if kind in ('thread.started', 'turn.started', 'item.completed', 'item.started', 'turn.completed'): return 'codex-exec'
@@ -99,11 +171,20 @@ def detect(rows):
 def extract(text, fmt=None):
     """Return events plus final usage; missing usage is None, never invented zero."""
     rows = load_rows(text); fmt = fmt or detect(rows)
+    wrapped_records = any(row.get('_source_timestamp') is not None and '_source_runner' not in row for row in rows)
+    if wrapped_records and fmt != 'claude-code':
+        raise ValueError('Timestamp-prefixed logs require a recognized Claude Code stream')
+    wrapped_claude = fmt == 'claude-code' and wrapped_records
     events, tokens, seen_usage, calls = [], None, {}, {}
     def add(row, kind, body, tool=None, error=False, **extra):
         e = dict(kind=kind, text=body, tool=tool, error=error, tokens_in=tokens,
-                 timestamp=row.get('timestamp'), source_line=row.get('_source_line'),
+                 timestamp=row.get('timestamp') if row.get('timestamp') is not None else row.get('_source_timestamp'),
+                 source_line=row.get('_source_line'),
                  source_index=row.get('_source_index'), **extra)
+        if row.get('_source_timestamp') is not None:
+            e['source_timestamp'] = row['_source_timestamp']
+        if row.get('_source_pointer') is not None:
+            e['source_pointer'] = row['_source_pointer']
         events.append(e)
         return e
     def add_usage(key, usage, fields):
@@ -117,16 +198,70 @@ def extract(text, fmt=None):
             delta += value - prev.get(field, 0); prev[field] = value
         tokens = (tokens or 0) + delta
     for ri, row in enumerate(rows):
+        if '_source_runner' in row:
+            if wrapped_claude:
+                add(row, 'status', row['_source_runner'], record_type='runner')
+            continue
         typ = row.get('type'); item = row.get('item') or {}; msg = row.get('message') or {}
-        if fmt == 'claude-code':
+        if fmt == 'inferencebench':
+            # Keep a one-to-one mapping to the dataset's normalized records.
+            # Missing native IDs must not be reconstructed by adjacent pairing.
+            row = dict(row, _source_index=row['i'])
+            meta = row.get('meta') if isinstance(row.get('meta'), dict) else {}
+            call_id = next((v for v in (row.get('call_id'), row.get('tool_call_id'),
+                           row.get('tool_use_id'), meta.get('call_id'), meta.get('tool_call_id'),
+                           meta.get('tool_use_id')) if isinstance(v, str) and v), None)
+            common = dict(role=row['role'], record_type=typ, model=row.get('model'),
+                          event_id=row.get('id'), call_id=call_id)
+            if typ == 'tool_call':
+                if call_id: calls[call_id] = row['tool_name']
+                add(row, 'call', compact(row['tool_input']), tool=row['tool_name'], **common)
+            elif typ == 'tool_result':
+                add(row, 'result', compact(row['tool_output']), tool=row.get('tool_name') or calls.get(call_id),
+                    error=bool(row.get('is_error')), **common)
+            elif typ in ('text','thinking','reasoning'):
+                kind = 'thinking' if typ in ('thinking','reasoning') else 'note' if row['role']=='assistant' else 'user' if row['role']=='user' else 'status'
+                add(row, kind, row['text'], **common)
+            else:
+                body = row.get('text') if isinstance(row.get('text'), str) else compact({k:v for k,v in row.items() if not k.startswith('_source')})
+                add(row, 'status', body, **common)
+        elif fmt == 'swe-rebench':
+            role = row['role']; before = len(events)
+            common = dict(role=role, event_id=row.get('id'), model=row.get('model'))
+            if role == 'assistant':
+                add_usage(row.get('id') or ('row', ri), row.get('usage') or {}, ('prompt_tokens',))
+            content = row.get('content')
+            blocks = content if isinstance(content, list) else [content]
+            for bi, block in enumerate(blocks):
+                if block in (None, '') and role != 'tool': continue
+                kind = 'result' if role=='tool' else 'note' if role=='assistant' else 'user' if role=='user' else 'status'
+                if isinstance(block, dict) and block.get('type') not in ('text','input_text','output_text'):
+                    kind = 'status'
+                    body = compact(block)
+                else: body = text_of(block)
+                add(row, kind, body, tool=row.get('name') or calls.get(row.get('tool_call_id')) if role=='tool' else None,
+                    call_id=row.get('tool_call_id') if role=='tool' else None,
+                    error=bool(row.get('is_error')), block=bi, **common)
+            for bi, call in enumerate(row.get('tool_calls') or []):
+                fn=call['function']; call_id=call.get('id')
+                if call_id: calls[call_id]=fn['name']
+                e=add(row, 'call', compact(fn['arguments']), tool=fn['name'], call_id=call_id,
+                      block=bi, **common)
+                e['source_pointer']=row['_source_pointer']+'/tool_calls/'+str(bi)
+            if len(events)==before:
+                add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}), **common)
+        elif fmt == 'claude-code':
             if typ in ('assistant', 'user'):
                 if typ == 'assistant':
                     add_usage(msg.get('id') or ('row', ri), msg.get('usage') or {},
                               ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
-                content = msg.get('content', [])
+                content = msg.get('content') or []
                 if isinstance(content, str): content = [{'type':'text', 'text':content}]
+                before = len(events)
                 for bi, c in enumerate(content):
-                    if not isinstance(c, dict): continue
+                    if not isinstance(c, dict):
+                        add(row, 'status', compact(c), block=bi, role=typ)
+                        continue
                     k = c.get('type'); common = dict(block=bi, role=typ, event_id=row.get('uuid'), model=msg.get('model'))
                     if k == 'text': add(row, 'note' if typ == 'assistant' else 'user', c.get('text',''), **common)
                     elif k == 'thinking': add(row, 'thinking', c.get('thinking',''), **common)
@@ -136,7 +271,12 @@ def extract(text, fmt=None):
                     elif k == 'tool_result':
                         add(row, 'result', text_of(c.get('content')), tool=calls.get(c.get('tool_use_id')),
                             error=bool(c.get('is_error')), call_id=c.get('tool_use_id'), **common)
-            elif typ in ('result', 'system', 'error'):
+                    else: add(row, 'status', compact(c), **common)
+                if len(events) == before:
+                    add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}))
+            else:
+                # Preserve rate limits, progress notifications and future native
+                # records rather than silently omitting unrecognized types.
                 add(row, 'status', compact({k:v for k,v in row.items() if not k.startswith('_source')}), error=bool(row.get('is_error')))
         elif fmt == 'codex-exec':
             if typ == 'turn.completed':
@@ -191,7 +331,7 @@ def extract(text, fmt=None):
     times = [stamp(e['timestamp']) for e in events if stamp(e['timestamp']) is not None]
     start = min(times) if times else None
     for i,e in enumerate(events,1):
-        now=stamp(e.pop('timestamp')); e.update(id=f'E{i}', t_min=None if now is None or start is None else round((now-start)/60, 2))
+        now=stamp(e['timestamp']); e.update(id=f'E{i}', t_min=None if now is None or start is None else round((now-start)/60, 2))
     return events, tokens, fmt
 
 

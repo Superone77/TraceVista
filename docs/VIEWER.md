@@ -6,15 +6,15 @@
 ## 打开
 
 直接打开[云端 TraceVista](https://tracevista.pages.dev/)，点击“Import trajectory”选择完整的 `.agent-state.json`。
-原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#5-用-tracevista-skill-生成和修改轨迹)。首页“View examples”展开案例列表，点击名称后打开案例。
+原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#bring-your-own-trajectory)。首页“View examples”展开案例列表，点击名称后打开案例。
 
 本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
 
-打开轨迹后默认使用层级视图，标题和状态统计位于内容顶部。右上角 Map view / Hierarchy view 切换关系图与层级视图，Details 和 Chat 在两种视图中均可使用；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。
+打开轨迹后默认使用层级视图，顶部只保留任务标题，Run overview 默认展开。右上角 Map view / Hierarchy view 切换关系图与层级视图，Details 和 Chat 在两种视图中均可使用；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。
 
-内置示例：`?example=kda-w8a16-r1`；由 `viewer/public/examples/index.json` 登记。
+内置示例：`?example=pi-agent-lora`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
-生产构建只打包内置示例，排除 local-data。KDA W8A16 是当前获准公开的内置示例。
+生产构建只打包内置示例，排除 local-data。当前案例由公开案例目录统一登记。
 
 ## 原地逐层展开（默认）
 
@@ -162,7 +162,7 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 
 仓库根目录：`pnpm test`，`pnpm build`。
 覆盖四层投影、跨层位置保持、跨分支连接、原文完整性与顺序、旧格式兼容、无效输入、
-示例路径以及 KDA 完整导出文件的原文完整性。浏览器内仍需检查真实缩放、滚动与卡片导航。
+示例路径以及 Pi Agent 完整导出文件的原文完整性。浏览器内仍需检查真实缩放、滚动与卡片导航。
 
 ## Generic structure and evidence (optional v1 observations)
 
@@ -189,7 +189,7 @@ outcome categories. They cannot prove that an analyst's semantic interpretation 
 Source evidence remains the authority. Guide/source recognition is authored by the converter,
 not guessed from keyword mentions by the renderer. Existing v1 files without this layer work.
 
-Only the authorized KDA W8A16 example is bundled. Synthetic data under `viewer/scripts/fixtures/` is
+Only the approved complete exports listed in the example catalog are bundled. Synthetic data under `viewer/scripts/fixtures/` is
 used only by tests. Ordinary real imports stay in ignored local-data. The viewer contains no
 agent/task-specific interpretation rules.
 
@@ -205,7 +205,7 @@ agent/task-specific interpretation rules.
 
 默认流程是生成并验证完整 `.agent-state.json`，然后在用户浏览器的 [TraceVista](https://tracevista.pages.dev/) 中点击“Import trajectory”，选择本次生成的文件。有文件选择能力的浏览器工具可以由 agent 完成这一步，再检查状态总览、关键转向和原始记录。
 
-无法操作浏览器时，agent 交付完整 JSON 和手动导入步骤，并说明尚未检查实际渲染。首页地址不会保存某条轨迹；重新打开时选择保存的 JSON。KDA 示例用于了解界面，当前文件的检查需要实际导入该文件。
+无法操作浏览器时，agent 交付完整 JSON 和手动导入步骤，并说明尚未检查实际渲染。首页地址不会保存某条轨迹；重新打开时选择保存的 JSON。Pi Agent 示例用于了解界面，当前文件的检查需要实际导入该文件。
 
 `create_view.py` 保留为显式选择的本地预览工具：它启动本机服务，在页面中加载所选查看器并传入完整文件。返回的 localhost URL 仅在同一台机器、服务运行期间有效。用法及导入协议见 [打开方式](../skills/tracevista-skill/references/opening.md)。
 
@@ -223,4 +223,4 @@ Canvas card typography remains separate in `trajectory.css`: semantic zoom conti
 
 The landing page has one **View examples** button. Hover, focus or click opens a named list; Escape or clicking outside closes it. Entries show their title and optional agent, task and date. The small catalog is bundled with the interface; full trajectory JSON is fetched only after an entry is selected.
 
-`viewer/public/examples/index.json` lists the approved public examples. Update the catalog and its complete JSON files together, then rebuild and deploy. Tests reject unlisted files in the public example directory. The current entry is **Kernel Design Agent (KDA) · W8A16 · 2026-10-02**, with English analyst annotations and unchanged source evidence.
+`viewer/public/examples/index.json` lists the approved public examples. Update the catalog and its complete JSON files together, then rebuild and deploy. Tests reject unlisted files in the public example directory. The library contains **Pi Agent · Kernel Optimization**, **PostTrainBench**, **InferenceBench**, **SWE-rebench**, and **Tongyi DeepResearch · Literature Research**, with English analyst annotations and unchanged source evidence. The homepage lists the name, agent and task without dates. Each run overview introduces its task and recorded configuration.

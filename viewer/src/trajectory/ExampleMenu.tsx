@@ -6,7 +6,6 @@ interface ExampleEntry {
   title: string;
   agent?: string;
   task?: string;
-  date?: string;
 }
 
 export default function ExampleMenu({ examples, loading = false }: { examples: ExampleEntry[]; loading?: boolean }) {
@@ -74,7 +73,7 @@ export default function ExampleMenu({ examples, loading = false }: { examples: E
     </button>
     <nav ref={panel} id={panelId} className="example-menu-panel" aria-label="Example trajectories" hidden={!open}>
       <ul className="example-menu-list">{examples.map(example => {
-        const metadata = [example.agent, example.task, example.date].filter(Boolean).join(' · ');
+        const metadata = [example.agent, example.task].filter(Boolean).join(' · ');
         return <li key={example.id}><a href={`?example=${encodeURIComponent(example.id)}`}>
           <span className="example-menu-title">{example.title}</span>
           {metadata && <span className="example-menu-meta">{metadata}</span>}
