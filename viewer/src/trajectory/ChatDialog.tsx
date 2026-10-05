@@ -33,7 +33,8 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const [manualModel, setManualModel] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [busy, setBusy] = useState<AbortController | null>(null);
-  const [showSettings, setShowSettings] = useState(() => !requestReady(settings));
+  // Settings stay folded until asked for: an unconfigured chat shows one Connect card instead of a form.
+  const [showSettings, setShowSettings] = useState(false);
   const [probe, setProbe] = useState<{ busy: boolean; text: string; error?: boolean }>({ busy: false, text: '' });
   const [status, setStatus] = useState<StreamStatus | SmartStatus>('waiting');
   const [waitSeconds, setWaitSeconds] = useState(0);
@@ -183,9 +184,11 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
 
   return <section className="chat-dialog nodrag nopan nowheel" aria-label="Ask about this trajectory">
     <header><b>Ask about this trajectory</b><span>
-      <button onClick={() => setShowSettings(v => !v)} aria-pressed={showSettings}>API settings</button>
-      <button onClick={exportChat} disabled={!turns.length}>Export</button>
-      <button onClick={() => { setTurns([]); onCited(new Set()); }} disabled={!turns.length || !!busy}>Clear</button>
+      <button className="chat-model-button" onClick={() => setShowSettings(v => !v)} aria-pressed={showSettings} title="Model and API settings">{ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : 'Connect a model'}</button>
+      <details className="chat-more"><summary aria-label="More chat actions">⋯</summary><div>
+        <button onClick={exportChat} disabled={!turns.length}>Export conversation</button>
+        <button onClick={() => { setTurns([]); onCited(new Set()); }} disabled={!turns.length || !!busy}>Clear conversation</button>
+      </div></details>
       <button onClick={close} aria-label="Close chat">×</button></span></header>
     {showSettings && <fieldset className="chat-settings" disabled={locked}>
       <label>Provider<select aria-label="Model provider" value={preset} onChange={e => editConnection(switchPreset(settings, e.target.value))}>
@@ -212,6 +215,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       <p>Your selected trajectory context is sent directly to {host || 'the configured API'} when you ask a question. The key stays in this browser and is used to authenticate with that API.</p>
     </fieldset>}
     <div className="chat-list" ref={list}>
+      {!ready && !showSettings && <div className="chat-connect"><p>Connect a model to ask questions. Requests go from this browser directly to the provider you choose.</p><button onClick={() => setShowSettings(true)}>Connect a model</button></div>}
       {!turns.length && <div className="chat-empty"><p>Ask about the full trajectory, or select a card on the map to ask about that step.</p>
         {['Why was the final version chosen?', 'Which evidence changed the agent’s direction?', 'Which conclusions are supported by independent checks?'].map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
       {turns.map(t => <div key={t.id} className={`chat-turn ${t.role}`}>
@@ -234,6 +238,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     </div>
     <footer>
       <div className="chat-focus">{focus ? <><span>Focus</span><button onClick={() => jump(focus.id)}>{focus.ladder?.topic ?? focus.title}</button><button onClick={clearFocus} aria-label="Switch to the full trajectory">×</button></> : <span>Full trajectory · Select a card to focus on that step</span>}</div>
+      <details className="chat-context-fold"><summary>Context · {smartPlan ? 'Smart context' : contextLabels[bundle.mode]} · ~{preview.estimatedTokens.toLocaleString()} tokens</summary>
       <div className="chat-context-options">
         <select aria-label="Context scope" value={smartPlan ? 'smart' : bundle.mode} disabled={locked} onChange={e => {
           if (e.target.value === 'smart') setContextStrategy('smart');
@@ -270,9 +275,10 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
             : <details><summary>Inspect records to be sent</summary>{bundle.items.filter(i => i.event).map(i => <div key={i.event}><button className="cite event" onClick={() => evidence(i.event!)}>{i.event}</button> {i.layer === 'material' ? 'Current node' : 'Earlier / linked evidence'} · {i.omittedChars ? `${i.omittedChars} characters omitted` : 'Full original text'}</div>)}</details>}
         </div>}
       </details>
+      </details>
       {preview.blocked && <div className="chat-error">TraceVista local check: {smartPlan ? 'first-round summaries and index' : 'input'} estimated at {preview.estimatedTokens.toLocaleString()} tokens; local allowance {inputTokens.toLocaleString()}. The allowance is too small or invalid, so nothing has been sent. {smartPlan ? 'Select an earlier action to narrow the candidate scope, or adjust the allowance.' : 'Try Smart context, Current node only, or adjust the allowance.'}</div>}
       <div className="chat-input">
-        <textarea value={draft} rows={2} placeholder={ready ? 'Ask about this trajectory… (Enter to send, Shift+Enter for a new line)' : 'Set the model and key in API settings first'} onChange={e => setDraft(e.target.value)}
+        <textarea value={draft} rows={2} placeholder={ready ? 'Ask about this trajectory… (Enter to send, Shift+Enter for a new line)' : 'Connect a model first'} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
         {busy ? <button onClick={() => busy.abort()}>Stop</button> : <button className="chat-send" onClick={() => void send()} disabled={!ready || locked || !draft.trim() || preview.blocked}>Send</button>}
       </div>

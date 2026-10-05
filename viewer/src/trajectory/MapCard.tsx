@@ -7,18 +7,19 @@ import ZoomText, { LadderMorph, type Quote } from './ZoomText';
 import { labels } from './labels';
 import RawRecords from './RawRecords';
 
-export interface Landmark { id: string; move: Move; label: string }
+export interface Landmark { id: string; move: Move; label: string; n: number }
 export type CardData = Record<string, unknown> & {
   p: MapNode; tier: Tier; observations: Observation[]; actions: Action[]; branches: number; ordinal: number;
   tools: string[]; records: RawEvent[]; enter: (id: string) => void; inspect: (id: string) => void;
   ladder: Ladder | null; quotes: Quote[]; landmarks: Landmark[]; fingerprint: ToolMark[]; routine: boolean;
   expand: (foldId: string) => void; evidence: (eventId: string) => void; cited?: boolean;
+  offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: string;
 };
 export type CardNode = Node<CardData, 'trajectory'>;
 
-function MoveStamp({ move }: { move?: Move }) {
+function MoveStamp({ move, n }: { move?: Move; n?: number }) {
   if (!move) return null;
-  return <span className="move-stamp" style={{ '--move': moveColors[move] } as CSSProperties}>{moveGlyphs[move]} {moveLabels[move]}</span>;
+  return <span className="move-stamp" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{moveGlyphs[move]} {moveLabels[move]}</span>;
 }
 function Fingerprint({ marks }: { marks: ToolMark[] }) {
   if (!marks.length) return null;
@@ -26,7 +27,7 @@ function Fingerprint({ marks }: { marks: ToolMark[] }) {
 }
 
 export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
-  const { p, tier, observations, actions, branches, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, fingerprint, routine, expand, evidence, cited } = data;
+  const { p, tier, observations, actions, branches, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, fingerprint, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix } = data;
   const handles = <><Handle type="target" position={Position.Top} id="top" /><Handle type="target" position={Position.Left} id="left" />
     <Handle type="source" position={Position.Top} id="link-out" style={{ left: '70%' }} /></>;
   const outHandles = <><Handle type="source" position={Position.Bottom} id="bottom" /><Handle type="source" position={Position.Right} id="right" /></>;
@@ -56,25 +57,25 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const plaque = (kind: keyof typeof FONTS) => ladder
     ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} min={kind === 'branch' ? 2 : 0} quotes={quotes} onEvidence={evidence} /></div>
     : <h2><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button></h2>;
-  return <div className={`map-card ${p.kind} tier-${tier} ${selected ? 'chosen' : ''} ${routine ? 'routine' : ''} ${move ? `move-${move}` : ''} ${cited ? 'cited' : ''}`} style={style} data-kind={p.kind} data-entity={p.id}>
+  return <div className={`map-card ${p.kind} tier-${tier} ${selected ? 'chosen' : ''} ${routine ? 'routine' : ''} ${move ? `move-${move}` : ''} ${cited ? 'cited' : ''} ${offMain ? 'off-main' : ''} ${delivered ? 'delivered' : ''}`} style={style} data-kind={p.kind} data-entity={p.id}>
     {handles}
     {p.kind === 'state' ? <>
       <div className={tier === 'states' ? 'state-map-summary' : 'state-map-heading'}>
-        <div className="state-eyebrow"><span className="state-name">S{ordinal} · {p.item.title}</span><span>{branches} stages · {actions.length} actions</span></div>
+        <div className="state-eyebrow"><span className="state-name">S{ordinal} · {p.item.title}{delivered && <b className="delivered-badge">Delivered</b>}{offMain && <span className="side-badge">Side branch</span>}</span><span>{actions.length} action{actions.length === 1 ? '' : 's'}{mix ? ` · ${mix}` : ''}</span></div>
         {tier === 'states' && <button className="nodrag nopan compact-state-reading" onClick={e => { e.stopPropagation(); inspect(p.id); }}><span className="compact-state-id">S{ordinal}</span><span>{ladder ? levelText(ladder, 1) : p.item.title}</span></button>}
         {tier === 'states' ? <button className="nodrag nopan state-open plaque" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{ladder ? <ZoomText ladder={ladder} fonts={FONTS.state} max={2} /> : p.item.title}</button>
           : ladder ? <div className="heading-plaque"><LadderMorph ladder={ladder} level={2} fontSize={FONTS.heading[2]} /></div> : <><h2><button className="nodrag nopan state-open" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{p.item.title}</button></h2><p>{p.item.summary}</p></>}
-        <div className="state-assessment"><b>{visual?.label}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ Restored version</span>}{tier === 'states' && <button className="nodrag nopan enter-state" onClick={e => { e.stopPropagation(); enter(p.id); }}>View trace ↗</button>}</div>
-        {tier === 'states' && landmarks.length > 0 && <div className="landmarks nodrag nopan">{landmarks.slice(0, 6).map(l => <button key={l.id} style={{ '--move': moveColors[l.move] } as CSSProperties} title={moveLabels[l.move]} onClick={e => { e.stopPropagation(); enter(l.id); }}>{moveGlyphs[l.move]} {l.label}</button>)}{landmarks.length > 6 && <span>+{landmarks.length - 6}</span>}</div>}
+        <div className="state-assessment"><b hidden={!state.assessment}>{visual?.label}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ Restored version</span>}{tier === 'states' && <button className="nodrag nopan enter-state" onClick={e => { e.stopPropagation(); enter(p.id); }}>View trace ↗</button>}</div>
+        {tier === 'states' && landmarks.length > 0 && <div className="landmarks nodrag nopan">{landmarks.slice(0, 6).map(l => <button key={l.id} style={{ '--move': moveColors[l.move] } as CSSProperties} title={`${l.n}. ${moveLabels[l.move]}`} onClick={e => { e.stopPropagation(); enter(l.id); }}><b className="decision-no">{l.n}</b>{moveGlyphs[l.move]} {l.label}</button>)}{landmarks.length > 6 && <span>+{landmarks.length - 6}</span>}</div>}
         {tier === 'states' && !ladder && <>{verdicts}{badges}<p>{p.item.summary}</p></>}
       </div>
       {tier !== 'states' && branches === 0 && <div className="empty-state">No work stages recorded in this state</div>}
     </> : p.kind === 'action' && tier === 'raw' ? <>
-      <div className="raw-action-heading"><span style={{ color }}>{action.behavior}</span><MoveStamp move={move} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{records.length} raw records</span></div>
+      <div className="raw-action-heading"><span style={{ color }}>{action.behavior}</span><MoveStamp move={move} n={decisionNo} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{records.length} raw records</span></div>
       {skillBadges}
       <RawRecords records={records} />
     </> : <>
-      <div className="card-top"><span>{p.kind === 'action' ? action.behavior : routine ? 'Routine work' : 'Work stage'}<MoveStamp move={move} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? labels[action.actor] ?? action.actor : labels[(p.item as Branch).status]}</span></div>
+      <div className="card-top"><span>{p.kind === 'action' ? action.behavior : routine ? 'Routine work' : 'Work stage'}<MoveStamp move={move} n={decisionNo} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? labels[action.actor] ?? action.actor : labels[(p.item as Branch).status]}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
       {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
       {p.kind === 'action' && skillBadges}{verdicts}

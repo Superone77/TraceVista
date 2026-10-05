@@ -1,6 +1,8 @@
-# 可视化与界面改进 · 第一批（分支 feat/visual-ui-pass）
+# 可视化与界面改进（分支 feat/visual-ui-pass）
 
-2026-10-05。基于 main 9f97436。只改查看器，不改格式、转换 skill 和示例数据。
+基于 main 9f97436。只改查看器，不改格式、转换 skill 和示例数据。
+
+# 第一批 · 2026-10-05
 
 ## 伸缩文字（ladder）断行
 - 修正卡片文字以「: , .」开头的问题，例如「Python loop baseline」后一行以「, 3 to 17 ms」开头。
@@ -48,3 +50,69 @@
 
 ## 与 PR #10 的关系
 - PR #10（层级树默认视图）同样改动 `StateReader.tsx` 和 `interface.css`，两者合并时会有冲突，需要按先合入的一方调整另一方。
+
+# 第二批 · 2026-10-06
+
+目标：视觉上有重点；简化；展开用伸缩文字式的过渡，不让信息一次压过来；帮读者找到关键决策点、看懂每一步主要做了什么。所有规则只依据图本身的结构，不针对任何 agent 或任务。
+
+## 交付主线（地图）
+- 时间顺序的终点（没有后续转换的状态）记为交付状态，状态卡标「Delivered」并加紫色外圈。
+- 从交付状态沿当前状态关系往上追，得到交付主线。主线连线加粗；主线外的状态和它内部的阶段、动作卡变淡，标「Side branch」，鼠标指向或选中时恢复。
+- 线性运行（所有状态都在主线上）不画支线，不做淡化。
+- 首屏按主线的横向跨度取景，缩放不低于 26%。PostTrainBench 现在一打开就能看到 S0、S4、S5 到交付的 S10。
+- 涉及 `story.ts`（新）、`StateReader.tsx`、`MapCard.tsx`、`story.css`（新）。
+
+## 关键决策统一编号
+- 每个状态取工作阶段层的排除、决定、转向、未决；不足两个时补动作层的，最多四个；按运行先后编号。
+- 同一编号出现在左栏、状态卡上的决策标签、阶段卡和动作卡的标记、详情面板里。
+- 状态编号 S0、S1… 改为按状态出现的先后，不再随版本树排布变化（原来 PostTrainBench 的 s10 显示为 S8）。
+
+## 左栏 Run overview（替换浮在地图上的概览面板）
+- 固定在地图左侧，各层都在，不再遮挡卡片。
+- 历程段落只显示前两句，「More」在原处展开其余部分和它引用的节点。
+- 交付状态一张卡片，点击定位。
+- 「Steps and key decisions」：每个状态一行，写它得出了什么、做了多少动作、主要是哪两类行为（如「38 actions · mostly Edit & Verify」），下面是编号的关键决策，每条一行。
+- 点击决策：理由和原文摘句在这一行下面展开，地图跳到它所在的阶段层或动作层，单个动作居中显示。在地图上选中决策时，左栏同步展开并滚到那一行。
+- 「Hide」收起，画布左上角「Overview」重新打开；画布窄于 600px 时自动收起（例如 1280 宽的窗口打开详情时），变宽后恢复。
+- 涉及 `StoryRail.tsx`（新）、`Stretch.tsx`（新）、`StateReader.tsx`、`story.css`。
+
+## 卡片简化
+- 状态卡右上角的「N stages · M actions」改为「M actions · mostly A & B」，说明这一步主要在做什么。
+- 没有测量的状态不再显示「No comparable measurement」。
+- 工作阶段卡底部的动作计数从约 6px 放大到约 9px（屏幕尺寸）。
+- 动作数为 1 时写「1 action」。
+- 涉及 `MapCard.tsx`、`story.css`。
+
+## 详情面板分层
+- 先给核心：这一步新增了什么、测量结果或行为类别、这一步里的关键决策（带编号）、支撑它的观察与它影响的决定。
+- 其余内容各自折叠，点击在原处展开（高度与透明度一起过渡）：What happened、Quoted evidence、Results and comparison、Version origin、Phases and actions、Classification basis、Tracked state、Execution order、Related actions、Structure and evidence、Source records、What this graph tracks。
+- 从证据编号打开的原文显示在核心内容下方，不用滚到底。
+- 未选中卡片时的总览页（Structure & evidence）保持原有内容。
+- 涉及 `Inspector.tsx`、`story.css`。
+
+## 对话框简化
+- 未连接模型时，不再一打开就铺满 API 设置表单，只显示一张「Connect a model」卡片。
+- 标题栏只留：模型按钮（连接后显示模型名，点击展开设置）、「⋯」菜单（导出、清空）、关闭。
+- 上下文范围、额度两行和请求预览折叠成一行「Context · Smart context · ~N tokens」，点击展开。
+- 对话逻辑、上下文选择、额度检查都没有改。
+- 涉及 `ChatDialog.tsx`、`story.css`。
+
+## 过渡与图例
+- 切换层级时，新出现的卡片在落点淡入，地图像是在原处展开而不是突然切换。
+- 左栏的「More」、决策展开、详情的折叠区块都用同一种高度与透明度的过渡。
+- 系统设置「减少动态效果」时不做动画。
+- 图例默认收成左下角的「Legend」按钮，不再压住卡片；状态层图例加「Delivered line」。
+- 涉及 `StateReader.tsx`、`story.css`。
+
+## 文档
+- `docs/VIEWER.md`：更新交付主线、状态卡、详情、关键决策编号、左栏、过渡、图例和对话框的说明。
+
+## 验证
+- `pnpm test` 全部通过，`pnpm build` 通过。
+- 浏览器实测（Chrome）：1500×920 下 Pi Agent、PostTrainBench、InferenceBench 的总览，Pi 的左栏决策点击（阶段层和动作层各一个）、详情、对话；1280×800 下左栏随详情自动收起和恢复。无页面报错。
+- 未测：真实模型对话（没有 key）、触控板手势、手机布局。
+
+## 本批未处理
+- 卡片固定高度造成的空白（工作阶段卡）。
+- 原来的浮动概览面板（`.journey`）样式还留在 `trajectory.css` 里，已不再使用。
+- 与 PR #10 的冲突仍需按先合入的一方调整。
