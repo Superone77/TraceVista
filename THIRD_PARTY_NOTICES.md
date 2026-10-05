@@ -93,3 +93,31 @@ Modifications: complete published messages, tool definitions, patch and outcome 
 are repackaged with English TraceVista annotations and evidence-linked state/action maps.
 Agent self-tests and the published task verdict are distinguished. This visualization was
 created on 2026-10-04; it does not imply endorsement by the dataset or software authors.
+
+### LiteResearcher SFT trajectories
+
+The bundled `literesearcher-affiliations.agent-state.json` is adapted from
+[LiteResearcher-SFT-Data](https://huggingface.co/datasets/simplex-ai-inc/LiteResearcher-SFT-Data),
+published by simplex-ai-inc under Apache License 2.0. The same license text is preserved at
+[LICENSES/PostTrainBench-Apache-2.0.txt](LICENSES/PostTrainBench-Apache-2.0.txt).
+
+Source revision: `5c8caa17121e216f8ad8f928e6a8d4f51d3fefee`, configuration `default`,
+split `train`, zero-based row `60000`, question pool `MiroRL_GenQA`.
+[Pinned dataset card](https://huggingface.co/datasets/simplex-ai-inc/LiteResearcher-SFT-Data/blob/5c8caa17121e216f8ad8f928e6a8d4f51d3fefee/README.md)
+and [source row](https://huggingface.co/datasets/simplex-ai-inc/LiteResearcher-SFT-Data/viewer/default/train?row=60000).
+Paper: [LiteResearcher: A Scalable Agentic RL Training Framework for Deep Research Agent](https://arxiv.org/html/2604.17931v1),
+by Wanli Li, Bince Qu, Bo Pan, Jianyu Zhang, Zheng Liu, Pan Zhang, Wei Chen and Bo Zhang.
+
+The paper attributes the SFT trajectories to a Tongyi DeepResearch teacher using online
+tools. This row is a released teacher conversation, not a LiteResearcher-4B execution.
+Its task is to compare the affiliations of Claudia Hohmann and Felix Tettenborn in two
+December 2020 journal articles. The published final answer names Fraunhofer ISI.
+
+Modifications: all 15 source messages are retained in one self-contained TraceVista export,
+with English state, work-stage and action annotations. The XML thinking, tool-call,
+tool-response and answer spans are separated into 22 events without changing their text.
+Tool observations originally encoded as user turns are displayed as results. Call identifiers
+are explicitly marked as adapter-created pairs; native IDs, exact model checkpoint,
+hardware, budgets, timing and independent answer grading are not supplied by the row.
+The answer-document state scope records only the final response creation. Selected on
+2026-10-05; no underlying research episode was rerun.
