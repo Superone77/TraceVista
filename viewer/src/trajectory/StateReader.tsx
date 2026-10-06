@@ -23,6 +23,7 @@ import { datasetRequest } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 
 const nodeTypes = { trajectory: MapCard };
+const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, RAIL_MAX = 760, MAP_MIN = 620;
 const edgeTypes = { routed: RoutedEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
@@ -53,6 +54,20 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const [decisionsOnly, setDecisionsOnly] = useState(readingStatus.ready);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
   const [journeyOpen, setJourneyOpen] = useState(true);
+  // The story rail's width: dragged by the reader, kept in this browser. The map keeps at least MAP_MIN beside it.
+  const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
+  const [railWidth, setRailWidth] = useState<number>(() => { try { const v = Number(localStorage.getItem(RAIL_STORE)); return v > 0 ? v : railDefault(); } catch { return railDefault(); } });
+  const railRef = useRef(railWidth); railRef.current = railWidth;
+  const railMax = () => { const map = canvasRef.current?.getBoundingClientRect().width ?? 0; return Math.max(RAIL_MIN, Math.min(RAIL_MAX, railRef.current + map - MAP_MIN)); };
+  const resizeRail = useCallback((px: number) => setRailWidth(Math.round(Math.max(RAIL_MIN, Math.min(railMax(), px)))), []);
+  const storeRail = (w: number | null) => { try { if (w == null) localStorage.removeItem(RAIL_STORE); else localStorage.setItem(RAIL_STORE, String(w)); } catch { /* private mode: the width lasts for this page */ } };
+  // Kept whenever it changes, except mid-drag; a drag is kept when it ends. Double-click returns to the default.
+  useEffect(() => { if (!document.body.classList.contains('resizing-story')) storeRail(railWidth); }, [railWidth]);
+  const saveRail = useCallback((reset?: boolean) => {
+    if (!reset) { storeRail(railRef.current); return; }
+    setRailWidth(Math.min(railDefault(), railMax()));
+    storeRail(null);
+  }, []);
   const [legendOpen, setLegendOpen] = useState(false);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -144,9 +159,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     const observer = new ResizeObserver(() => {
       const box = el.getBoundingClientRect();
       // The run overview covers a third of a narrow map: tuck it away while a side panel takes the room, bring it back after.
-      const railPx = 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
-      if (box.width < 600) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
-      else if (journeyTucked.current && box.width - railPx >= 640) { journeyTucked.current = false; setJourneyOpen(true); }
+      if (box.width < 600 && !document.body.classList.contains('resizing-story')) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
+      else if (journeyTucked.current && box.width - railRef.current >= 640) { journeyTucked.current = false; setJourneyOpen(true); }
       if (overviewPinned.current) overview();
       else if (last.width > 0 && last.height > 0 && (box.width !== last.width || box.height !== last.height)) {
         // Keep what was in the middle of the map in the middle, then make sure the selected card is still on screen.
@@ -349,7 +363,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} onFly={fly}
-      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }} />}
+      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
+      width={{ now: railWidth, min: RAIL_MIN, max: journeyOpen ? railMax() : RAIL_MAX }} onResize={resizeRail} onResizeEnd={saveRail} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>

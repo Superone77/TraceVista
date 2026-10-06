@@ -132,3 +132,11 @@
 .compact-landmarks { display: flex; flex-wrap: wrap; gap: calc(4px / var(--map-zoom)); margin-top: calc(5px / var(--map-zoom)); overflow: hidden; max-height: calc(22px / var(--map-zoom)); flex-shrink: 0; }
 .compact-landmarks button { font-size: calc(9.5px / var(--map-zoom)); line-height: 1.3; padding: calc(1px / var(--map-zoom)) calc(5px / var(--map-zoom)); border: calc(1px / var(--map-zoom)) solid color-mix(in srgb, var(--move) 45%, white); border-radius: calc(4px / var(--map-zoom)); background: var(--surface); color: var(--move); white-space: nowrap; }
 .compact-landmarks .decision-no { font-size: .85em; }
+
+/* The story rail's right edge: drag, arrow keys, or double-click to reset. */
+.story-resize { position: absolute; top: 0; right: -4px; bottom: 0; width: 8px; z-index: 3; cursor: col-resize; touch-action: none; }
+.story-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+.story-resize:hover::after, .story-resize:focus-visible::after, body.resizing-story .story-resize::after { background: var(--accent, #3b5bdb); }
+.story-resize:focus-visible { outline: none; }
+body.resizing-story { cursor: col-resize; user-select: none; }
+body.resizing-story .react-flow__pane { cursor: col-resize; }

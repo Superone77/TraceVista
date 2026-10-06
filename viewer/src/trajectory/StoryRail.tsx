@@ -3,6 +3,7 @@
 // the tool returned. Opening a sentence flies the map to the same place at the matching depth; a card picked on the
 // map opens the text down to it. Only the graph's own fields are used: ladders, moves, behaviors and raw records.
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import type React from 'react';
 import { entityColor, moveColors, moveGlyphs, type Action, type Branch, type Entity, type Graph, type Move, type State } from './model';
 import { sentencesOf } from './ladder';
 import { shortName } from './story';
@@ -28,9 +29,10 @@ function Verb({ move, n }: { move?: Move | null; n?: number }) {
   return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{t(verbs[move])}</span>;
 }
 
-export default function StoryRail({ graph, main, delivered, decisionNo, selected, onFly, onCite, onEvidence, onHide }: {
+export default function StoryRail({ graph, main, delivered, decisionNo, selected, onFly, onCite, onEvidence, onHide, width, onResize, onResizeEnd }: {
   graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
   onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
+  width: { now: number; min: number; max: number }; onResize: (px: number) => void; onResizeEnd: (reset?: boolean) => void;
 }) {
   const { t } = useLang();
   storyZh = graph.language === 'zh';
@@ -123,7 +125,27 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     </li>;
   };
 
-  return <aside className="story-rail" ref={root} aria-label={t('The run, as a story to stretch')}>
+  // Drag the right edge to resize; arrow keys move it by 16px (Shift: 64px); double-click returns to the default width.
+  const drag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget, x0 = e.clientX, w0 = width.now;
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add('resizing-story');
+    const move = (ev: PointerEvent) => onResize(w0 + ev.clientX - x0);
+    const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); document.body.classList.remove('resizing-story'); onResizeEnd(); };
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+  };
+  const keys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 64 : 16;
+    const next = e.key === 'ArrowLeft' ? width.now - step : e.key === 'ArrowRight' ? width.now + step : e.key === 'Home' ? width.min : e.key === 'End' ? width.max : null;
+    if (next == null) return;
+    e.preventDefault(); onResize(next); onResizeEnd();
+  };
+  return <aside className="story-rail" ref={root} style={{ width: width.now }} aria-label={t('The run, as a story to stretch')}>
+    <div className="story-resize" role="separator" aria-orientation="vertical" tabIndex={0} aria-label={t('Resize the story')} title={t('Resize the story')}
+      aria-valuenow={Math.round(width.now)} aria-valuemin={Math.round(width.min)} aria-valuemax={Math.round(width.max)}
+      onPointerDown={drag} onKeyDown={keys} onDoubleClick={() => onResizeEnd(true)} />
     <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')} title={t('Hide the story')}>‹</button></div>
     <div className="story-body">
       <p className="story-kicker">{graph.title}</p>
