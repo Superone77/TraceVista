@@ -55,9 +55,7 @@ export function keyDecisions(g: Graph): KeyDecision[] {
   return out;
 }
 
-/** What a stretch of work mostly did, in words: its two most frequent behaviors. */
-export function workMix(actions: Action[]): string {
-  const counts = behaviors.map(b => [b, actions.filter(a => a.behavior === b).length] as [Behavior, number]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-  if (!counts.length) return '';
-  return `mostly ${counts.slice(0, 2).map(([b]) => b).join(' & ')}`;
+/** What a stretch of work mostly did: its two most frequent behaviors (worded by the reader's language). */
+export function workMix(actions: Action[]): Behavior[] {
+  return behaviors.map(b => [b, actions.filter(a => a.behavior === b).length] as [Behavior, number]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([b]) => b);
 }

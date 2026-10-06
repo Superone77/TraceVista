@@ -7,6 +7,7 @@ import { entityColor, moveColors, moveGlyphs, type Action, type Branch, type Ent
 import { sentencesOf } from './ladder';
 import { shortName } from './story';
 import Stretch from './Stretch';
+import { useLang } from './i18n';
 
 export type Depth = 'states' | 'branches' | 'actions' | 'raw';
 const verbs: Record<Move, string> = { pivot: 'Changed course', ruleout: 'Ruled out', decision: 'Decided', open: 'Left open', insight: 'Found' };
@@ -21,13 +22,15 @@ function Sentence({ id, open, onToggle, count, className = '', children }: { id:
 }
 function Verb({ move, n }: { move?: Move | null; n?: number }) {
   if (!move) return null;
-  return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{verbs[move]}</span>;
+  const { t } = useLang();
+  return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{t(verbs[move])}</span>;
 }
 
 export default function StoryRail({ graph, main, delivered, decisionNo, selected, onFly, onCite, onEvidence, onHide }: {
   graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
   onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
 }) {
+  const { t } = useLang();
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [mounted, setMounted] = useState<Set<string>>(() => new Set());
   const [more, setMore] = useState(false);
@@ -74,13 +77,13 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   };
   const evidence = (a: Action) => {
     const q = evidenceOf(a);
-    if (!q) return <p className="story-note">No quoted record for this step.</p>;
-    const who = q.kind === 'note' || q.kind === 'message' ? 'The agent wrote' : q.kind === 'result' || q.kind === 'tool_result' ? 'The tool returned' : 'Recorded';
+    if (!q) return <p className="story-note">{t('No quoted record for this step.')}</p>;
+    const who = t(q.kind === 'note' || q.kind === 'message' ? 'The agent wrote' : q.kind === 'result' || q.kind === 'tool_result' ? 'The tool returned' : 'Recorded');
     return <blockquote className="story-quote"><span className="story-who">{who}<button onClick={() => onEvidence(q.event)}>{q.event.split(':').pop()} ↗</button></span>{q.text}</blockquote>;
   };
   const actionSentence = (a: Action) => <div className="story-p" key={a.id}>
-    <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count="quote">
-      <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{doing[a.behavior] ?? a.behavior}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
+    <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count={t('quote')}>
+      <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{t(doing[a.behavior] ?? a.behavior)}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
     </Sentence>
     {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{evidence(a)}</Stretch>}
   </div>;
@@ -89,16 +92,16 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const shown = acts.filter(a => a.move || a.ladder), quiet = acts.filter(a => !(a.move || a.ladder));
     const quietId = `${b.id}::routine`;
     return <div className="story-p" key={b.id}>
-      <Sentence id={b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? `${acts.length} step${acts.length > 1 ? 's' : ''}` : undefined} className={b.move ? '' : 'routine'}>
+      <Sentence id={b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? t(acts.length > 1 ? '{n} steps' : '{n} step', { n: acts.length }) : undefined} className={b.move ? '' : 'routine'}>
         <Verb move={b.move} n={decisionNo.get(b.id)} />{sentence(b.ladder?.takeaway ?? b.title)}{b.ladder?.reason && <> <span className="story-reason">{sentence(b.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(b.id) && <Stretch open={open.has(b.id)}><div className="story-layer">
         {shown.map(actionSentence)}
         {quiet.length > 0 && <div className="story-p">
-          <Sentence id={quietId} open={open.has(quietId)} onToggle={() => open.has(quietId) ? setOpen(s => { const n = new Set(s); n.delete(quietId); return n; }) : openAll([quietId])} className="routine">…and {quiet.length} routine step{quiet.length > 1 ? 's' : ''}.</Sentence>
+          <Sentence id={quietId} open={open.has(quietId)} onToggle={() => open.has(quietId) ? setOpen(s => { const n = new Set(s); n.delete(quietId); return n; }) : openAll([quietId])} className="routine">{t(quiet.length > 1 ? '…and {n} routine steps.' : '…and {n} routine step.', { n: quiet.length })}</Sentence>
           {mounted.has(quietId) && <Stretch open={open.has(quietId)}><div className="story-layer">{quiet.map(actionSentence)}</div></Stretch>}
         </div>}
-        {!acts.length && <p className="story-note">No actions recorded in this phase.</p>}
+        {!acts.length && <p className="story-note">{t('No actions recorded in this phase.')}</p>}
       </div></Stretch>}
     </div>;
   };
@@ -108,27 +111,27 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const lead = s.ladder?.topic ?? shortName(s);
     const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}[:,]?\\s*`, 'i'), '');
     return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
-      <Sentence id={s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? `${phases.length} phase${phases.length > 1 ? 's' : ''}` : undefined}>
-        {side && <span className="story-side">A side attempt. </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
+      <Sentence id={s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? t(phases.length > 1 ? '{n} phases' : '{n} phase', { n: phases.length }) : undefined}>
+        {side && <span className="story-side">{t('A side attempt.')} </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(s.id) && <Stretch open={open.has(s.id)}><div className="story-layer">
-        {phases.length ? phases.map(phase) : <p className="story-note">Nothing more was recorded inside this step.</p>}
+        {phases.length ? phases.map(phase) : <p className="story-note">{t('Nothing more was recorded inside this step.')}</p>}
       </div></Stretch>}
     </li>;
   };
 
-  return <aside className="story-rail" ref={root} aria-label="The run, as a story to stretch">
-    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label="Hide the story">Hide ‹</button></div>
+  return <aside className="story-rail" ref={root} aria-label={t('The run, as a story to stretch')}>
+    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')}>{t('Hide ‹')}</button></div>
     <div className="story-body">
       <p className="story-kicker">{graph.title}</p>
-      <h2>How the agent got there</h2>
-      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>Delivered.</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
+      <h2>{t('How the agent got there')}</h2>
+      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Delivered.')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
       {lead && <div className="story-gist"><p>{lead}</p>
         {(rest || cited.length > 0) && <><Stretch open={more}>{rest && <p>{rest}</p>}
           {cited.length > 0 && <div className="story-cites">{cited.map(e => <button key={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => onCite(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div>}</Stretch>
-          <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{more ? 'Less' : 'More'}</button></>}
+          <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{t(more ? 'Less' : 'More')}</button></>}
       </div>}
-      <p className="story-how">Click a sentence to stretch it into what happened inside; the map flies to the same place. Click it again to fold it back.{sideLine ? ' Hollow steps are side attempts that were left behind.' : ''}</p>
+      <p className="story-how">{t('Click a sentence to stretch it into what happened inside; the map flies to the same place. Click it again to fold it back.')}{sideLine ? ` ${t('Hollow steps are side attempts that were left behind.')}` : ''}</p>
       <ol className="story-text">{graph.states.map(step)}</ol>
     </div>
   </aside>;

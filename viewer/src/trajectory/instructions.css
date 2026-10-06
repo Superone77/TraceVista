@@ -1,4 +1,4 @@
-.welcome.welcome-with-instructions{--welcome-title-size:clamp(4.5rem,8.3vw,10rem);min-height:100svh;justify-content:center;padding:48px 48px calc(48px + 6svh);font-family:Georgia,'Times New Roman',serif}
+.welcome.welcome-with-instructions{--welcome-title-size:clamp(4.5rem,8.3vw,10rem);min-height:100svh;justify-content:center;padding:48px 48px calc(48px + 6svh);font-family:var(--font-sans)}
 .welcome-layout{--welcome-gap:clamp(48px,6vw,112px);width:100%;max-width:1560px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:center;gap:var(--welcome-gap)}
 .welcome-hero{min-width:0;text-align:center}
 .welcome.welcome-with-instructions h1{font-family:inherit;font-size:var(--welcome-title-size);font-weight:400;line-height:1;letter-spacing:-.055em;margin:0 0 34px}
@@ -10,7 +10,7 @@
 .instruction-steps{display:grid;grid-template-columns:1fr;gap:28px}
 .instruction-step{min-width:0;display:flex;flex-direction:column}
 .instruction-step-title{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px}
-.instruction-step-title>span{font-family:Inter,Arial,sans-serif;font-size:.6875rem;font-variant-numeric:tabular-nums;color:var(--text-3);border:1px solid var(--line-strong);border-radius:50%;width:26px;height:26px;display:grid;place-items:center;flex-shrink:0}
+.instruction-step-title>span{font-family:var(--font-sans);font-size:.6875rem;font-variant-numeric:tabular-nums;color:var(--text-3);border:1px solid var(--line-strong);border-radius:50%;width:26px;height:26px;display:grid;place-items:center;flex-shrink:0}
 .instruction-step-title h3{font-size:1.25rem;font-weight:400;margin:0;letter-spacing:-.3px}
 .instruction-copy-block{position:relative;flex:1;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:46px 28px 26px;display:flex;flex-direction:column;justify-content:center}
 .instruction-copy-block>button{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:40px;height:40px;padding:9px;border:0;border-radius:7px;background:transparent;color:var(--text-3)}
@@ -18,6 +18,6 @@
 .instruction-copy-block>button svg{width:21px;height:21px;display:block}
 .instructions .instruction-copy-block>p{margin:0;color:var(--text);font-size:1.0625rem;line-height:1.6;overflow-wrap:anywhere}
 .instruction-copy-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.instruction-copy-error{display:block;margin-top:10px;color:var(--danger-ink);font-family:Inter,Arial,sans-serif;font-size:.75rem}
+.instruction-copy-error{display:block;margin-top:10px;color:var(--danger-ink);font-family:var(--font-sans);font-size:.75rem}
 @media(max-width:1000px){.welcome.welcome-with-instructions{padding:48px 24px}.welcome-layout{grid-template-columns:1fr;gap:56px;max-width:660px}.instructions::before{display:none}}
 @media(max-width:760px){.welcome.welcome-with-instructions{padding-right:22px;padding-left:22px}.instructions{max-width:540px}.instructions>h2{margin-bottom:26px}.instruction-copy-block{padding:44px 22px 22px}.welcome.welcome-with-instructions .welcome-actions button,.welcome.welcome-with-instructions .welcome-example{min-width:156px;min-height:56px;padding:13px 18px}}

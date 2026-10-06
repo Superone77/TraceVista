@@ -9,7 +9,7 @@
 .example-menu-list a { display: grid; gap: .375rem; padding: .875rem; border-radius: .375rem; color: var(--text); text-decoration: none; line-height: 1.5; overflow-wrap: anywhere; }
 .example-menu-list a:hover, .example-menu-list a:focus-visible { background: var(--surface-2); }
 .example-menu-title { font-size: 1rem; }
-.example-menu-meta { font-family: Inter, Arial, sans-serif; font-size: .75rem; color: var(--text-3); }
+.example-menu-meta { font-family:var(--font-sans); font-size: .75rem; color: var(--text-3); }
 @media (max-width: 760px) {
   .welcome.welcome-with-instructions .welcome-actions { position: relative; }
   .example-menu { position: static; }

@@ -8,6 +8,7 @@ const commands=[
  [process.execPath,['viewer/scripts/test-observations.mjs']],
  [process.execPath,['viewer/scripts/test-reading-layer.mjs']],
  [process.execPath,['viewer/scripts/test-ui-language.mjs']],
+ [process.execPath,['viewer/scripts/test-i18n.mjs']],
  [process.execPath,['viewer/scripts/test-chat.mjs']],
  [process.execPath,['viewer/scripts/test-smart-context.mjs']],
  [process.execPath,['viewer/scripts/test-providers.mjs']],

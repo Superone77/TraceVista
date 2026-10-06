@@ -14,6 +14,7 @@ import ExampleMenu from './ExampleMenu';
 import StoryRail, { type Depth } from './StoryRail';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
+import { LangProvider, LangToggle, useLang } from './i18n';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -25,11 +26,13 @@ const edgeTypes = { routed: RoutedEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null);
-  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label="Choose a trajectory file" type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
+  const { t } = useLang();
+  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
 function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: File) => void; onHome: () => void }) {
   const rf = useReactFlow<CardNode, Edge>();
+  const { t } = useLang();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [tier, setTier] = useState<Tier>('states');
@@ -274,7 +277,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       data: { p, tier, observations: observationsFor(graph, p.id), actions: related, branches: graph.branches.filter(b => b.state === p.id).length,
         records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
-        offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : '',
+        offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [],
         fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
@@ -321,39 +324,39 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     <div className="toolbar">
       <ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
-          <FilePicker label="Import trajectory" onImport={onImport} />
-          <button onClick={() => { download(); dismiss(); }}>Export complete trace</button>
-          <button onClick={onHome}>Home</button>
+          <FilePicker label={t('Import trajectory')} onImport={onImport} />
+          <button onClick={() => { download(); dismiss(); }}>{t('Export complete trace')}</button>
+          <button onClick={onHome}>{t('Home')}</button>
         </div>
         <div className="viewer-menu-section">
-          <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
-          <button onClick={() => { setSelected(null); showDetails(); dismiss(); }}>Structure &amp; evidence</button>
-          <label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
-          <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>
+          <button onClick={() => { overview(true); dismiss(); }}><span>{t('Fit view')}</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
+          <button onClick={() => { setSelected(null); showDetails(); dismiss(); }}>{t('Structure & evidence')}</button>
+          <label className="viewer-menu-field">{t('State relationships')}<select aria-label={t('State relationships')} value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">{t('Version tree')}</option><option value="chronology">{t('Execution order')}</option></select></label>
+          <label className="viewer-menu-field">{t('Canvas input')}<select aria-label={t('Canvas input mode')} value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">{t('Trackpad')}</option><option value="mouse">{t('Mouse')}</option></select></label>
         </div>
         <div className="viewer-menu-section">
-          {hasReading && <label className="viewer-menu-check" title="Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions"><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />Decisions only</label>}
-          <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />Cross-branch links</label>
-          <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />Untried ideas</label>
-          {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>Reading layer incomplete; showing all actions</p>}
+          {hasReading && <label className="viewer-menu-check" title={t('Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions')}><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />{t('Decisions only')}</label>}
+          <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />{t('Cross-branch links')}</label>
+          <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />{t('Untried ideas')}</label>
+          {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
-      <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>
-      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>Details</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>Chat</button></div>
+      <div className="zoom-levels" aria-label={t('Zoom detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((level, i) => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} onClick={() => showTier(level)}><span>0{i + 1}</span> {t(tierLabels[level])}</button>)}</div>
+      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} onFly={fly}
       onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
-      {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>Story</button>}
-      {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />Delivered line</span>}<span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label="Hide the legend">×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>Legend</button>}</div>
+      {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
+      {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ {t('Informs')}</span>}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {/* Details and chat share one dock beside the map: opening the second never narrows the map again, and nothing covers it.
           The hidden panel stays mounted, so a chat request in flight survives a look at the details. */}
       {(inspectorOpen || chatOpen) && <div className="side-dock" data-front={inspectorOpen && chatOpen ? front : inspectorOpen ? 'details' : 'chat'}>
-        {inspectorOpen && chatOpen && <div className="dock-tabs" role="tablist" aria-label="Side panel">
-          <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>Details</button>
-          <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>Chat</button>
+        {inspectorOpen && chatOpen && <div className="dock-tabs" role="tablist" aria-label={t('Side panel')}>
+          <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>{t('Details')}</button>
+          <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>{t('Chat')}</button>
         </div>}
         {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
         {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
@@ -361,7 +364,8 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   </div>;
 }
 
-export default function StateReader() {
+function App() {
+  const { t } = useLang();
   const [handoff] = useState(() => {
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
@@ -395,11 +399,15 @@ export default function StateReader() {
     const controller = new AbortController();
     const request = fetch(path, { signal: controller.signal });
     void request
-      .then(r => { if (!r.ok) throw new Error('Could not load the trajectory. Check that the example is included, or import a local JSON file.'); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error(t('Could not load the trajectory. Check that the example is included, or import a local JSON file.')); return r.json(); })
       .then(value => { setGraph(parseGraph(value)); setLoading(false); })
       .catch(e => { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, []);
   useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>Close</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="Import trajectory" onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><div className="welcome-lang"><LangToggle /></div><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label={t('Import trajectory')} onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+}
+
+export default function StateReader() {
+  return <LangProvider><App /></LangProvider>;
 }

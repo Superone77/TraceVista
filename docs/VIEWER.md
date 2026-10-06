@@ -208,13 +208,17 @@ agent/task-specific interpretation rules.
 
 ## Interface and trajectory language
 
-The viewer uses English for navigation, controls, status labels, settings, and errors. Imported titles, summaries, reading layers, raw records, review comments, and attachments retain their original language. Chat replies follow the language of the question; quoted evidence stays in its source language.
+The interface switches between English and Chinese with the EN / 中文 toggle in the toolbar (and on the home page). English is the default; the choice is remembered in this browser and sets the page language. Navigation, controls, status labels, the story rail, card labels, details, the main chat surfaces and the home page switch. Imported titles, summaries, reading layers, raw records, review comments, and attachments retain their original language. Chat replies follow the language of the question; the suggested questions follow the interface language. The two prompts on the home page stay in English because they are pasted into an agent as commands. Not yet translated: the Structure & evidence browser inside Details, the chat's advanced context explanations, and provider error messages.
+
+English text is the key: components call `t('English text')`, and Chinese lives in `viewer/src/trajectory/i18n.zh.json`, so component sources stay English-only (`test-ui-language.mjs`). `viewer/scripts/i18n-keys.mjs` reads every key from the source with the TypeScript parser, including the label tables translated at render time; `test-i18n.mjs` requires a Chinese entry with the same placeholders for each key and rejects entries no key uses.
 
 ## Interface type scale
 
-`viewer/src/trajectory/interface.css` defines screen-space UI sizes in `rem`: controls and panel text use `.875rem`, captions use `.75rem`. Narrow layouts wrap controls and reposition panels instead of shrinking text. Browser zoom and the user's base font size remain effective. The landing page keeps its larger serif text; only the decorative TraceVista title uses a bounded fluid size.
+`viewer/src/trajectory/interface.css` defines screen-space UI sizes in `rem`: controls and panel text use `.875rem`, captions use `.75rem`. Narrow layouts wrap controls and reposition panels instead of shrinking text. Browser zoom and the user's base font size remain effective. The landing page keeps its larger text size; only the decorative TraceVista title uses a bounded fluid size.
 
 Canvas card typography remains separate in `trajectory.css`: semantic zoom continues to reveal states, phases, actions and raw records without scaling the surrounding interface.
+
+One family for everything read or clicked, one for literal text: `--font-sans` (Inter, then PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC) and `--font-mono` (SF Mono, ui-monospace, Menlo, Consolas), both defined on `:root` in `trajectory.css`. Raw records, code and quoted source text use the mono family; every other surface, including the story rail and the home page, uses the sans family. No web fonts are fetched beyond the bundled Inter.
 
 ## Example library
 

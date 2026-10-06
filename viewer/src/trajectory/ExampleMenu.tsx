@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import './example-menu.css';
+import { useLang } from './i18n';
 
 interface ExampleEntry {
   id: string;
@@ -9,6 +10,7 @@ interface ExampleEntry {
 }
 
 export default function ExampleMenu({ examples, loading = false }: { examples: ExampleEntry[]; loading?: boolean }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -69,9 +71,9 @@ export default function ExampleMenu({ examples, loading = false }: { examples: E
         event.preventDefault(); show();
         requestAnimationFrame(() => panel.current?.querySelector<HTMLAnchorElement>('a')?.focus());
       }}>
-      {loading ? 'Loading…' : 'View examples'} <span aria-hidden="true">▾</span>
+      {t(loading ? 'Loading…' : 'View examples')} <span aria-hidden="true">▾</span>
     </button>
-    <nav ref={panel} id={panelId} className="example-menu-panel" aria-label="Example trajectories" hidden={!open}>
+    <nav ref={panel} id={panelId} className="example-menu-panel" aria-label={t('Example trajectories')} hidden={!open}>
       <ul className="example-menu-list">{examples.map(example => {
         const metadata = [example.agent, example.task].filter(Boolean).join(' · ');
         return <li key={example.id}><a href={`?example=${encodeURIComponent(example.id)}`}>
