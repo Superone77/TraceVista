@@ -3,7 +3,7 @@ import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReac
 import '@xyflow/react/dist/style.css';
 import { behaviors, colors, observationsFor, parseGraph, toolFingerprint, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
 import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, type Tier, type StateMode, type FoldItem } from './semantic';
-import MapCard, { type CardNode, type Landmark } from './MapCard';
+import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
 import RoutedEdge, { type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import Inspector from './Inspector';
@@ -177,7 +177,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     // Updating one CSS variable avoids rebuilding every node and its raw records per frame.
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
-    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < .36);
+    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < COMPACT_ZOOM);
     if (zoomReadout.current) zoomReadout.current.textContent = `${Math.round(viewport.zoom * 100)}%`;
     if (flying.current) return;
     const previous = tierRef.current;

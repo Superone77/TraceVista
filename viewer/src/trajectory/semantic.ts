@@ -11,9 +11,8 @@ const perLine = (text: string, font: number) => {
 };
 /**
  * The height an overview card needs, so it is not drawn as a fixed slab with its words floating in it.
- * Plaque: the taller of the takeaway at its overview size (42px) and the brief at the size it takes just before the
- * phase tier (30px). Header, measurement and decision chips are drawn at a constant screen size; their canvas height
- * is budgeted for zoom 0.36, below which the overview switches to one-line compact cards.
+ * Plaque: the takeaway at its overview size (42px). Header, measurement and decision chips are drawn at a constant screen
+ * size; their canvas height is budgeted for zoom 0.36, below which cards switch to the compact reading that fills them.
  */
 /** A phase card's height from its own text: header, the brief at its phase-tier size (21px on a 324px line), footer. */
 export function phaseHeight(b: Entity): number {
@@ -23,13 +22,15 @@ export function phaseHeight(b: Entity): number {
   return Math.round(Math.min(BRANCH_H, Math.max(170, 112 + lines * 28.5)));
 }
 export function overviewHeight(s: State, g: Graph): number {
+  // On the overview the plaque shows the takeaway (42px); the brief level needs zoom 0.5, where the phase tier begins.
   const takeaway = s.ladder?.takeaway ?? s.title;
-  const brief = s.ladder ? `${s.ladder.takeaway} ${s.ladder.reason ?? ''}` : s.title;
-  const plaque = Math.max(perLine(takeaway, 42) * 55.4, perLine(brief, 30) * 39.6);
+  const plaque = perLine(takeaway, 42) * 55.4;
   const turn = (e: Entity) => !!e.move && TURNS.includes(e.move);
   const chips = g.branches.some(b => b.state === s.id && turn(b)) || g.actions.some(a => a.state === s.id && turn(a));
   const measured = !!s.assessment || s.lineage?.relation === 'restored';
-  const screenRows = (65 + (chips ? 77 : 0) + (measured ? 29 : 0)) * (.44 / .36);
+  // A restored version adds a badge to the measurement row, which then wraps to a second line.
+  const badge = !!s.assessment && s.lineage?.relation === 'restored';
+  const screenRows = (65 + (chips ? 77 : 0) + (measured ? 29 : 0) + (badge ? 44 : 0)) * (.44 / .36);
   return Math.round(Math.min(380, Math.max(150, screenRows + plaque + 24)));
 }
 

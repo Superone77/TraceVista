@@ -123,3 +123,12 @@
 .reader .toolbar .lang-toggle button, .lang-toggle button { border: 0; border-radius: 0; background: transparent; color: var(--text-2); padding: .3rem .6rem; font-size: var(--ui-caption, .75rem); min-height: 0; }
 .reader .toolbar .lang-toggle button[aria-pressed=true], .lang-toggle button[aria-pressed=true] { background: var(--ink, #1d1d1d); color: var(--surface, #fff); }
 .welcome-lang { position: fixed; top: 1rem; right: 1rem; z-index: 5; }
+
+/* Compact overview: the card is filled with the takeaway, its reason and, when there is room, the decision chips. */
+.canvas[data-compact-overview=true] .state-map-summary { justify-content: flex-start; padding-top: calc(8px / var(--map-zoom)); }
+.canvas[data-compact-overview=true] .compact-state-reading { -webkit-line-clamp: unset; font-weight: 400; line-height: calc(15px / var(--map-zoom)); font-size: calc(11.2px / var(--map-zoom)); }
+.compact-state-reading b { font-weight: 650; color: var(--text); }
+.compact-reason { color: var(--text-2); }
+.compact-landmarks { display: flex; flex-wrap: wrap; gap: calc(4px / var(--map-zoom)); margin-top: calc(5px / var(--map-zoom)); overflow: hidden; max-height: calc(22px / var(--map-zoom)); flex-shrink: 0; }
+.compact-landmarks button { font-size: calc(9.5px / var(--map-zoom)); line-height: 1.3; padding: calc(1px / var(--map-zoom)) calc(5px / var(--map-zoom)); border: calc(1px / var(--map-zoom)) solid color-mix(in srgb, var(--move) 45%, white); border-radius: calc(4px / var(--map-zoom)); background: var(--surface); color: var(--move); white-space: nowrap; }
+.compact-landmarks .decision-no { font-size: .85em; }

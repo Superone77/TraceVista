@@ -1,5 +1,5 @@
 import { memo, type CSSProperties } from 'react';
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useStore, type Node, type NodeProps } from '@xyflow/react';
 import { behaviors, colors, entityColor, stateVisual, observationLabels, factText, moveColors, moveGlyphs, moveLabels, type Move, type Observation, type State, type Action, type Branch, type RawEvent, type ToolMark } from './model';
 import type { FoldItem, MapNode, Tier } from './semantic';
 import { FONTS, levelText, type Ladder } from './ladder';
@@ -9,6 +9,8 @@ import RawRecords from './RawRecords';
 import { useLang } from './i18n';
 import type { Behavior } from './model';
 
+/** Below this zoom the overview plaque could show only its topic, so cards switch to the filled compact reading. */
+export const COMPACT_ZOOM = .36;
 export interface Landmark { id: string; move: Move; label: string; n: number }
 export type CardData = Record<string, unknown> & {
   p: MapNode; tier: Tier; observations: Observation[]; actions: Action[]; branches: number; ordinal: number;
@@ -25,10 +27,41 @@ function MoveStamp({ move, n }: { move?: Move; n?: number }) {
   return <span className="move-stamp" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{moveGlyphs[move]} {t(moveLabels[move])}</span>;
 }
 
+/**
+ * A far-out overview card filled at the current zoom: S-number, takeaway, reason, then the decision chips when there is
+ * room. Text is drawn at a constant screen size, so how much fits depends on the zoom; the line count is worked out here
+ * and quantised, so the card re-renders only when a line is gained or lost, not on every zoom frame.
+ */
+function CompactReading({ height, width, ordinal, takeaway, reason, metric, landmarks, onOpen, onEnter }: {
+  height: number; width: number; ordinal: number; takeaway: string; reason: string; metric: boolean; landmarks: Landmark[];
+  onOpen: () => void; onEnter: (id: string) => void;
+}) {
+  const LINE = 15, CHIPS = 26, PAD = 16;
+  const units = (t: string) => { const cjk = (t.match(/[\u3400-\u9fff]/g) ?? []).length; return cjk + ([...t].length - cjk) * .55; };
+  const layout = useStore(st => {
+    const z = st.transform[2];
+    const screenW = Math.max(width * z, 300) - 28;
+    const avail = height * z - PAD - (metric ? LINE : 0);
+    const lines = Math.max(1, Math.floor(avail / LINE));
+    const need = Math.ceil(units(`S${ordinal}  ${takeaway} ${reason}`) * 11.2 / screenW);
+    const chips = landmarks.length > 0 && avail - Math.min(need, lines) * LINE >= CHIPS;
+    return `${Math.max(1, Math.min(need, chips ? Math.floor((avail - CHIPS) / LINE) : lines))}|${chips ? 1 : 0}`;
+  });
+  const [clamp, chips] = layout.split('|').map(Number);
+  return <>
+    <button className="nodrag nopan compact-state-reading" style={{ WebkitLineClamp: clamp }} onClick={e => { e.stopPropagation(); onOpen(); }}>
+      <span className="compact-state-id">S{ordinal}</span><b>{takeaway}</b>{reason && <span className="compact-reason"> {reason}</span>}
+    </button>
+    {chips > 0 && <div className="compact-landmarks nodrag nopan">{landmarks.slice(0, 6).map(l => <button key={l.id} style={{ '--move': moveColors[l.move] } as CSSProperties} onClick={e => { e.stopPropagation(); onEnter(l.id); }}><b className="decision-no">{l.n}</b>{moveGlyphs[l.move]} {l.label}</button>)}</div>}
+  </>;
+}
+
 export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor } = data;
   const { t } = useLang();
   const label = (key: string) => t(labels[key] ?? key);
+  // Only overview cards subscribe to the zoom, and only to which side of the compact threshold it is on.
+  const compact = useStore(st => p.kind === 'state' && tier === 'states' && st.transform[2] < COMPACT_ZOOM);
   const handles = <><Handle type="target" position={Position.Top} id="top" /><Handle type="target" position={Position.Left} id="left" />
     <Handle type="source" position={Position.Top} id="link-out" style={{ left: '70%' }} /></>;
   const outHandles = <><Handle type="source" position={Position.Bottom} id="bottom" /><Handle type="source" position={Position.Right} id="right" /></>;
@@ -62,8 +95,9 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
     {p.kind === 'state' ? <>
       <div className={tier === 'states' ? 'state-map-summary' : 'state-map-heading'}>
         <div className="state-eyebrow"><span className="state-name">S{ordinal} · {p.item.title}{delivered && <b className="delivered-badge">{t('Delivered')}</b>}{offMain && <span className="side-badge">{t('Side branch')}</span>}</span><span>{t(actions.length === 1 ? '{n} action' : '{n} actions', { n: actions.length })}{mix?.length ? ` · ${t(mix.length > 1 ? 'mostly {a} & {b}' : 'mostly {a}', { a: t(mix[0]), b: mix[1] ? t(mix[1]) : '' })}` : ''}</span></div>
-        {tier === 'states' && <button className="nodrag nopan compact-state-reading" onClick={e => { e.stopPropagation(); inspect(p.id); }}><span className="compact-state-id">S{ordinal}</span><span>{ladder ? levelText(ladder, 1) : p.item.title}</span></button>}
-        {tier === 'states' ? <button className="nodrag nopan state-open plaque" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{ladder ? <ZoomText ladder={ladder} fonts={FONTS.state} max={2} /> : p.item.title}</button>
+        {tier === 'states' && compact && <CompactReading height={p.height} width={p.width} ordinal={ordinal} takeaway={ladder ? levelText(ladder, 1) : p.item.title} reason={state.ladder?.reason ?? ''}
+          metric={!!state.assessment} landmarks={landmarks} onOpen={() => inspect(p.id)} onEnter={enter} />}
+        {tier === 'states' ? <button className="nodrag nopan state-open plaque" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{ladder ? <ZoomText ladder={ladder} fonts={FONTS.state} max={2} min={1} /> : p.item.title}</button>
           : ladder ? <div className="heading-plaque"><LadderMorph ladder={ladder} level={2} fontSize={FONTS.heading[2]} /></div> : <><h2><button className="nodrag nopan state-open" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{p.item.title}</button></h2><p>{p.item.summary}</p></>}
         <div className="state-assessment"><b hidden={!state.assessment}>{visual ? t(visual.label) : ''}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ {t('Restored version')}</span>}</div>
         {tier === 'states' && landmarks.length > 0 && <div className="landmarks nodrag nopan">{landmarks.slice(0, 6).map(l => <button key={l.id} style={{ '--move': moveColors[l.move] } as CSSProperties} title={`${l.n}. ${t(moveLabels[l.move])}`} onClick={e => { e.stopPropagation(); enter(l.id); }}><b className="decision-no">{l.n}</b>{moveGlyphs[l.move]} {l.label}</button>)}{landmarks.length > 6 && <span>+{landmarks.length - 6}</span>}</div>}
