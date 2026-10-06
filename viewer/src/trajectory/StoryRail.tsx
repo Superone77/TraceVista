@@ -1,69 +1,135 @@
-// The run as a reader skims it: one line per step (what it found, what kind of work it was), the numbered
-// turns under each step, and where the run ended. Details grow in place (StretchText) instead of piling up.
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { entityColor, moveColors, moveGlyphs, moveLabels, type Action, type Entity, type Graph } from './model';
+// The left rail: the run as one text the reader stretches (StretchText, after Ted Nelson), read like a storyline:
+// the outcome first, then each step as a sentence. A sentence grows in place into its phases, a phase into its steps, a step into what the agent wrote or
+// the tool returned. Opening a sentence flies the map to the same place at the matching depth; a card picked on the
+// map opens the text down to it. Only the graph's own fields are used: ladders, moves, behaviors and raw records.
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { entityColor, moveColors, moveGlyphs, type Action, type Branch, type Entity, type Graph, type Move, type State } from './model';
 import { sentencesOf } from './ladder';
-import { shortName, workMix, type KeyDecision } from './story';
+import { shortName } from './story';
 import Stretch from './Stretch';
 
-export default function StoryRail({ graph, decisions, main, delivered, ordinals, selected, onState, onDecision, onCite, onHide }: {
-  graph: Graph; decisions: KeyDecision[]; main: Set<string>; delivered: string | null; ordinals: Map<string, number>;
-  selected: string | null; onState: (id: string) => void; onDecision: (d: KeyDecision) => void; onCite: (id: string) => void; onHide: () => void;
+export type Depth = 'states' | 'branches' | 'actions' | 'raw';
+const verbs: Record<Move, string> = { pivot: 'Changed course', ruleout: 'Ruled out', decision: 'Decided', open: 'Left open', insight: 'Found' };
+const doing: Record<string, string> = { Explore: 'Looked into', Plan: 'Planned', Edit: 'Changed', Execute: 'Ran', Verify: 'Checked', Diagnose: 'Diagnosed' };
+const sentence = (t: string) => { const s = t.trim(); return !s || /[.!?。！？]$/.test(s) ? s : s + (/[㐀-鿿]$/.test(s) ? '。' : '.'); };
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function Sentence({ id, open, onToggle, count, className = '', children }: { id: string; open: boolean; onToggle: () => void; count?: string; className?: string; children: ReactNode }) {
+  return <span className={`story-s ${className}`} role="button" tabIndex={0} aria-expanded={open} data-story={id} onClick={onToggle}
+    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}>{children}{count && <span className="story-count">{count}</span>}</span>;
+}
+function Verb({ move, n }: { move?: Move | null; n?: number }) {
+  if (!move) return null;
+  return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{verbs[move]}</span>;
+}
+
+export default function StoryRail({ graph, main, delivered, decisionNo, selected, onFly, onCite, onEvidence, onHide }: {
+  graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
+  onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
 }) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const [mounted, setMounted] = useState<Set<string>>(() => new Set());
   const [more, setMore] = useState(false);
-  const [open, setOpen] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
+  const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
+  const sideLine = main.size > 0 && main.size < graph.states.length;
   const joiner = graph.language === 'zh' ? '' : ' ';
   const sentences = graph.journey ? sentencesOf(graph.journey.text) : [];
   const lead = sentences.slice(0, 2).join(joiner), rest = sentences.slice(2).join(joiner);
-  const sideLine = main.size > 0 && main.size < graph.states.length;
-  // The entities the overview paragraph narrates, still one click away, folded with the rest of the paragraph.
-  const byId = new Map<string, Entity>([...graph.states, ...graph.branches, ...graph.actions].map(e => [e.id, e]));
+  const byId = useMemo(() => new Map<string, Entity>([...graph.states, ...graph.branches, ...graph.actions].map(e => [e.id, e])), [graph]);
   const cited = (graph.journey?.cites ?? []).map(id => byId.get(id)).filter((e): e is Entity => !!e);
   const end = graph.states.find(s => s.id === delivered);
-  // A turn picked on the map opens here too, so the map and the list never disagree about where the reader is.
+
+  const openAll = (ids: string[]) => {
+    setMounted(s => { const n = new Set(s); ids.forEach(id => n.add(id)); return n; });
+    setOpen(s => { const n = new Set(s); ids.forEach(id => n.add(id)); return n; });
+  };
+  const toggle = (id: string, depth: Depth) => {
+    if (open.has(id)) { setOpen(s => { const n = new Set(s); n.delete(id); return n; }); return; }
+    openAll([id]);
+    onFly(id, depth);
+  };
+  // A card picked on the map: open the text down to it and bring its sentence into view.
   useEffect(() => {
-    if (!selected || !decisions.some(d => d.id === selected)) return;
-    setOpen(selected);
-    requestAnimationFrame(() => root.current?.querySelector(`[data-decision="${CSS.escape(selected)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-  }, [selected, decisions]);
-  return <aside className="story-rail" ref={root} aria-label="Run overview and key decisions">
-    <header><b>Run overview</b><button onClick={onHide} aria-label="Hide the run overview">Hide</button></header>
-    <div className="story-scroll">
-      {lead && <div className="story-journey">
-        <p>{lead}</p>
+    if (!selected) return;
+    const action = graph.actions.find(a => a.id === selected);
+    const branch = graph.branches.find(b => b.id === (action?.branch ?? selected));
+    const state = graph.states.find(s => s.id === (branch?.state ?? action?.state ?? selected));
+    const path = [state?.id, branch?.id].filter((id): id is string => !!id);
+    if (!path.length) return;
+    openAll(path);
+    const t = setTimeout(() => root.current?.querySelector(`[data-story="${CSS.escape(selected)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 360);
+    return () => clearTimeout(t);
+  }, [selected, graph]);
+
+  const evidenceOf = (a: Action) => {
+    const q = a.ladder?.abstract?.[0];
+    if (q) return { event: q.event, text: q.quote, kind: eventMap.get(q.event)?.kind };
+    for (const kind of ['note', 'message', 'result', 'tool_result']) for (const id of a.events) {
+      const e = eventMap.get(id);
+      if (e?.kind === kind && e.text?.trim()) return { event: id, text: e.text.trim().slice(0, 600), kind };
+    }
+    return null;
+  };
+  const evidence = (a: Action) => {
+    const q = evidenceOf(a);
+    if (!q) return <p className="story-note">No quoted record for this step.</p>;
+    const who = q.kind === 'note' || q.kind === 'message' ? 'The agent wrote' : q.kind === 'result' || q.kind === 'tool_result' ? 'The tool returned' : 'Recorded';
+    return <blockquote className="story-quote"><span className="story-who">{who}<button onClick={() => onEvidence(q.event)}>{q.event.split(':').pop()} ↗</button></span>{q.text}</blockquote>;
+  };
+  const actionSentence = (a: Action) => <div className="story-p" key={a.id}>
+    <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count="quote">
+      <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{doing[a.behavior] ?? a.behavior}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
+    </Sentence>
+    {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{evidence(a)}</Stretch>}
+  </div>;
+  const phase = (b: Branch) => {
+    const acts = graph.actions.filter(a => a.branch === b.id);
+    const shown = acts.filter(a => a.move || a.ladder), quiet = acts.filter(a => !(a.move || a.ladder));
+    const quietId = `${b.id}::routine`;
+    return <div className="story-p" key={b.id}>
+      <Sentence id={b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? `${acts.length} step${acts.length > 1 ? 's' : ''}` : undefined} className={b.move ? '' : 'routine'}>
+        <Verb move={b.move} n={decisionNo.get(b.id)} />{sentence(b.ladder?.takeaway ?? b.title)}{b.ladder?.reason && <> <span className="story-reason">{sentence(b.ladder.reason)}</span></>}
+      </Sentence>
+      {mounted.has(b.id) && <Stretch open={open.has(b.id)}><div className="story-layer">
+        {shown.map(actionSentence)}
+        {quiet.length > 0 && <div className="story-p">
+          <Sentence id={quietId} open={open.has(quietId)} onToggle={() => open.has(quietId) ? setOpen(s => { const n = new Set(s); n.delete(quietId); return n; }) : openAll([quietId])} className="routine">…and {quiet.length} routine step{quiet.length > 1 ? 's' : ''}.</Sentence>
+          {mounted.has(quietId) && <Stretch open={open.has(quietId)}><div className="story-layer">{quiet.map(actionSentence)}</div></Stretch>}
+        </div>}
+        {!acts.length && <p className="story-note">No actions recorded in this phase.</p>}
+      </div></Stretch>}
+    </div>;
+  };
+  const step = (s: State) => {
+    const side = sideLine && !main.has(s.id);
+    const phases = graph.branches.filter(b => b.state === s.id);
+    const lead = s.ladder?.topic ?? shortName(s);
+    const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}[:,]?\\s*`, 'i'), '');
+    return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
+      <Sentence id={s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? `${phases.length} phase${phases.length > 1 ? 's' : ''}` : undefined}>
+        {side && <span className="story-side">A side attempt. </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
+      </Sentence>
+      {mounted.has(s.id) && <Stretch open={open.has(s.id)}><div className="story-layer">
+        {phases.length ? phases.map(phase) : <p className="story-note">Nothing more was recorded inside this step.</p>}
+      </div></Stretch>}
+    </li>;
+  };
+
+  return <aside className="story-rail" ref={root} aria-label="The run, as a story to stretch">
+    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label="Hide the story">Hide ‹</button></div>
+    <div className="story-body">
+      <p className="story-kicker">{graph.title}</p>
+      <h2>How the agent got there</h2>
+      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>Delivered.</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
+      {lead && <div className="story-gist"><p>{lead}</p>
         {(rest || cited.length > 0) && <><Stretch open={more}>{rest && <p>{rest}</p>}
           {cited.length > 0 && <div className="story-cites">{cited.map(e => <button key={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => onCite(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div>}</Stretch>
           <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{more ? 'Less' : 'More'}</button></>}
       </div>}
-      {end && <button className="story-end" onClick={() => onState(end.id)}>
-        <span>Delivered · S{ordinals.get(end.id)}</span><b>{end.ladder?.takeaway ?? end.title}</b>
-      </button>}
-      <h3>Steps and key decisions{decisions.length ? ` · ${decisions.length}` : ''}</h3>
-      {sideLine && <p className="story-hint">Faded steps are side branches: tried, then left off the line that was delivered.</p>}
-      <ol className="story-steps">{graph.states.map(s => {
-        const turns = decisions.filter(d => d.state === s.id);
-        const actions = graph.actions.filter(a => a.state === s.id) as Action[];
-        const off = sideLine && !main.has(s.id);
-        return <li key={s.id} className={`story-step${off ? ' off-main' : ''}${selected === s.id ? ' active' : ''}`}>
-          <button className="story-step-head" onClick={() => onState(s.id)} title={s.ladder?.takeaway ?? s.title}>
-            <span className="story-sid">S{ordinals.get(s.id)}</span>
-            <span className="story-step-text"><b>{shortName(s)}</b><span>{s.ladder?.takeaway ?? s.title}</span>
-              <small>{actions.length} action{actions.length === 1 ? '' : 's'}{actions.length ? ` · ${workMix(actions)}` : ''}{off ? ' · side branch' : ''}{s.id === delivered ? ' · delivered' : ''}</small></span>
-          </button>
-          {turns.length > 0 && <ol className="story-decisions">{turns.map(d => <li key={d.id} data-decision={d.id} className={selected === d.id ? 'active' : ''} style={{ '--move': moveColors[d.move] } as CSSProperties}>
-            <button className="story-decision-head" aria-expanded={open === d.id} onClick={() => { const next = open === d.id ? null : d.id; setOpen(next); if (next) onDecision(d); }}>
-              <span className="story-n">{d.n}</span><span className="story-glyph" title={moveLabels[d.move]}>{moveGlyphs[d.move]}</span>
-              <span className="story-label"><b>{d.label}</b> {d.takeaway}</span>
-            </button>
-            <Stretch open={open === d.id}><div className="story-detail">
-              <span className="story-move">{moveLabels[d.move]}</span>
-              {d.reason && <p>{d.reason}</p>}
-              {d.quote && <blockquote>{d.quote.quote}</blockquote>}
-            </div></Stretch>
-          </li>)}</ol>}
-        </li>;
-      })}</ol>
+      <p className="story-how">Click a sentence to stretch it into what happened inside; the map flies to the same place. Click it again to fold it back.{sideLine ? ' Hollow steps are side attempts that were left behind.' : ''}</p>
+      <ol className="story-text">{graph.states.map(step)}</ol>
     </div>
   </aside>;
 }
