@@ -25,6 +25,7 @@
 - **交付主线**：时间顺序的终点（没有后续转换的状态）记为交付状态，标“Delivered”并加紫色外圈。从它沿当前状态关系向上追到根，得到交付主线：主线连线加粗，主线外的状态与其内部卡片变淡并标“Side branch”，鼠标指向或选中时恢复。完全线性的运行不画支线。首屏按主线的横向跨度取景，缩放不低于 26%。
 - 状态卡右上角写这一步做了多少动作、主要是哪两类行为（如“42 actions · mostly Edit & Diagnose”）。状态编号 S0、S1… 按状态出现的先后，不随版本树的排布顺序变化。
 - 初始显示可读的状态卡片；“Fit view”可查看整个版本结构。缩放仍逐层显示分支、行为和原始轨迹。
+- 卡片高度按自己的内容估算，不再用固定高度：总览层的状态卡按结论与理由的长度、有无测量和关键决策决定（150 到 380），缩放低于 36% 时改为单行紧凑卡；工作阶段层每个状态的一行阶段卡取这一行里最长那张的高度（170 到 350），保持对齐。
 - 单击卡片或其标题自动打开右侧详情。详情先给核心：这一步新增了什么（takeaway 与 reason）、测量结果或行为类别、这一步里的关键决策（编号与左栏一致）、支撑它的观察。完整描述、引用原文、比较对象、版本来源、阶段与动作、追踪状态、时间前后关系、结构与证据、来源记录各自折叠，点击后在原处展开。从证据编号打开的原文显示在核心内容下方。双击或“View trace ↗”进入下一层。
 - 状态可以附带 `lineage: {parent, relation, reason, events}`，relation 为 derived/restored/retained。没有证据时沿用已有状态转移，不能仅凭分数下降猜测发生了回退。
 - 可选 `assessment` 提供 metric、unit、value、previous、previousState、higherIsBetter、tolerance、correctness、measurement、note；measurement=historical 禁止把历史评分计算为新的性能变化。
@@ -208,9 +209,11 @@ agent/task-specific interpretation rules.
 
 ## Interface and trajectory language
 
-The interface switches between English and Chinese with the EN / 中文 toggle in the toolbar (and on the home page). English is the default; the choice is remembered in this browser and sets the page language. Navigation, controls, status labels, the story rail, card labels, details, the main chat surfaces and the home page switch. Imported titles, summaries, reading layers, raw records, review comments, and attachments retain their original language. Chat replies follow the language of the question; the suggested questions follow the interface language. The two prompts on the home page stay in English because they are pasted into an agent as commands. Not yet translated: the Structure & evidence browser inside Details, the chat's advanced context explanations, and provider error messages.
+The EN / 中文 toggle in the toolbar (and on the home page) switches the interface and everything that was written about the run: titles, summaries, ladders, the story rail, the run overview, scope and notes, reasons, classification notes and observation summaries. What the agent itself said or received stays as recorded: raw records and the verbatim quotes taken from them are never translated. English is the default; the choice is remembered in this browser and sets the page language. Chat replies follow the language of the question. The two prompts on the home page stay in English because they are pasted into an agent as commands. Not yet translated: the field labels inside the Structure & evidence browser, the chat's advanced context notes and provider error messages.
 
-English text is the key: components call `t('English text')`, and Chinese lives in `viewer/src/trajectory/i18n.zh.json`, so component sources stay English-only (`test-ui-language.mjs`). `viewer/scripts/i18n-keys.mjs` reads every key from the source with the TypeScript parser, including the label tables translated at render time; `test-i18n.mjs` requires a Chinese entry with the same placeholders for each key and rejects entries no key uses.
+**Interface strings.** English text is the key: components call `t('English text')`, and Chinese lives in `viewer/src/trajectory/i18n.zh.json`, so component sources stay English-only (`test-ui-language.mjs`). `viewer/scripts/i18n-keys.mjs` reads every key from the source with the TypeScript parser; `test-i18n.mjs` requires a Chinese entry with the same placeholders for each key and rejects entries no key uses.
+
+**Generated text.** A trajectory may carry `"i18n": {"zh": {"<text as written>": "<translation>"}}`. The viewer swaps each annotated string for its translation when the interface language differs from the file's own `language`; a ladder topic stays inside its translated takeaway. Export writes the file as imported, translations included; chat reads the original. All five bundled examples carry a Chinese table covering every annotation (2,178 strings). The Pi Agent test checks that every key of the table is an annotation in that file.
 
 ## Interface type scale
 

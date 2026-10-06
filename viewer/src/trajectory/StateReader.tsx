@@ -15,6 +15,7 @@ import StoryRail, { type Depth } from './StoryRail';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
 import { LangProvider, LangToggle, useLang } from './i18n';
+import { localizeGraph } from './localize';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -30,7 +31,7 @@ function FilePicker({ label, onImport }: { label: string; onImport: (file: File)
   return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: File) => void; onHome: () => void }) {
+function Reader({ graph, original, onImport, onHome }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void }) {
   const rf = useReactFlow<CardNode, Edge>();
   const { t } = useLang();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -72,6 +73,8 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const main = useMemo(() => mainLine(graph, stateMode), [graph, stateMode]);
   // Only a line that leaves some states out is worth drawing; a straight run is all main line.
   const sideLine = main.size > 0 && main.size < graph.states.length;
+  // Name who did an action only when more than one participant acted.
+  const multiActor = useMemo(() => new Set(graph.actions.map(a => a.actor)).size > 1, [graph]);
   const ordinals = useMemo(() => new Map(graph.states.map((st, i) => [st.id, i])), [graph]);
   const projected = useMemo(() => {
     const p = semanticProjection(graph, layout, tier, showLinks, proposed);
@@ -174,7 +177,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     // Updating one CSS variable avoids rebuilding every node and its raw records per frame.
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
-    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < .3);
+    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < .36);
     if (zoomReadout.current) zoomReadout.current.textContent = `${Math.round(viewport.zoom * 100)}%`;
     if (flying.current) return;
     const previous = tierRef.current;
@@ -277,11 +280,11 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       data: { p, tier, observations: observationsFor(graph, p.id), actions: related, branches: graph.branches.filter(b => b.state === p.id).length,
         records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
-        offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [],
+        offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [], multiActor,
         fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
-  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals]);
+  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor]);
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
@@ -295,13 +298,13 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       // Cross-links route around cards (ThoughtDAG's edge-path); structural chains stay straight.
       const routed = cross ? { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } } : { type: 'smoothstep' };
       return { ...e, ...routed, sourceHandle: cross ? 'right' : 'bottom', targetHandle: cross ? 'left' : 'top',
-        label: tier === 'states' && e.kind !== 'restore' || cross && !touched && !(informs && tier !== 'branches') ? undefined : `${e.label}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, zIndex: stateEdge ? 0 : informs ? 4 : 2,
+        label: tier === 'states' && e.kind !== 'restore' || cross && !touched && !(informs && tier !== 'branches') ? undefined : `${t(e.label ?? '')}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, zIndex: stateEdge ? 0 : informs ? 4 : 2,
         markerEnd: { type: MarkerType.ArrowClosed, color, width: stateEdge ? 18 : 12, height: stateEdge ? 18 : 12 },
         style: { stroke: color, opacity: cross && !touched && !informs || stateEdge && !onMain ? .45 : 1, strokeWidth: stateEdge ? onMain && sideLine ? 3.5 : 2 : informs ? 2 : cross ? 1.5 : 1.2, vectorEffect: 'non-scaling-stroke', strokeDasharray: informs ? '5 4' : cross || e.kind === 'restore' ? '7 6' : undefined },
         labelStyle: { fontSize: 13, fill: color, fontWeight: informs ? 600 : 400 }, labelBgStyle: { fill: '#f2f2f2', fillOpacity: .96 },
       } as Edge;
     });
-  }, [projected, layout, tier, selected, sideLine, main]);
+  }, [projected, layout, tier, selected, sideLine, main, t]);
   function showTier(next: Tier) {
     if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
@@ -315,7 +318,8 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next);
   }
   function download() {
-    const value = { ...graph, format: 'coding-agent-state-trajectory' };
+    // Export what was imported, translations included, not the view in the current language.
+    const value = { ...original, format: 'coding-agent-state-trajectory' };
     const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: 'agent-state-trajectory.json' });
     a.click(); URL.revokeObjectURL(url);
@@ -341,7 +345,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
-      <div className="zoom-levels" aria-label={t('Zoom detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((level, i) => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} onClick={() => showTier(level)}><span>0{i + 1}</span> {t(tierLabels[level])}</button>)}</div>
+      <div className="zoom-levels" aria-label={t('Zoom detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
       <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} onFly={fly}
@@ -359,13 +363,13 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
           <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>{t('Chat')}</button>
         </div>}
         {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
-        {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
+        {chatOpen && <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
       </div>}</main>
   </div>;
 }
 
 function App() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [handoff] = useState(() => {
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
@@ -404,8 +408,10 @@ function App() {
       .catch(e => { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, []);
-  useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><div className="welcome-lang"><LangToggle /></div><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label={t('Import trajectory')} onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+  // Everything an analyst or a model wrote follows the interface language when the file carries a translation.
+  const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
+  useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><div className="welcome-lang"><LangToggle /></div><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label={t('Import trajectory')} onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
 }
 
 export default function StateReader() {

@@ -1,4 +1,37 @@
-import type { Graph, Entity, Action, ProjectedEdge } from './model';
+import type { Graph, Entity, Action, ProjectedEdge, State, Move } from './model';
+
+// Kept local: the tests load this module on its own, without its neighbours. Mirrors model.ts landmarkMoves.
+const TURNS: readonly Move[] = ['ruleout', 'decision', 'pivot', 'open'];
+
+/** Readable width of an overview card, and how many characters of a plaque fit on one of its lines at a canvas font size. */
+const OVERVIEW_TEXT_W = 1150;
+const perLine = (text: string, font: number) => {
+  const cjk = (text.match(/[\u3400-\u9fff]/g) ?? []).length, latin = [...text].length - cjk;
+  return Math.max(1, Math.ceil((cjk * font + latin * font * .53) / OVERVIEW_TEXT_W));
+};
+/**
+ * The height an overview card needs, so it is not drawn as a fixed slab with its words floating in it.
+ * Plaque: the taller of the takeaway at its overview size (42px) and the brief at the size it takes just before the
+ * phase tier (30px). Header, measurement and decision chips are drawn at a constant screen size; their canvas height
+ * is budgeted for zoom 0.36, below which the overview switches to one-line compact cards.
+ */
+/** A phase card's height from its own text: header, the brief at its phase-tier size (21px on a 324px line), footer. */
+export function phaseHeight(b: Entity): number {
+  const brief = b.ladder ? `${b.ladder.takeaway} ${b.ladder.reason ?? ''}` : `${b.title} ${b.summary}`;
+  const cjk = (brief.match(/[\u3400-\u9fff]/g) ?? []).length, latin = [...brief].length - cjk;
+  const lines = Math.max(2, Math.ceil((cjk * 21 + latin * 21 * .56) / 310));
+  return Math.round(Math.min(BRANCH_H, Math.max(170, 112 + lines * 28.5)));
+}
+export function overviewHeight(s: State, g: Graph): number {
+  const takeaway = s.ladder?.takeaway ?? s.title;
+  const brief = s.ladder ? `${s.ladder.takeaway} ${s.ladder.reason ?? ''}` : s.title;
+  const plaque = Math.max(perLine(takeaway, 42) * 55.4, perLine(brief, 30) * 39.6);
+  const turn = (e: Entity) => !!e.move && TURNS.includes(e.move);
+  const chips = g.branches.some(b => b.state === s.id && turn(b)) || g.actions.some(a => a.state === s.id && turn(a));
+  const measured = !!s.assessment || s.lineage?.relation === 'restored';
+  const screenRows = (65 + (chips ? 77 : 0) + (measured ? 29 : 0)) * (.44 / .36);
+  return Math.round(Math.min(380, Math.max(150, screenRows + plaque + 24)));
+}
 
 export type Tier = 'states' | 'branches' | 'actions' | 'raw';
 export const tierLabels: Record<Tier, string> = { states: 'System states', branches: 'Work phases', actions: 'Actions', raw: 'Raw records' };
@@ -48,12 +81,14 @@ export interface MapNode {
   x: number; y: number; width: number; height: number; parentId?: string;
 }
 export type StateMode = 'lineage' | 'chronology';
+/** Edge labels for version ancestry, translated where they are drawn. */
+export const connectionLabels: Record<'restored' | 'retained' | 'derived', string> = { restored: 'Restore this version', retained: 'Retain and finish', derived: 'Derived from this version' };
 export interface Layout { nodes: MapNode[]; width: number; height: number; stateMode?: StateMode }
 
 /** Lineage expresses version ancestry; chronological transitions remain intact. */
 export function stateConnections(g: Graph, mode: StateMode) {
   return g.states.flatMap(s => {
-    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: s.lineage.relation === 'restored' ? 'Restore this version' : s.lineage.relation === 'retained' ? 'Retain and finish' : 'Derived from this version' }];
+    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: connectionLabels[s.lineage.relation] }];
     return g.transitions.filter(t => t.target === s.id).map(t => ({ source: t.source, target: t.target, kind: 'transition', label: t.label }));
   });
 }
@@ -65,7 +100,9 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
   // Reserve more room for longer descriptions; very long ones scroll inside the card.
   const actionHeight = (action: Action) => tier === 'raw' ? 420 : Math.min(640, Math.max(340,
     160 + Math.ceil([...(action.summary || action.title)].reduce((n, c) => n + (/[\u3400-\u9fff]/.test(c) ? 2 : 1), 0) / 38) * 26));
-  const actionTop = 192 + BRANCH_H + 12;
+  // Each state's row of phases is as tall as its tallest phase card, so the row stays aligned without a fixed slab.
+  const rowH = new Map(g.states.map(st => [st.id, Math.max(170, ...g.branches.filter(b => b.state === st.id).map(phaseHeight))]));
+  const actionTopOf = (id: string) => 192 + (rowH.get(id) ?? BRANCH_H) + 12;
   const keep = keptActions(g);
   const items = new Map(g.branches.map(b => [b.id, branchItems(g, b.id, opts, keep)]));
   const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight(item);
@@ -91,12 +128,13 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
     const branches = g.branches.filter(b => b.state === s.id);
     const depth = Math.max(0, ...branches.map(b => items.get(b.id)!.reduce((h, item) => h + itemHeight(item) + 24, 0)));
     // A state with no recorded phases keeps only its heading below the overview, not an empty lane's height.
-    const height = tier === 'states' ? 380 : !branches.length ? 228 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
+    const actionTop = actionTopOf(s.id);
+    const height = tier === 'states' ? overviewHeight(s, g) : !branches.length ? 228 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
     nodes.push({ id: s.id, kind: 'state', item: s, x: x0, y, width, height });
     const startX = x0 + (width - branches.length * 400 + 40) / 2;
     if (tier !== 'states') branches.forEach((b, lane) => {
       const x = startX + lane * 400;
-      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: BRANCH_H, parentId: s.id });
+      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: rowH.get(s.id) ?? BRANCH_H, parentId: s.id });
       if (!detailed) return;
       let top = y + actionTop;
       for (const item of items.get(b.id)!) {

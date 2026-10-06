@@ -218,7 +218,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     </fieldset>}
     <div className="chat-list" ref={list}>
       {!ready && !showSettings && <div className="chat-connect"><p>{tr('Connect a model to ask questions. Requests go from this browser directly to the provider you choose.')}</p><button onClick={() => setShowSettings(true)}>{tr('Connect a model')}</button></div>}
-      {!turns.length && <div className="chat-empty"><p>{tr('Ask about the full trajectory, or select a card on the map to ask about that step.')}</p>
+      {!turns.length && <div className="chat-empty">
         {['Why was the final version chosen?', 'Which evidence changed the agent’s direction?', 'Which conclusions are supported by independent checks?'].map(q => tr(q)).map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
       {turns.map(t => <div key={t.id} className={`chat-turn ${t.role}`}>
         {t.role === 'user' && t.focus && <small>Focus <button className="cite node" onClick={() => jump(t.focus!)}>{t.focus}</button></small>}

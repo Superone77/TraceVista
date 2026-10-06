@@ -15,7 +15,7 @@ export type CardData = Record<string, unknown> & {
   tools: string[]; records: RawEvent[]; enter: (id: string) => void; inspect: (id: string) => void;
   ladder: Ladder | null; quotes: Quote[]; landmarks: Landmark[]; fingerprint: ToolMark[]; routine: boolean;
   expand: (foldId: string) => void; evidence: (eventId: string) => void; cited?: boolean;
-  offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: Behavior[];
+  offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: Behavior[]; multiActor?: boolean;
 };
 export type CardNode = Node<CardData, 'trajectory'>;
 
@@ -24,13 +24,9 @@ function MoveStamp({ move, n }: { move?: Move; n?: number }) {
   if (!move) return null;
   return <span className="move-stamp" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{moveGlyphs[move]} {t(moveLabels[move])}</span>;
 }
-function Fingerprint({ marks }: { marks: ToolMark[] }) {
-  if (!marks.length) return null;
-  return <span className="fingerprint" title={marks.map(m => `${m.name} ×${m.count}`).join('\n')}>{marks.map(m => <span key={m.glyph}>{m.glyph}{m.count}</span>)}</span>;
-}
 
 export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
-  const { p, tier, observations, actions, branches, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, fingerprint, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix } = data;
+  const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor } = data;
   const { t } = useLang();
   const label = (key: string) => t(labels[key] ?? key);
   const handles = <><Handle type="target" position={Position.Top} id="top" /><Handle type="target" position={Position.Left} id="left" />
@@ -43,7 +39,6 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       <button className="nodrag nopan fold-open" onClick={e => { e.stopPropagation(); expand(p.id); }}>
         <b>⋯ {t('{n} routine steps', { n: fold.actions.length })}</b>
         <span className="fold-behaviors">{behaviors.filter(b => fold.actions.some(a => a.behavior === b)).map(b => <span key={b} style={{ color: colors[b] }}>{t(b)} {fold.actions.filter(a => a.behavior === b).length}</span>)}</span>
-        <span className="fold-foot"><Fingerprint marks={fingerprint} /><span>{t('Expand ↓')}</span></span>
       </button>
       {outHandles}
     </div>;
@@ -70,24 +65,23 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
         {tier === 'states' && <button className="nodrag nopan compact-state-reading" onClick={e => { e.stopPropagation(); inspect(p.id); }}><span className="compact-state-id">S{ordinal}</span><span>{ladder ? levelText(ladder, 1) : p.item.title}</span></button>}
         {tier === 'states' ? <button className="nodrag nopan state-open plaque" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{ladder ? <ZoomText ladder={ladder} fonts={FONTS.state} max={2} /> : p.item.title}</button>
           : ladder ? <div className="heading-plaque"><LadderMorph ladder={ladder} level={2} fontSize={FONTS.heading[2]} /></div> : <><h2><button className="nodrag nopan state-open" onClick={e => { e.stopPropagation(); inspect(p.id); }}>{p.item.title}</button></h2><p>{p.item.summary}</p></>}
-        <div className="state-assessment"><b hidden={!state.assessment}>{visual ? t(visual.label) : ''}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ {t('Restored version')}</span>}{tier === 'states' && <button className="nodrag nopan enter-state" onClick={e => { e.stopPropagation(); enter(p.id); }}>{t('View trace ↗')}</button>}</div>
+        <div className="state-assessment"><b hidden={!state.assessment}>{visual ? t(visual.label) : ''}{visual?.delta != null ? ` ${visual.delta > 0 ? '+' : ''}${visual.delta.toFixed(2)}%` : ''}</b>{state.assessment && <span>{state.assessment.metric} {state.assessment.value.toFixed(3)}{state.assessment.unit ?? ''}</span>}{state.lineage?.relation === 'restored' && <span className="restore-badge">↶ {t('Restored version')}</span>}</div>
         {tier === 'states' && landmarks.length > 0 && <div className="landmarks nodrag nopan">{landmarks.slice(0, 6).map(l => <button key={l.id} style={{ '--move': moveColors[l.move] } as CSSProperties} title={`${l.n}. ${t(moveLabels[l.move])}`} onClick={e => { e.stopPropagation(); enter(l.id); }}><b className="decision-no">{l.n}</b>{moveGlyphs[l.move]} {l.label}</button>)}{landmarks.length > 6 && <span>+{landmarks.length - 6}</span>}</div>}
         {tier === 'states' && !ladder && <>{verdicts}{badges}<p>{p.item.summary}</p></>}
       </div>
-      {tier !== 'states' && branches === 0 && <div className="empty-state">{t('No work stages recorded in this state')}</div>}
     </> : p.kind === 'action' && tier === 'raw' ? <>
       <div className="raw-action-heading"><span style={{ color }}>{t(action.behavior)}</span><MoveStamp move={move} n={decisionNo} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{t(records.length === 1 ? '{n} raw record' : '{n} raw records', { n: records.length })}</span></div>
       {skillBadges}
       <RawRecords records={records} />
     </> : <>
-      <div className="card-top"><span>{p.kind === 'action' ? t(action.behavior) : t(routine ? 'Routine work' : 'Work stage')}<MoveStamp move={move} n={decisionNo} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? label(action.actor) : label((p.item as Branch).status)}</span></div>
+      <div className="card-top"><span>{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
       {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
       {p.kind === 'action' && skillBadges}{verdicts}
       {!ladder && p.kind === 'branch' && <p className="branch-description">{p.item.summary}</p>}
       {p.kind === 'action'
-        ? <div className="card-foot"><span>{label(action.outcome)}{tools.length ? ` · ${tools.join(' / ')}` : ''}</span><Fingerprint marks={fingerprint} /><span>{t(action.events.length === 1 ? '{n} evidence record' : '{n} evidence records', { n: action.events.length })}</span></div>
-        : <div className="card-foot branch-foot"><span className="counts">{behaviors.filter(b => actions.some(a => a.behavior === b)).map(b => <span key={b} title={t(b)} style={{ color: colors[b] }}>{t(b).slice(0, 2)} {actions.filter(a => a.behavior === b).length}</span>)}</span><Fingerprint marks={fingerprint} />{tier === 'branches' && <button className="nodrag nopan enter-branch" onClick={e => { e.stopPropagation(); enter(p.id); }}>{t('View actions ↗')}</button>}</div>}
+        ? <div className="card-foot"><span>{label(action.outcome)}{tools.length ? ` · ${tools.join(' / ')}` : ''}</span></div>
+        : <div className="card-foot branch-foot"><span className="counts">{behaviors.filter(b => actions.some(a => a.behavior === b)).map(b => <span key={b} title={t(b)} style={{ color: colors[b] }}>{t(b).slice(0, 2)} {actions.filter(a => a.behavior === b).length}</span>)}</span></div>}
       {(p.kind === 'action' || !ladder) && badges}
     </>}
     {outHandles}

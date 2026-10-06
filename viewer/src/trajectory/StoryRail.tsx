@@ -12,7 +12,9 @@ import { useLang } from './i18n';
 export type Depth = 'states' | 'branches' | 'actions' | 'raw';
 const verbs: Record<Move, string> = { pivot: 'Changed course', ruleout: 'Ruled out', decision: 'Decided', open: 'Left open', insight: 'Found' };
 const doing: Record<string, string> = { Explore: 'Looked into', Plan: 'Planned', Edit: 'Changed', Execute: 'Ran', Verify: 'Checked', Diagnose: 'Diagnosed' };
-const sentence = (t: string) => { const s = t.trim(); return !s || /[.!?。！？]$/.test(s) ? s : s + (/[㐀-鿿]$/.test(s) ? '。' : '.'); };
+// A sentence ends in the story's language: a Chinese story ends a Latin-only topic with 。 too.
+let storyZh = false;
+const sentence = (t: string) => { const s = t.trim(); return !s || /[.!?。！？]$/.test(s) ? s : s + (storyZh || /[\u3400-\u9fff]/.test(s) ? '。' : '.'); };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -31,6 +33,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
 }) {
   const { t } = useLang();
+  storyZh = graph.language === 'zh';
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [mounted, setMounted] = useState<Set<string>>(() => new Set());
   const [more, setMore] = useState(false);
@@ -109,7 +112,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const side = sideLine && !main.has(s.id);
     const phases = graph.branches.filter(b => b.state === s.id);
     const lead = s.ladder?.topic ?? shortName(s);
-    const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}[:,]?\\s*`, 'i'), '');
+    const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}\\s*[:,：，]?\\s*`, 'i'), '');
     return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
       <Sentence id={s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? t(phases.length > 1 ? '{n} phases' : '{n} phase', { n: phases.length }) : undefined}>
         {side && <span className="story-side">{t('A side attempt.')} </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
@@ -121,7 +124,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   };
 
   return <aside className="story-rail" ref={root} aria-label={t('The run, as a story to stretch')}>
-    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')}>{t('Hide ‹')}</button></div>
+    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')} title={t('Hide the story')}>‹</button></div>
     <div className="story-body">
       <p className="story-kicker">{graph.title}</p>
       <h2>{t('How the agent got there')}</h2>
@@ -131,7 +134,6 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
           {cited.length > 0 && <div className="story-cites">{cited.map(e => <button key={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => onCite(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div>}</Stretch>
           <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{t(more ? 'Less' : 'More')}</button></>}
       </div>}
-      <p className="story-how">{t('Click a sentence to stretch it into what happened inside; the map flies to the same place. Click it again to fold it back.')}{sideLine ? ` ${t('Hollow steps are side attempts that were left behind.')}` : ''}</p>
       <ol className="story-text">{graph.states.map(step)}</ol>
     </div>
   </aside>;

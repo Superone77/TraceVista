@@ -26,12 +26,26 @@ function english(value,path=''){
  if(typeof value==='string')assert(!/[\u3400-\u9fff]/u.test(value),`Untranslated annotation: ${path}`);
  else if(Array.isArray(value))value.forEach((v,i)=>english(v,`${path}[${i}]`));
  else if(value&&typeof value==='object')for(const [key,v]of Object.entries(value)){
-  if(['timeline','artifacts','quote'].includes(key))continue; // Preserve the language of verbatim evidence.
+  if(['timeline','artifacts','quote','i18n'].includes(key))continue; // Preserve the language of verbatim evidence; i18n holds the translations.
   assert(!/[\u3400-\u9fff]/u.test(key),`Untranslated annotation field: ${path}.${key}`);
   english(v,`${path}.${key}`);
  }
 }
 english(original);
+// The Chinese table only translates this file's own English annotations: every key is an annotation, every value a translation.
+if(original.i18n){
+ const annotations=new Set();
+ (function collect(value,key=''){
+  if(['timeline','artifacts','quote','i18n'].includes(key))return;
+  if(typeof value==='string')annotations.add(value);
+  else if(Array.isArray(value))value.forEach(v=>collect(v));
+  else if(value&&typeof value==='object')for(const [k,v]of Object.entries(value))collect(v,k);
+ })(original);
+ for(const [lang,table]of Object.entries(original.i18n))for(const [en,text]of Object.entries(table)){
+  assert(annotations.has(en),`i18n.${lang}: ${en.slice(0,60)} is not an annotation in this file`);
+  assert(typeof text==='string'&&text.trim(),`i18n.${lang}: empty translation for ${en.slice(0,60)}`);
+ }
+}
 const g=parseGraph(original);
 assert.match(g.title,/Pi Agent/);
 assert(!/Pi Infra Agent/i.test(g.title));

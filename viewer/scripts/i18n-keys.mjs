@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
 
 const sourceDir = new URL('../src/trajectory/', import.meta.url);
-const TABLES = new Set(['labels', 'moveLabels', 'tierLabels', 'verbs', 'doing']);
+const TABLES = new Set(['labels', 'moveLabels', 'tierLabels', 'verbs', 'doing', 'connectionLabels']);
 
 export function interfaceKeys() {
   const keys = new Set();

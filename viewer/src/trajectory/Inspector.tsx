@@ -33,7 +33,7 @@ export default function Inspector({ graph, item, jump, close, focusEvent }: { gr
   const rawHits = rawQuery.trim() ? graph.timeline.timeline.filter(e => `${e.id} ${e.kind} ${e.text}`.toLowerCase().includes(rawQuery.toLowerCase())).slice(0, 80) : [];
   // Lead first: what the step adds and the turns in it; everything else unfolds on request (StretchText), so the panel never opens as a wall.
   return <aside className="inspector">
-    <div className="inspector-toolbar"><span>{tr('Node details')}</span><button aria-label={tr('Close node details')} onClick={close}>{tr('Close ×')}</button></div>
+    <div className="inspector-toolbar"><span /><button aria-label={tr('Close node details')} onClick={close}>{tr('Close ×')}</button></div>
     {item ? <>
       <div className="eyebrow">{kind}</div>
       <h2>{item.title}</h2>
