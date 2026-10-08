@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow, type Edge, type Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { behaviors, colors, observationsFor, parseGraph, toolFingerprint, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
-import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, type Tier, type StateMode, type FoldItem } from './semantic';
+import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, phaseFlow, edgeLabels, connectionLabels, type Tier, type StateMode, type FoldItem } from './semantic';
 import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
 import RoutedEdge, { type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
@@ -69,6 +69,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     storeRail(null);
   }, []);
   const [legendOpen, setLegendOpen] = useState(false);
+  // The card under the pointer shows its reasons (informs links) the same way a selected card does.
+  const [hovered, setHovered] = useState<string | null>(null);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   // With both panels open the dock shows one at a time: details or chat, each at full height.
@@ -92,7 +94,9 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const multiActor = useMemo(() => new Set(graph.actions.map(a => a.actor)).size > 1, [graph]);
   const ordinals = useMemo(() => new Map(graph.states.map((st, i) => [st.id, i])), [graph]);
   const projected = useMemo(() => {
-    const p = semanticProjection(graph, layout, tier, showLinks, proposed);
+    const raw = semanticProjection(graph, layout, tier, showLinks, proposed);
+    // Inside a state, time is drawn phase to phase (flow edges); the recorded cross-phase sequence links would draw it twice.
+    const p = { ...raw, edges: raw.edges.filter(e => !(e.id.startsWith('link:') && e.kind === 'sequence')) };
     if (!decisionsOnly) return p;
     // The decision view keeps why-links and drops chronology between branches; across states the state edges carry the flow.
     const stateOf = new Map<string, string>([...graph.branches.map(b => [b.id, b.state] as const), ...graph.actions.map(a => [a.id, a.state] as const)]);
@@ -283,6 +287,23 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     return [e.id, e.ladder ? fromReading(e.ladder) : localLadder(e.title, withoutParent(e.summary, parent?.summary))];
   })), [all, byId]);
   const landmarks = useMemo(() => new Map(graph.states.map(st => [st.id, decisions.filter(d => d.state === st.id).map((d): Landmark => ({ id: d.id, move: d.move, label: d.label, n: d.n }))])), [graph, decisions]);
+  const flow = useMemo(() => phaseFlow(graph), [graph]);
+  // Focus: below the overview, a selected card keeps its parent state, its neighbours in time and its reasons; the rest recede.
+  const focus = useMemo(() => {
+    if (!selected || tier === 'states' || !projected.nodes.some(n => n.id === selected && n.kind !== 'state')) return null;
+    const keep = new Set([selected]);
+    for (const e of projected.edges) if (e.source === selected) keep.add(e.target); else if (e.target === selected) keep.add(e.source);
+    const own = projected.nodes.find(n => n.id === selected);
+    if (own?.parentId) keep.add(own.parentId);
+    return keep;
+  }, [selected, tier, projected]);
+  // A small mark on each card that has reasons, so the dashed lines need not be drawn until asked for.
+  const why = useMemo(() => {
+    const m = new Map<string, { in: number; out: number }>();
+    const at = (id: string) => { if (!m.has(id)) m.set(id, { in: 0, out: 0 }); return m.get(id)!; };
+    for (const e of projected.edges) if (e.kind === 'informs') { at(e.target).in += e.count ?? 1; at(e.source).out += e.count ?? 1; }
+    return m;
+  }, [projected]);
   const nodes = useMemo<CardNode[]>(() => projected.nodes.map(p => {
     const parent = p.parentId ? layout.nodes.find(n => n.id === p.parentId) : null;
     const related = p.kind === 'fold' ? [] : graph.actions.filter(a => p.kind === 'state' ? a.state === p.id : a.branch === p.id);
@@ -295,30 +316,70 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
         records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
         offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [], multiActor,
+        flowNo: p.kind === 'branch' ? flow.get(p.id)?.n : undefined, why: why.get(p.id), dim: !!focus && p.kind !== 'state' && !focus.has(p.id),
         fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
-  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor]);
+  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus]);
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
-    return projected.edges.map(e => {
+    const overview = tier === 'states';
+    const out: Edge[] = [];
+    for (const projectedEdge of projected.edges) {
+      // The projection's own label is English and unconditional; each kind below decides its label, translated.
+      const { label: _plain, ...e } = projectedEdge;
       const stateEdge = ['transition', 'lineage', 'restore'].includes(e.kind);
-      const cross = !stateEdge && e.kind !== 'sequence';
       const informs = e.kind === 'informs';
-      const touched = e.source === selected || e.target === selected;
-      const onMain = stateEdge && (!sideLine || main.has(e.source) && main.has(e.target));
-      const color = e.kind === 'restore' ? '#7a4fa8' : informs ? moveColors.insight : stateEdge || e.kind === 'effect' ? '#2f7363' : cross ? '#8b78b0' : '#9fb0ba';
-      // Cross-links route around cards (ThoughtDAG's edge-path); structural chains stay straight.
-      const routed = cross ? { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } } : { type: 'smoothstep' };
-      return { ...e, ...routed, sourceHandle: cross ? 'right' : 'bottom', targetHandle: cross ? 'left' : 'top',
-        label: tier === 'states' && e.kind !== 'restore' || cross && !touched && !(informs && tier !== 'branches') ? undefined : `${t(e.label ?? '')}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, zIndex: stateEdge ? 0 : informs ? 4 : 2,
-        markerEnd: { type: MarkerType.ArrowClosed, color, width: stateEdge ? 18 : 12, height: stateEdge ? 18 : 12 },
-        style: { stroke: color, opacity: cross && !touched && !informs || stateEdge && !onMain ? .45 : 1, strokeWidth: stateEdge ? onMain && sideLine ? 3.5 : 2 : informs ? 2 : cross ? 1.5 : 1.2, vectorEffect: 'non-scaling-stroke', strokeDasharray: informs ? '5 4' : cross || e.kind === 'restore' ? '7 6' : undefined },
-        labelStyle: { fontSize: 13, fill: color, fontWeight: informs ? 600 : 400 }, labelBgStyle: { fill: '#f2f2f2', fillOpacity: .96 },
-      } as Edge;
-    });
-  }, [projected, layout, tier, selected, sideLine, main, t]);
+      const touched = [selected, hovered].some(id => id && (e.source === id || e.target === id));
+      // Reasons are drawn only for the card being looked at; elsewhere a mark on the card says they exist.
+      if (informs && !overview && !touched) continue;
+      const dimmed = !!focus && !stateEdge && !touched;
+      const label = (text: string, color: string, extra: Partial<Edge> = {}) => ({ label: text, labelStyle: { fontSize: 13, fill: color, fontWeight: 600 }, labelBgStyle: { fill: '#f2f2f2', fillOpacity: .96 }, ...extra });
+      if (stateEdge) {
+        const onMain = !sideLine || main.has(e.source) && main.has(e.target);
+        const restore = e.kind === 'restore', color = restore ? '#7a4fa8' : '#2f7363';
+        if (overview) {
+          // The overview is the version tree: ancestry is the line the reader follows.
+          out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
+            style: { stroke: color, opacity: onMain ? 1 : .45, strokeWidth: onMain && sideLine ? 3.5 : 2, vectorEffect: 'non-scaling-stroke', strokeDasharray: restore ? '7 6' : undefined } } as Edge);
+        } else {
+          // Inside states the versions are the background: a wide pale band between frames, ↶ where an older version was restored.
+          out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            style: { stroke: color, opacity: onMain ? .16 : .09, strokeWidth: 14, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' } } as Edge);
+        }
+        continue;
+      }
+      if (e.kind === 'flow' || e.kind === 'parallel') {
+        const parallel = e.kind === 'parallel', color = parallel ? '#9aa0a6' : '#4b5563';
+        out.push({ ...e, type: 'straight', sourceHandle: 'right', targetHandle: 'left', zIndex: 3,
+          ...(parallel ? label(t(edgeLabels.parallel), color) : {}),
+          markerEnd: parallel ? undefined : { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
+          style: { stroke: color, strokeWidth: parallel ? 1.5 : 2.2, strokeDasharray: parallel ? '2 5' : undefined, opacity: dimmed ? .3 : 1, vectorEffect: 'non-scaling-stroke' } } as Edge);
+        continue;
+      }
+      if (e.kind === 'sequence') {
+        out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 2,
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#8b949e', width: 12, height: 12 },
+          style: { stroke: '#8b949e', strokeWidth: 1.4, opacity: dimmed ? .3 : 1, vectorEffect: 'non-scaling-stroke' } } as Edge);
+        continue;
+      }
+      const effect = e.kind === 'effect';
+      const color = informs ? moveColors.insight : effect ? '#2f7363' : '#8b78b0';
+      // A phase leads straight down into the version it made; an action, and every other cross link, routes around cards.
+      const phaseEffect = effect && tier === 'branches';
+      const routed = phaseEffect ? { type: 'smoothstep' } : { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } };
+      const text = informs ? t(edgeLabels.because) : t(_plain ?? '');
+      out.push({ ...e, ...routed, sourceHandle: phaseEffect ? 'bottom' : 'right', targetHandle: phaseEffect ? 'top' : 'left', zIndex: informs ? 4 : 2,
+        ...(touched || informs ? label(`${text}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, color) : {}),
+        markerEnd: { type: MarkerType.ArrowClosed, color, width: 12, height: 12 },
+        style: { stroke: color, opacity: dimmed ? .2 : effect || touched ? 1 : .45, strokeWidth: informs || effect ? 2 : 1.5, vectorEffect: 'non-scaling-stroke', strokeDasharray: informs ? '5 4' : effect ? undefined : '7 6' } } as Edge);
+    }
+    return out;
+  }, [projected, layout, tier, selected, hovered, focus, sideLine, main, t]);
   function showTier(next: Tier) {
     if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
@@ -365,11 +426,11 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} onFly={fly}
       onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
       width={{ now: railWidth, min: RAIL_MIN, max: journeyOpen ? railMax() : RAIL_MAX }} onResize={resizeRail} onResizeEnd={saveRail} />}
-      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
+      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
       {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
-      {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ {t('Informs')}</span>}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
+      {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {/* Details and chat share one dock beside the map: opening the second never narrows the map again, and nothing covers it.
           The hidden panel stays mounted, so a chat request in flight survives a look at the details. */}
       {(inspectorOpen || chatOpen) && <div className="side-dock" data-front={inspectorOpen && chatOpen ? front : inspectorOpen ? 'details' : 'chat'}>

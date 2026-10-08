@@ -51,6 +51,28 @@ export interface FoldItem { id: string; title: string; summary: string; events: 
 export interface LayoutOptions { fold?: boolean; openFolds?: ReadonlySet<string> }
 export const FOLD_MIN = 3;
 export const BRANCH_H = 350;
+/** Edge labels drawn on the map (translated where drawn). The projection keeps its own labels; these name the flow edges. */
+export const edgeLabels: Record<'flow' | 'parallel' | 'effect' | 'because' | 'review_request' | 'review_return' | 'sequence' | 'informs' | 'later', string> = {
+  flow: 'Then', parallel: 'In parallel', effect: 'Creates state', because: 'Because',
+  review_request: 'Review request', review_return: 'Review response', sequence: 'Continues', informs: 'Informs', later: 'Informs later work',
+};
+export interface PhaseTime { n: number; start: number; end: number; parallel: boolean }
+/**
+ * Inside a state, time is the reading order: each phase's number by when its first action started (file order where no
+ * time was recorded), and whether it started before an earlier phase had finished, i.e. ran alongside it.
+ */
+export function phaseFlow(g: Graph): Map<string, PhaseTime> {
+  const info = new Map<string, PhaseTime>();
+  for (const s of g.states) {
+    const phases = g.branches.filter(b => b.state === s.id).map((b, i) => {
+      const ts = g.actions.filter(a => a.branch === b.id && a.t_min != null).map(a => a.t_min!);
+      return { id: b.id, i, start: ts.length ? Math.min(...ts) : Infinity, end: ts.length ? Math.max(...ts) : -Infinity };
+    }).sort((x, y) => x.start - y.start || x.i - y.i);
+    let reach = -Infinity;
+    phases.forEach((p, k) => { info.set(p.id, { n: k + 1, start: p.start, end: p.end, parallel: k > 0 && Number.isFinite(p.start) && p.start < reach }); reach = Math.max(reach, p.end); });
+  }
+  return info;
+}
 const FOLD_H = 96;
 /** Actions a reader must see when routine steps fold: turns, what informed them, and what changed state. */
 export function keptActions(g: Graph): Set<string> {
@@ -105,6 +127,7 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
   const rowH = new Map(g.states.map(st => [st.id, Math.max(170, ...g.branches.filter(b => b.state === st.id).map(phaseHeight))]));
   const actionTopOf = (id: string) => 192 + (rowH.get(id) ?? BRANCH_H) + 12;
   const keep = keptActions(g);
+  const flow = phaseFlow(g);
   const items = new Map(g.branches.map(b => [b.id, branchItems(g, b.id, opts, keep)]));
   const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight(item);
   const nodes: MapNode[] = [];
@@ -126,7 +149,7 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
     if (placed.has(s.id)) return;
     placed.add(s.id);
     const x0 = left + ((spans.get(s.id)! - 1) * (width + 120)) / 2;
-    const branches = g.branches.filter(b => b.state === s.id);
+    const branches = g.branches.filter(b => b.state === s.id).sort((a, b) => (flow.get(a.id)?.n ?? 0) - (flow.get(b.id)?.n ?? 0));
     const depth = Math.max(0, ...branches.map(b => items.get(b.id)!.reduce((h, item) => h + itemHeight(item) + 24, 0)));
     // A state with no recorded phases keeps only its heading below the overview, not an empty lane's height.
     const actionTop = actionTopOf(s.id);
@@ -196,7 +219,24 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       chain.forEach((n, i) => edges.push({ id: `sequence:${n.id}`, source: i ? chain[i - 1].id : b.id, target: n.id, kind: 'sequence', label: '' }));
     }
   }
-  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: 'Creates state' });
+  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: edgeLabels.effect });
+  // Time inside a state: phase to phase in the order they started; a phase that ran alongside the previous one is marked, not arrowed.
+  const flow = phaseFlow(g);
+  for (const s of g.states) {
+    const ordered = g.branches.filter(b => b.state === s.id && visible.has(b.id)).sort((a, b) => flow.get(a.id)!.n - flow.get(b.id)!.n);
+    for (let i = 1; i < ordered.length; i++) {
+      const parallel = flow.get(ordered[i].id)!.parallel;
+      edges.push({ id: `flow:${ordered[i - 1].id}:${ordered[i].id}`, source: ordered[i - 1].id, target: ordered[i].id, kind: parallel ? 'parallel' : 'flow', label: parallel ? edgeLabels.parallel : '' });
+    }
+  }
+  // At the phase tier, the phase whose action made the next version leads to it, so time runs on from the phase, not the frame.
+  if (tier === 'branches') {
+    const byId = new Map(g.actions.map(a => [a.id, a]));
+    for (const t of g.transitions) {
+      const a = byId.get(t.action);
+      if (a && visible.has(a.branch) && visible.has(t.target)) edges.push({ id: `effect:${a.branch}:${t.target}`, source: a.branch, target: t.target, kind: 'effect', label: edgeLabels.effect });
+    }
+  }
   if (showLinks) {
     const actions = new Map(g.actions.map(a => [a.id, a]));
     const aggregate = new Map<string, ProjectedEdge>();
@@ -210,7 +250,7 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       const id = `link:${source}:${target}:${l.kind}`;
       const prior = aggregate.get(id);
       if (prior) prior.count = (prior.count ?? 1) + 1;
-      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? 'Review request' : l.kind === 'review_return' ? 'Review response' : l.kind === 'sequence' ? 'Continues' : l.kind === 'informs' ? 'Informs' : 'Informs later work' });
+      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: edgeLabels[(['review_request', 'review_return', 'sequence', 'informs'] as const).find(k => k === l.kind) ?? 'later'] });
     }
     edges.push(...aggregate.values());
   }

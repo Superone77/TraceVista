@@ -18,6 +18,7 @@ export type CardData = Record<string, unknown> & {
   ladder: Ladder | null; quotes: Quote[]; landmarks: Landmark[]; fingerprint: ToolMark[]; routine: boolean;
   expand: (foldId: string) => void; evidence: (eventId: string) => void; cited?: boolean;
   offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: Behavior[]; multiActor?: boolean;
+  flowNo?: number; why?: { in: number; out: number }; dim?: boolean;
 };
 export type CardNode = Node<CardData, 'trajectory'>;
 
@@ -57,7 +58,7 @@ function CompactReading({ height, width, ordinal, takeaway, reason, metric, land
 }
 
 export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
-  const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor } = data;
+  const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor, flowNo, why, dim } = data;
   const { t } = useLang();
   const label = (key: string) => t(labels[key] ?? key);
   // Only overview cards subscribe to the zoom, and only to which side of the compact threshold it is on.
@@ -90,7 +91,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
   const plaque = (kind: keyof typeof FONTS) => ladder
     ? <div className="plaque"><ZoomText ladder={ladder} fonts={FONTS[kind]} min={kind === 'branch' ? 2 : 0} quotes={quotes} onEvidence={evidence} /></div>
     : <h2><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button></h2>;
-  return <div className={`map-card ${p.kind} tier-${tier} ${selected ? 'chosen' : ''} ${routine ? 'routine' : ''} ${move ? `move-${move}` : ''} ${cited ? 'cited' : ''} ${offMain ? 'off-main' : ''} ${delivered ? 'delivered' : ''}`} style={style} data-kind={p.kind} data-entity={p.id}>
+  return <div className={`map-card ${p.kind} tier-${tier} ${selected ? 'chosen' : ''} ${routine ? 'routine' : ''} ${move ? `move-${move}` : ''} ${cited ? 'cited' : ''} ${offMain ? 'off-main' : ''} ${delivered ? 'delivered' : ''} ${dim ? 'dimmed' : ''}`} style={style} data-kind={p.kind} data-entity={p.id}>
     {handles}
     {p.kind === 'state' ? <>
       <div className={tier === 'states' ? 'state-map-summary' : 'state-map-heading'}>
@@ -108,7 +109,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       {skillBadges}
       <RawRecords records={records} />
     </> : <>
-      <div className="card-top"><span>{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} /></span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
+      <div className="card-top"><span>{flowNo != null && <b className="flow-no" title={t('Order in time within this state')}>{flowNo}</b>}{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} />{why && why.in > 0 && <em className="why-mark" title={t('Hover or select to see why')}>{t('because {n}', { n: why.in })}</em>}</span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
       {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
       {p.kind === 'action' && skillBadges}{verdicts}

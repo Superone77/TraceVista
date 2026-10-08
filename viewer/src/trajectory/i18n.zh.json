@@ -220,5 +220,17 @@
  "{n} steps": "{n} 步",
  "…and {n} routine step.": "……另有 {n} 个常规步骤。",
  "…and {n} routine steps.": "……另有 {n} 个常规步骤。",
- "Resize the story": "拖动调整故事线宽度"
+ "Resize the story": "拖动调整故事线宽度",
+ "Then": "接着",
+ "In parallel": "同时进行",
+ "Creates state": "产生下一个版本",
+ "Because": "因为",
+ "Review request": "请求审查",
+ "Review response": "审查回复",
+ "Continues": "接着做",
+ "Informs later work": "影响后续工作",
+ "Order in time within this state": "在这个状态里的时间顺序",
+ "Hover or select to see why": "悬停或选中查看原因",
+ "because {n}": "因为 {n}",
+ "Version": "版本"
 }

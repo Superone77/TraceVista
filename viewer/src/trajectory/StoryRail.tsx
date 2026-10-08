@@ -7,6 +7,7 @@ import type React from 'react';
 import { entityColor, moveColors, moveGlyphs, type Action, type Branch, type Entity, type Graph, type Move, type State } from './model';
 import { sentencesOf } from './ladder';
 import { shortName } from './story';
+import { phaseFlow } from './semantic';
 import Stretch from './Stretch';
 import { useLang } from './i18n';
 
@@ -45,6 +46,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   const joiner = graph.language === 'zh' ? '' : ' ';
   const sentences = graph.journey ? sentencesOf(graph.journey.text) : [];
   const lead = sentences.slice(0, 2).join(joiner), rest = sentences.slice(2).join(joiner);
+  const flow = useMemo(() => phaseFlow(graph), [graph]);
   const byId = useMemo(() => new Map<string, Entity>([...graph.states, ...graph.branches, ...graph.actions].map(e => [e.id, e])), [graph]);
   const cited = (graph.journey?.cites ?? []).map(id => byId.get(id)).filter((e): e is Entity => !!e);
   const end = graph.states.find(s => s.id === delivered);
@@ -98,7 +100,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const quietId = `${b.id}::routine`;
     return <div className="story-p" key={b.id}>
       <Sentence id={b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? t(acts.length > 1 ? '{n} steps' : '{n} step', { n: acts.length }) : undefined} className={b.move ? '' : 'routine'}>
-        <Verb move={b.move} n={decisionNo.get(b.id)} />{sentence(b.ladder?.takeaway ?? b.title)}{b.ladder?.reason && <> <span className="story-reason">{sentence(b.ladder.reason)}</span></>}
+        <span className="story-flow-no">{flow.get(b.id)?.n}</span>{flow.get(b.id)?.parallel && <span className="story-parallel">∥ {t('In parallel')} </span>}<Verb move={b.move} n={decisionNo.get(b.id)} />{sentence(b.ladder?.takeaway ?? b.title)}{b.ladder?.reason && <> <span className="story-reason">{sentence(b.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(b.id) && <Stretch open={open.has(b.id)}><div className="story-layer">
         {shown.map(actionSentence)}
@@ -112,7 +114,8 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   };
   const step = (s: State) => {
     const side = sideLine && !main.has(s.id);
-    const phases = graph.branches.filter(b => b.state === s.id);
+    // The same order in time, and the same numbers, as the phase cards on the map.
+    const phases = graph.branches.filter(b => b.state === s.id).sort((a, b) => (flow.get(a.id)?.n ?? 0) - (flow.get(b.id)?.n ?? 0));
     const lead = s.ladder?.topic ?? shortName(s);
     const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}\\s*[:,：，]?\\s*`, 'i'), '');
     return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
