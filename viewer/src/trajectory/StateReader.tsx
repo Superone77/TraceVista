@@ -4,7 +4,7 @@ import '@xyflow/react/dist/style.css';
 import { behaviors, colors, observationsFor, parseGraph, toolFingerprint, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
 import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, phaseFlow, edgeLabels, connectionLabels, type Tier, type StateMode, type FoldItem } from './semantic';
 import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
-import RoutedEdge, { type Rect } from './RoutedEdge';
+import RoutedEdge, { GutterEdge, type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
@@ -24,7 +24,7 @@ import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff'
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, RAIL_MAX = 760, MAP_MIN = 620;
-const edgeTypes = { routed: RoutedEdge };
+const edgeTypes = { routed: RoutedEdge, gutter: GutterEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null);
@@ -324,6 +324,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
+    const frames = projected.nodes.filter(n => n.kind === 'state').map(n => rects.get(n.id)!);
     const overview = tier === 'states';
     const out: Edge[] = [];
     for (const projectedEdge of projected.edges) {
@@ -347,9 +348,11 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
             style: { stroke: color, opacity: onMain ? 1 : .45, strokeWidth: onMain && sideLine ? 3.5 : 2, vectorEffect: 'non-scaling-stroke', strokeDasharray: restore ? '7 6' : undefined } } as Edge);
         } else {
           // Inside states the versions are the background: a wide pale band between frames, ↶ where an older version was restored.
-          out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+          const src = rects.get(e.source)!, tgt = rects.get(e.target)!;
+          out.push({ ...e, type: 'gutter', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+            data: { start: { x: src.x + src.width / 2, y: src.y + src.height }, exit: 'down', srcFrame: src, tgt, frames },
             ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
-            style: { stroke: color, opacity: onMain ? .16 : .09, strokeWidth: 14, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' } } as Edge);
+            style: { stroke: color, opacity: onMain ? .16 : .09, strokeWidth: 14, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', vectorEffect: 'non-scaling-stroke' } } as Edge);
         }
         continue;
       }
@@ -371,7 +374,15 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       const color = informs ? moveColors.insight : effect ? '#2f7363' : '#8b78b0';
       // A phase leads straight down into the version it made; an action, and every other cross link, routes around cards.
       const phaseEffect = effect && tier === 'branches';
-      const routed = phaseEffect ? { type: 'smoothstep' } : { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } };
+      let routed: Partial<Edge>;
+      if (effect && rects.get(e.target)) {
+        // From the step that made the version, out of its frame and along the gutters into the new version's frame.
+        const from = rects.get(e.source)!, own = layout.nodes.find(n => n.id === e.source);
+        const srcFrame = rects.get(own?.parentId ?? '') ?? from;
+        routed = { type: 'gutter', data: phaseEffect
+          ? { start: { x: from.x + from.width / 2, y: from.y + from.height }, exit: 'down', srcFrame, tgt: rects.get(e.target)!, frames }
+          : { start: { x: from.x + from.width, y: from.y + Math.min(from.height / 2, 60) }, exit: 'right', laneX: from.x + from.width + 20, srcFrame, tgt: rects.get(e.target)!, frames } };
+      } else routed = { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } };
       const text = informs ? t(edgeLabels.because) : t(_plain ?? '');
       out.push({ ...e, ...routed, sourceHandle: phaseEffect ? 'bottom' : 'right', targetHandle: phaseEffect ? 'top' : 'left', zIndex: informs ? 4 : 2,
         ...(touched || informs ? label(`${text}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, color) : {}),
