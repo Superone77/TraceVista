@@ -10,6 +10,14 @@
 .hierarchy-overview { padding: 14px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 24px; font-size: 14px; line-height: 1.8; }
 .hierarchy-overview summary { cursor: pointer; font-weight: 600; }
 .hierarchy-states { display: grid; gap: 18px; }
+.hierarchy-groups { display: grid; gap: 20px; }
+.hierarchy-group { min-width: 0; padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); }
+.hierarchy-group-toggle { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; width: 100%; padding: 4px 0; border: 0; text-align: left; color: var(--text); background: transparent; }
+.hierarchy-group-toggle strong { flex: 1; font-size: 18px; }
+.hierarchy-group-toggle > span:last-child { font-size: 12px; color: var(--text-2); }
+.hierarchy-group > p { font-size: 13px; line-height: 1.8; color: var(--text-2); overflow-wrap: anywhere; }
+.hierarchy-group-evidence { margin: 12px 0; font-size: 12px; color: var(--text-2); }
+.hierarchy-group-evidence summary { cursor: pointer; margin-bottom: 8px; }
 .hierarchy-node { min-width: 0; border: 1px solid var(--line); border-left: 3px solid var(--node-color); border-radius: 10px; background: var(--surface); scroll-margin-block: 16px; }
 .hierarchy-node.selected { outline: 2px solid var(--accent-line); outline-offset: 2px; }
 .hierarchy-heading { display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px 8px; }

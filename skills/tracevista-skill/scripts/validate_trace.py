@@ -8,6 +8,7 @@ from pathlib import Path
 
 from build_state_graph import BEHAVIORS, compile_graph
 from ladder import reading_quality
+from reading_groups import validate_reading_groups
 
 MAX_BYTES = 64 * 1024 * 1024
 
@@ -99,6 +100,10 @@ def validate_wire_graph(graph):
         # Range expansion is an authoring convenience, not a viewer import format.
         require(refs(item.get('events')))
     require(len({item['id'] for item in entities}) == len(entities))
+    try:
+        validate_reading_groups(graph, {item['id'] for item in entities}, event_ids)
+    except ValueError:
+        raise TraceError('invalid-graph', 'import-format') from None
     states = {state['id']: state for state in graph['states']}
     parents = {key: set() for key in states}
     for state in states.values():

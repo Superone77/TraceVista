@@ -93,6 +93,31 @@ Then say where the run started, what it ruled out, where it turned, where it lan
 Only the turns that mattered. At most 260 CJK characters or 110 words. Cite every entity it
 narrates.
 
+## 5. Optional reading groups
+
+Use `readingGroups` when the reader should start with a selected delivery path and
+expand background or alternative work separately. This is analyst interpretation,
+not execution order, code ancestry, or proof that an entire branch was discarded.
+Each group requires an explanation and raw event citations supporting its scope.
+
+```json
+"readingGroups": [
+  {"id": "delivery", "title": "Delivery", "summary": "The selected result and its checks.",
+   "states": ["s1"], "events": ["main:E451"], "defaultExpanded": true},
+  {"id": "background", "title": "Background", "summary": "Earlier work supporting the selected result.",
+   "states": ["s0"], "events": ["main:E12"], "defaultExpanded": false}
+]
+```
+
+Groups must contain every state exactly once, with IDs distinct from entity IDs.
+Array order controls reading order within and between groups. The hierarchy view
+opens groups according to `defaultExpanded`, leaving individual state cards folded.
+References to hidden entities open their containing group and containment path.
+Map view keeps the full graph; grouping never removes raw events, attachments,
+actions, transitions or lineage. Exports retain the defaults, not transient clicks.
+Older viewers may ignore this optional field and show the complete chronological
+overview. Files without groups keep their existing display.
+
 ## Validation
 
 `build_state_graph.py` calls `scripts/ladder.py` and rejects: an unknown move, a topic not found

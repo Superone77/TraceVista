@@ -140,6 +140,11 @@ function validateObservations(g: Graph, entities: Set<string>, raw: Set<string>)
   }
 }
 
+/** Analyst-authored reading order, independent of chronology and version ancestry. */
+export interface ReadingGroup {
+  id: string; title: string; summary: string; states: string[]; events: string[]; defaultExpanded: boolean;
+}
+
 export interface Graph {
   format: 'thoughtdag-state-trajectory' | 'coding-agent-state-trajectory'; version: 1; title: string; subtitle?: string; scope: string; notes: string[];
   states: State[]; branches: Branch[]; actions: Action[]; links: Link[]; transitions: Transition[];
@@ -149,6 +154,7 @@ export interface Graph {
   artifacts?: { name: string; path: string; sha256: string; text: string }[];
   /** Optional reading layer: one paragraph narrating the run's turns, citing what it narrates. */
   journey?: { text: string; cites: string[] }; language?: 'zh' | 'en';
+  readingGroups?: ReadingGroup[];
 }
 
 /** Tool glyphs, after ThoughtDAG's action fingerprint (src/lib/turn-insight.ts). */
@@ -233,6 +239,22 @@ export function parseGraph(value: unknown): Graph {
   const states = new Map(g.states.map(s => [s.id, s]));
   const branches = new Map(g.branches.map(b => [b.id, b]));
   const actions = new Map(g.actions.map(a => [a.id, a]));
+  if (g.readingGroups != null) {
+    if (!Array.isArray(g.readingGroups) || !g.readingGroups.length) throw new Error('Reading groups must partition all states');
+    const groupIds = new Set<string>(), grouped = new Set<string>();
+    for (const group of g.readingGroups) {
+      if (!group || typeof group.id !== 'string' || !group.id.trim() || ids.has(group.id) || groupIds.has(group.id)
+        || typeof group.title !== 'string' || !group.title.trim() || typeof group.summary !== 'string' || !group.summary.trim()
+        || typeof group.defaultExpanded !== 'boolean' || !Array.isArray(group.events) || !group.events.length || group.events.some(e => !raw.has(e))
+        || !Array.isArray(group.states) || !group.states.length) throw new Error('Reading groups require unique IDs, text, disclosure defaults and evidence');
+      groupIds.add(group.id);
+      for (const id of group.states) {
+        if (!states.has(id) || grouped.has(id)) throw new Error('Reading groups must partition all states exactly once');
+        grouped.add(id);
+      }
+    }
+    if (grouped.size !== states.size) throw new Error('Reading groups must partition all states exactly once');
+  }
   for (const s of g.states) {
     if (s.lineage && (!states.has(s.lineage.parent) || !['derived', 'restored', 'retained'].includes(s.lineage.relation) || !s.lineage.reason || !Array.isArray(s.lineage.events) || !s.lineage.events.length || s.lineage.events.some(e => !raw.has(e)))) throw new Error('Version lineage is missing a parent state or evidence');
     const seen = new Set<string>(); let p: State | undefined = s;

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
-import { colors, entityColor, moveGlyphs, moveLabels, type Entity, type Graph } from './model';
+import { colors, entityColor, moveGlyphs, moveLabels, type Entity, type Graph, type State, type ReadingGroup } from './model';
 import { labels } from './labels';
 import RawRecords from './RawRecords';
 import './hierarchy.css';
@@ -45,6 +45,24 @@ function Section({ entity, level, count, unit, expanded, selected, toggle, inspe
   </section>;
 }
 
+function Group({ group, expanded, toggle, evidence, children }: {
+  group: ReadingGroup; expanded: boolean; toggle: () => void; evidence: (id: string) => void; children: ReactNode;
+}) {
+  const headingId = useId(), contentId = useId();
+  return <section className="hierarchy-group" aria-labelledby={headingId}>
+    <button id={headingId} className="hierarchy-group-toggle" aria-expanded={expanded} aria-controls={contentId} onClick={toggle}>
+      <span aria-hidden="true">{expanded ? '▾' : '▸'}</span><strong>{group.title}</strong><span>{group.states.length} states · {expanded ? 'Collapse' : 'Expand'}</span>
+    </button>
+    <p>{group.summary}</p>
+    <div id={contentId} hidden={!expanded}>{expanded && <>
+      <details className="hierarchy-group-evidence"><summary>Grouping evidence · Analyst selection</summary>
+        <div className="hierarchy-references">{group.events.map(id => <button key={id} className="hierarchy-reference" onClick={() => evidence(id)}>{id}</button>)}</div>
+      </details>
+      <div className="hierarchy-states">{children}</div>
+    </>}</div>
+  </section>;
+}
+
 /** Disclosure changes document flow locally. Only explicit references scroll to a target. */
 export default function HierarchyView({ graph, expanded, selected, focus, toggle, inspect, reveal, evidence }: Props) {
   const root = useRef<HTMLDivElement>(null);
@@ -67,14 +85,7 @@ export default function HierarchyView({ graph, expanded, selected, focus, toggle
     {prefix}{index.entities.get(id)?.ladder?.topic || index.entities.get(id)?.title || id} ↗
   </button>;
   const quotes = (entity: Entity) => (entity.ladder?.abstract ?? []).map((q, i) => <blockquote key={i}>{q.quote} <button onClick={() => evidence(q.event)}>{q.event}</button></blockquote>);
-  return <div ref={root} className="hierarchy-view" aria-label="Expandable trajectory">
-    <div className="hierarchy-content">
-      <div className="hierarchy-intro"><span className="hierarchy-kicker">TRAJECTORY / HIERARCHY</span><h1>{graph.title}</h1>
-        <p>Expand a card to read its children in place. Collapse it to return to the parent.</p>
-        <span className="hierarchy-meta">{graph.states.length} states · {graph.branches.length} work phases · {graph.actions.length} actions · {graph.coverage.raw_events} raw records</span>
-      </div>
-      {graph.journey && <details className="hierarchy-overview"><summary>Run overview · Analyst notes</summary><p>{graph.journey.text}</p><div className="hierarchy-references">{graph.journey.cites.map(id => <span key={id}>{reference(id)}</span>)}</div></details>}
-      <div className="hierarchy-states">{graph.states.map(state => {
+  const renderState = (state: State) => {
         const phases = index.phases.get(state.id)!;
         return <Section key={state.id} entity={state} level="state" count={phases.length} unit="work phases" expanded={expanded.has(state.id)} selected={selected === state.id} toggle={() => toggle(state.id)} inspect={() => inspect(state.id)}>
           {state.lineage && <p className="hierarchy-relation">Version origin ({state.lineage.relation}): {reference(state.lineage.parent)}</p>}
@@ -96,7 +107,20 @@ export default function HierarchyView({ graph, expanded, selected, focus, toggle
             </Section>;
           })}
         </Section>;
-      })}</div>
+  };
+  return <div ref={root} className="hierarchy-view" aria-label="Expandable trajectory">
+    <div className="hierarchy-content">
+      <div className="hierarchy-intro"><span className="hierarchy-kicker">TRAJECTORY / HIERARCHY</span><h1>{graph.title}</h1>
+        <p>Expand a card to read its children in place. Collapse it to return to the parent.</p>
+        <span className="hierarchy-meta">{graph.states.length} states · {graph.branches.length} work phases · {graph.actions.length} actions · {graph.coverage.raw_events} raw records</span>
+      </div>
+      {graph.journey && <details className="hierarchy-overview"><summary>Run overview · Analyst notes</summary><p>{graph.journey.text}</p><div className="hierarchy-references">{graph.journey.cites.map(id => <span key={id}>{reference(id)}</span>)}</div></details>}
+      {graph.readingGroups ? <div className="hierarchy-groups">
+        <p className="hierarchy-meta">Reading groups · Analyst notes. Group order is separate from execution order and version ancestry.</p>
+        {graph.readingGroups.map(group => <Group key={group.id} group={group} expanded={expanded.has(group.id)} toggle={() => toggle(group.id)} evidence={evidence}>
+          {expanded.has(group.id) && group.states.map(id => renderState(graph.states.find(state => state.id === id)!))}
+        </Group>)}
+      </div> : <div className="hierarchy-states">{graph.states.map(renderState)}</div>}
       <p className="hierarchy-footnote">The nesting shows which state and work phase each action belongs to. Version ancestry and execution order are separate relations in Details and Map view. Unassigned records remain in Structure &amp; evidence.</p>
     </div>
   </div>;

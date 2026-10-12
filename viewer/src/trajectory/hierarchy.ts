@@ -1,5 +1,9 @@
 import type { Graph } from './model';
 
+export function initialHierarchy(graph: Graph): Set<string> {
+  return new Set((graph.readingGroups ?? []).filter(group => group.defaultExpanded).map(group => group.id));
+}
+
 /** Reveal just the target's containment path; state ancestry is a separate relation. */
 export function revealHierarchy(graph: Graph, expanded: ReadonlySet<string>, id: string): Set<string> {
   const next = new Set(expanded);
@@ -7,6 +11,8 @@ export function revealHierarchy(graph: Graph, expanded: ReadonlySet<string>, id:
   const branch = graph.branches.find(b => b.id === (action?.branch ?? id));
   const state = graph.states.find(s => s.id === (action?.state ?? branch?.state ?? id));
   if (!state) return next;
+  const group = graph.readingGroups?.find(group => group.states.includes(state.id));
+  if (group) next.add(group.id);
   next.add(state.id);
   if (branch) next.add(branch.id);
   if (action) next.add(action.id);

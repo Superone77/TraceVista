@@ -12,7 +12,7 @@ import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import HierarchyView from './HierarchyView';
-import { revealHierarchy, toggleHierarchy } from './hierarchy';
+import { initialHierarchy, revealHierarchy, toggleHierarchy } from './hierarchy';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -34,7 +34,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [hierarchy, setHierarchy] = useState(true);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(() => initialHierarchy(graph));
   const [hierarchyFocus, setHierarchyFocus] = useState<{ id: string; revision: number } | null>(null);
   const [tier, setTier] = useState<Tier>('states');
   const tierRef = useRef<Tier>('states');
@@ -239,6 +239,7 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
         <div className="viewer-menu-section">
           {hierarchy ? <button onClick={() => { setExpanded(new Set()); setHierarchyFocus(null); dismiss(); }}>Collapse all</button>
             : <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>}
+          {hierarchy && graph.readingGroups && <button onClick={() => { setExpanded(initialHierarchy(graph)); setHierarchyFocus(null); setSelected(null); dismiss(); }}>Reading defaults</button>}
           <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
           {!hierarchy && <><label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
           <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>

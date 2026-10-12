@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from observations import validate_observations
+from reading_groups import validate_reading_groups
 from build_canvas import expand, edge, base_data
 from ladder import validate_reading_layer, reading_quality, write_private_json
 
@@ -131,6 +132,7 @@ def compile_graph(analysis, timeline):
                          'behaviors': {b: sum(a['behavior'] == b for a in actions.values()) for b in BEHAVIORS}}
     validate_observations(graph, seen, set(index))
     validate_reading_layer(graph, index)
+    validate_reading_groups(graph, seen, set(index))
     return graph
 
 
