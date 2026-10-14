@@ -1,0 +1,10 @@
+.reader .chat-provider-field { display: grid; grid-template-columns: 5rem minmax(0, 1fr); align-items: center; gap: 8px; color: var(--text-2); }
+.reader .chat-settings .provider-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: var(--ui-control-height); padding: 5px 7px; font: inherit; text-align: left; }
+.provider-trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-menu { position: fixed; z-index: 10000; overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--text); font: 14px/1.5 var(--font-sans); box-shadow: 0 6px 24px var(--shadow-md); outline: none; }
+.provider-menu:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.provider-group { padding: 8px 10px 4px; color: var(--text-3); font-size: 12px; font-weight: 600; }
+.provider-option { display: flex; gap: 6px; align-items: center; padding: 7px 8px; border-radius: 5px; cursor: pointer; }
+.provider-option > span { width: 1em; flex-shrink: 0; }
+.provider-option[aria-selected=true] { font-weight: 600; }
+.provider-option:hover, .provider-option.active { background: var(--surface-3); color: var(--ink); }

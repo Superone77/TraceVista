@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { moveColors, type Entity, type Graph } from './model';
 import { buildChat, citations, contextLabels, type ChatTurn, type ContextOptions } from './chat';
 import { useLang } from './i18n';
+import ProviderPicker from './ProviderPicker';
 import { buildSmartContext, runSmartChat, type SmartStatus } from './smartContext';
-import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presets, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
+import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
 import './smart-context.css';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
@@ -203,9 +204,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       </div></details>
       <button onClick={close} aria-label="Close chat">×</button></span></header>
     {showSettings && <fieldset className="chat-settings" disabled={locked}>
-      <label>{tr('Provider')}<select aria-label="Model provider" value={preset} onChange={e => editConnection(switchPreset(settings, e.target.value))}>
-        {(['Cloud APIs', 'Local servers', 'Custom'] as const).map(group => <optgroup key={group} label={group}>{Object.entries(presets).filter(([, p]) => p.group === group).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}</optgroup>)}
-      </select></label>
+      <div className="chat-provider-field"><span>{tr('Provider')}</span><ProviderPicker value={preset} disabled={locked} onChange={value => editConnection(switchPreset(settings, value))} /></div>
       <label>{tr('Base URL')}<input aria-label="API base URL" value={settings.baseUrl} placeholder="https://…/v1" onChange={e => editConnection(changeEndpoint(settings, e.target.value))} /></label>
       <label>{tr('Key')}<input aria-label="API Key" type="password" autoComplete="off" value={settings.apiKey} placeholder={selectedPreset(settings).noKey || preset === 'custom' ? tr('Optional if authentication is disabled') : tr('Enter the API key for this provider')} onChange={e => { setProbe({ busy: false, text: '' }); setSettings(s => ({ ...s, apiKey: e.target.value })); }} /></label>
       {selectedPreset(settings).keyUrl && <a className="chat-provider-link" href={selectedPreset(settings).keyUrl} target="_blank" rel="noreferrer">{tr('Get a key for {name} ↗', { name: selectedPreset(settings).label })}</a>}
