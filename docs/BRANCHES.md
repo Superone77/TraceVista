@@ -21,9 +21,9 @@ pnpm setup:hooks
 获得相应权限后，在仓库目录执行并核对返回值：
 
 ```bash
-gh api --method PUT repos/Superone77/trajactory_visualizer/branches/main/protection \
+gh api --method PUT repos/Superone77/TraceVista/branches/main/protection \
   --input .github/main-protection.json
-gh api repos/Superone77/trajactory_visualizer/branches/main/protection
+gh api repos/Superone77/TraceVista/branches/main/protection
 ```
 
 当前 CLI 登录账号也是 Superone77。GitHub 不允许作者批准自己的 PR；要由 Superone77 在 GitHub 点击 Approve，PR 应由另一提交账号创建。使用当前账号时，先由用户在聊天中审阅并明确批准，再操作该 PR；这不算 GitHub 的 approving review。

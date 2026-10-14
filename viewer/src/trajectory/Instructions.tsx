@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import './instructions.css';
 import { useLang } from './i18n';
 
-const installPrompt = 'Install skills/tracevista-skill from https://github.com/Superone77/trajactory_visualizer';
+const installPrompt = 'Install skills/tracevista-skill from https://github.com/Superone77/TraceVista';
 const conversionPrompt = 'Use tracevista-skill to convert [trajectory file or folder] into a complete .agent-state.json, then open https://tracevista.pages.dev/ in my browser and import it.';
 
 function CopyBlock({ text, label }: { text: string; label: string }) {

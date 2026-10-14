@@ -75,7 +75,7 @@ Open an example and follow its decisions from the overview down to the original 
 ### 1. Install the skill
 
 ```text
-Install skills/tracevista-skill from https://github.com/Superone77/trajactory_visualizer
+Install skills/tracevista-skill from https://github.com/Superone77/TraceVista
 ```
 
 ### 2. Convert and open
@@ -98,8 +98,8 @@ The map, annotations, original records, and source attachments travel together i
 Requires **Node.js 24.x** and **pnpm 11.19.0**.
 
 ```bash
-git clone https://github.com/Superone77/trajactory_visualizer.git
-cd trajactory_visualizer
+git clone https://github.com/Superone77/TraceVista.git
+cd TraceVista
 npm install -g pnpm@11.19.0
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm dev
@@ -116,7 +116,7 @@ TraceVista pairs a **React Flow viewer** with a **trajectory conversion skill**.
 - [Reading layer](skills/tracevista-skill/references/reading-layer.md) — summaries, turning points, and decision links.
 - [Contributing](docs/BRANCHES.md) — work on a branch and send a pull request.
 
-Have an interesting trajectory or an idea for the viewer? [Open an issue](https://github.com/Superone77/trajactory_visualizer/issues).
+Have an interesting trajectory or an idea for the viewer? [Open an issue](https://github.com/Superone77/TraceVista/issues).
 
 ## Acknowledgements
 
