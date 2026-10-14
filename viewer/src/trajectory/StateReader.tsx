@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MarkerType, useReactFlow, type Edge, type Viewport } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { behaviors, colors, entityColor, observationsFor, parseGraph, toolFingerprint, landmarkMoves, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
-import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, type Tier, type StateMode, type FoldItem } from './semantic';
-import MapCard, { type CardNode, type Landmark } from './MapCard';
-import RoutedEdge, { type Rect } from './RoutedEdge';
+import { behaviors, colors, observationsFor, parseGraph, toolFingerprint, moves, moveColors, moveGlyphs, moveLabels, stateTones, type Graph, type Action, type Branch, type Entity } from './model';
+import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsForAction, tierLabels, phaseFlow, edgeLabels, connectionLabels, type Tier, type StateMode, type FoldItem } from './semantic';
+import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
+import RoutedEdge, { GutterEdge, type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
+import StoryRail, { type Depth } from './StoryRail';
+import { expandStoryToTier, revealStoryPath } from './storyDisclosure';
+import { deliveredState, keyDecisions, mainLine, workMix } from './story';
+import './story.css';
+import { LangProvider, LangToggle, useLang } from './i18n';
+import { localizeGraph } from './localize';
 import './trajectory.css';
 import './interface.css';
 import exampleCatalog from '../../public/examples/index.json';
@@ -18,17 +24,18 @@ import { datasetRequest } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 
 const nodeTypes = { trajectory: MapCard };
-const edgeTypes = { routed: RoutedEdge };
-/** A short name for chips and citations: the ladder's topic, else the title's head. */
-const shortName = (e: Entity) => e.ladder?.topic ?? e.title.split(/[·:：，,（(]/)[0].trim().slice(0, 14);
+const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
+const edgeTypes = { routed: RoutedEdge, gutter: GutterEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
   const input = useRef<HTMLInputElement>(null);
-  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label="Choose a trajectory file" type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
+  const { t } = useLang();
+  return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: File) => void; onHome: () => void }) {
+function Reader({ graph, original, onImport, onHome }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void }) {
   const rf = useReactFlow<CardNode, Edge>();
+  const { t } = useLang();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [tier, setTier] = useState<Tier>('states');
@@ -48,17 +55,60 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const [decisionsOnly, setDecisionsOnly] = useState(readingStatus.ready);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
   const [journeyOpen, setJourneyOpen] = useState(true);
+  const [storyExpanded, setStoryExpanded] = useState<Set<string>>(() => new Set());
+  // Reading can take most of the workspace; keep a narrow map beside it rather than a fixed rail cap.
+  const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
+  const [railWidth, setRailWidth] = useState<number>(() => { try { const v = Number(localStorage.getItem(RAIL_STORE)); return Number.isFinite(v) && v >= RAIL_MIN ? v : railDefault(); } catch { return railDefault(); } });
+  const [railLimit, setRailLimit] = useState(() => Math.max(RAIL_MIN, window.innerWidth - MAP_MIN));
+  const railRef = useRef(railWidth); railRef.current = railWidth;
+  const railSpace = () => {
+    const workspace = canvasRef.current?.parentElement;
+    if (!workspace) return window.innerWidth;
+    const dock = workspace.querySelector<HTMLElement>(':scope > .side-dock');
+    const occupied = dock && getComputedStyle(dock).position !== 'absolute' ? dock.getBoundingClientRect().width : 0;
+    return workspace.getBoundingClientRect().width - occupied;
+  };
+  const railMax = () => Math.max(RAIL_MIN, railSpace() - MAP_MIN);
+  const resizeRail = useCallback((px: number) => setRailWidth(Math.round(Math.max(RAIL_MIN, Math.min(railMax(), px)))), []);
+  const storeRail = (w: number | null) => { try { if (w == null) localStorage.removeItem(RAIL_STORE); else localStorage.setItem(RAIL_STORE, String(w)); } catch { /* private mode: the width lasts for this page */ } };
+  // Kept whenever it changes, except mid-drag; a drag is kept when it ends. Double-click returns to the default.
+  useEffect(() => { if (!document.body.classList.contains('resizing-story')) storeRail(railWidth); }, [railWidth]);
+  const saveRail = useCallback((reset?: boolean) => {
+    if (!reset) { storeRail(railRef.current); return; }
+    setRailWidth(Math.min(railDefault(), railMax()));
+    storeRail(null);
+  }, []);
+  const [legendOpen, setLegendOpen] = useState(false);
+  // The card under the pointer shows its reasons (informs links) the same way a selected card does.
+  const [hovered, setHovered] = useState<string | null>(null);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
+  const [focusRevision, setFocusRevision] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
+  // With both panels open the dock shows one at a time: details or chat, each at full height.
+  const [front, setFront] = useState<'details' | 'chat'>('details');
+  const chatFront = useRef(false); chatFront.current = chatOpen && front === 'chat';
+  const showDetails = useCallback(() => { setInspectorOpen(true); setFront('details'); }, []);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
-  const pendingJump = useRef<string | null>(null);
-  const inspect = useCallback((id: string) => { overviewPinned.current = false; setSelected(id); setInspectorOpen(true); }, []);
+  const pendingJump = useRef<{ id: string; desired?: Tier; revealInStory: boolean } | null>(null);
+  const revealStory = useCallback((id: string) => setStoryExpanded(previous => revealStoryPath(original, previous, id)), [original]);
+  const inspect = useCallback((id: string) => { overviewPinned.current = false; revealStory(id); setSelected(id); setInspectorOpen(true); if (!chatFront.current) setFront('details'); }, [revealStory]);
   const expand = useCallback((foldId: string) => setOpenFolds(s => new Set(s).add(foldId)), []);
-  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); setInspectorOpen(true); }, []);
+  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); setFocusRevision(revision => revision + 1); showDetails(); }, [showDetails]);
   const layouts = useMemo(() => Object.fromEntries((['states', 'branches', 'actions', 'raw'] as Tier[]).map(t => [t, layoutGraph(graph, t, stateMode, { fold: decisionsOnly, openFolds })])) as Record<Tier, ReturnType<typeof layoutGraph>>, [graph, stateMode, decisionsOnly, openFolds]);
   const layout = layouts[tier];
+  const decisions = useMemo(() => keyDecisions(graph), [graph]);
+  const decisionNo = useMemo(() => new Map(decisions.map(d => [d.id, d.n])), [decisions]);
+  const delivered = useMemo(() => deliveredState(graph), [graph]);
+  const main = useMemo(() => mainLine(graph, stateMode), [graph, stateMode]);
+  // Only a line that leaves some states out is worth drawing; a straight run is all main line.
+  const sideLine = main.size > 0 && main.size < graph.states.length;
+  // Name who did an action only when more than one participant acted.
+  const multiActor = useMemo(() => new Set(graph.actions.map(a => a.actor)).size > 1, [graph]);
+  const ordinals = useMemo(() => new Map(graph.states.map((st, i) => [st.id, i])), [graph]);
   const projected = useMemo(() => {
-    const p = semanticProjection(graph, layout, tier, showLinks, proposed);
+    const raw = semanticProjection(graph, layout, tier, showLinks, proposed);
+    // Inside a state, time is drawn phase to phase (flow edges); the recorded cross-phase sequence links would draw it twice.
+    const p = { ...raw, edges: raw.edges.filter(e => !(e.id.startsWith('link:') && e.kind === 'sequence')) };
     if (!decisionsOnly) return p;
     // The decision view keeps why-links and drops chronology between branches; across states the state edges carry the flow.
     const stateOf = new Map<string, string>([...graph.branches.map(b => [b.id, b.state] as const), ...graph.actions.map(a => [a.id, a.state] as const)]);
@@ -73,32 +123,81 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     pendingViewport.current = view;
     setTier(next);
   }, [rf]);
+  const flying = useRef(false);
+  const flightTimer = useRef(0);
+  const pendingFlight = useRef<Viewport | null>(null);
+  const FLIGHT = 520;
   useLayoutEffect(() => {
     if (pendingViewport.current) {
       const view = pendingViewport.current;
       pendingViewport.current = null;
       void rf.setViewport(view);
     }
+    if (pendingFlight.current) {
+      const view = pendingFlight.current;
+      pendingFlight.current = null;
+      requestAnimationFrame(() => { void rf.setViewport(view, { duration: FLIGHT }); });
+    }
   }, [tier, rf]);
-  const overview = useCallback((fitAll = false) => {
+  // Fly the camera to a view. While it flies, zoom does not switch tiers; a reader's own pan or zoom takes over at once.
+  // Across tiers, the target tier's layout is swapped in under the screen centre first, then the camera flies from there.
+  const flyTo = useCallback((next: Tier, view: Viewport) => {
+    const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
+    if (!box || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setView(next, view); return; }
+    flying.current = true;
+    window.clearTimeout(flightTimer.current);
+    flightTimer.current = window.setTimeout(() => { flying.current = false; }, FLIGHT + 160);
+    if (tierRef.current === next) { void rf.setViewport(view, { duration: FLIGHT }); return; }
+    pendingFlight.current = view;
+    setView(next, rebaseViewport(layouts[tierRef.current], layouts[next], rf.getViewport(), { x: box.width / 2, y: box.height / 2 }));
+  }, [rf, setView, layouts]);
+  const overview = useCallback((fitAll = false, fly = false) => {
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     if (!box) return;
     overviewPinned.current = true;
     setSelected(null);
     const { width, height } = layouts.states;
-    const leftInset = journeyOpen && graph.journey && box.width >= 1000 ? Math.min(380, box.width * .38) + 32 : 0;
-    const centerX = (leftInset + box.width) / 2;
+    const centerX = box.width / 2;
     const root = layouts.states.nodes.find(n => n.kind === 'state')!;
-    const zoom = Math.max(.04, Math.min(.44, (box.width - leftInset - 64) / (fitAll ? width : root.width), ...(fitAll ? [(box.height - 110) / height] : [])));
-    setView('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (root.x + root.width / 2) * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
-  }, [layouts, setView, journeyOpen, graph.journey]);
+    // First view: the line that was delivered, as wide as it spreads, never smaller than a readable card.
+    const line = layouts.states.nodes.filter(n => n.kind === 'state' && main.has(n.id));
+    const lo = Math.min(...line.map(n => n.x), root.x), hi = Math.max(...line.map(n => n.x + n.width), root.x + root.width);
+    const zoom = fitAll ? Math.max(.04, Math.min(.44, (box.width - 64) / width, (box.height - 110) / height)) : Math.max(.26, Math.min(.44, (box.width - 64) / (hi - lo)));
+    (fly ? flyTo : setView)('states', { x: fitAll ? centerX - width * zoom / 2 : centerX - (lo + hi) / 2 * zoom, y: fitAll ? (box.height - height * zoom) / 2 : 58, zoom });
+  }, [layouts, setView, flyTo, main]);
+  const selectedRef = useRef<string | null>(null); selectedRef.current = selected;
+  const layoutRef = useRef(layout); layoutRef.current = layout;
+  const journeyTucked = useRef(false);
   useEffect(() => {
     const el = canvasRef.current?.querySelector('.react-flow');
     if (!el) return;
-    const observer = new ResizeObserver(() => { if (overviewPinned.current) overview(); });
+    let last = el.getBoundingClientRect();
+    const observer = new ResizeObserver(() => {
+      const box = el.getBoundingClientRect();
+      const available = railSpace(), limit = Math.max(RAIL_MIN, available - MAP_MIN);
+      setRailLimit(limit);
+      setRailWidth(width => Math.min(width, limit));
+      // A deliberately narrow map is fine. Tuck the story only when both panels cannot fit at their minimums.
+      if (available < RAIL_MIN + MAP_MIN && !document.body.classList.contains('resizing-story')) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
+      else if (journeyTucked.current && available >= RAIL_MIN + MAP_MIN + 40) { journeyTucked.current = false; setJourneyOpen(true); }
+      if (overviewPinned.current) overview();
+      else if (last.width > 0 && last.height > 0 && (box.width !== last.width || box.height !== last.height)) {
+        // Keep what was in the middle of the map in the middle, then make sure the selected card is still on screen.
+        const v = rf.getViewport();
+        let x = v.x + (box.width - last.width) / 2, y = v.y + (box.height - last.height) / 2;
+        const card = layoutRef.current.nodes.find(n => n.id === selectedRef.current);
+        if (card) {
+          const left = x + card.x * v.zoom, right = left + Math.min(card.width * v.zoom, box.width - 32);
+          if (right > box.width - 16) x -= right - (box.width - 16); else if (left < 16) x += 16 - left;
+        }
+        void rf.setViewport({ x, y, zoom: v.zoom });
+      }
+      last = box;
+    });
     observer.observe(el);
+    if (canvasRef.current?.parentElement) observer.observe(canvasRef.current.parentElement);
     return () => observer.disconnect();
-  }, [overview]);
+  }, [overview, rf]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || (e.target as HTMLElement)?.closest('input, textarea, button, select, summary, [contenteditable="true"]')) return;
@@ -112,8 +211,9 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     // Updating one CSS variable avoids rebuilding every node and its raw records per frame.
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
-    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < .3);
+    if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < COMPACT_ZOOM);
     if (zoomReadout.current) zoomReadout.current.textContent = `${Math.round(viewport.zoom * 100)}%`;
+    if (flying.current) return;
     const previous = tierRef.current;
     const next = semanticTier(viewport.zoom, previous);
     if (next === previous) return;
@@ -124,13 +224,14 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const point = e && typeof e.clientX === 'number' ? { x: e.clientX - box.left, y: e.clientY - box.top } : { x: box.width / 2, y: box.height / 2 };
     setView(next, rebaseViewport(layouts[previous], layouts[next], viewport, point));
   }, [layouts, setView]);
-  const moveTo = useCallback((id: string, desired?: Tier) => {
+  const moveTo = useCallback((id: string, desired?: Tier, revealInStory = true) => {
+    if (revealInStory) revealStory(id);
     const entity = layouts.raw.nodes.find(n => n.id === id);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     if (!entity) {
       // A folded action: open its fold, then jump once the layout has it.
       const fold = layouts.raw.nodes.find(n => n.kind === 'fold' && (n.item as FoldItem).actions.some(a => a.id === id));
-      if (fold) { pendingJump.current = id; setOpenFolds(s => new Set(s).add(fold.id)); }
+      if (fold) { pendingJump.current = { id, desired, revealInStory }; setOpenFolds(s => new Set(s).add(fold.id)); }
       return;
     }
     if (!box) return;
@@ -144,11 +245,57 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     overviewPinned.current = false;
     setSelected(id); setProposed(true);
     const zoom = next === 'raw' ? 1.2 : next === 'actions' ? .96 : .64;
-    const x = p.x + p.width / 2;
-    const y = p.kind === 'state' ? p.y + 140 : p.y + Math.min(p.height / 2, (box.height - 70) / (2 * zoom));
-    setView(next, { x: box.width / 2 - x * zoom, y: box.height / 2 - y * zoom, zoom });
-  }, [layouts, setView]);
-  useEffect(() => { const id = pendingJump.current; if (id && layouts.raw.nodes.some(n => n.id === id)) { pendingJump.current = null; moveTo(id); } }, [layouts, moveTo]);
+    const TOP = 24; // screen pixels between the toolbar and the first card
+    const laneOf = (n: { kind: string; id: string; item: unknown }) => n.kind === 'branch' ? n.id : n.kind === 'action' || n.kind === 'fold' ? (n.item as Action | FoldItem).branch : undefined;
+    let view: Viewport;
+    if (next === 'branches') {
+      // The state's heading and its row of phases from the top; on a row wider than the screen, the target phase in the middle.
+      const state = p.kind === 'state' ? p : layouts.branches.nodes.find(n => n.id === p!.parentId) ?? p;
+      const phase = layouts.branches.nodes.find(n => n.kind === 'branch' && n.id === laneOf(entity));
+      // A row wider than the screen starts from its left edge, unless a particular phase was asked for.
+      const fits = state.width * zoom <= box.width - 48;
+      const x = fits ? box.width / 2 - (state.x + state.width / 2) * zoom : phase ? box.width / 2 - (phase.x + phase.width / 2) * zoom : 24 - state.x * zoom;
+      view = { x, y: TOP - state.y * zoom, zoom };
+    } else {
+      // A lane: its phase card on top with the actions below it. A target further down, or any record view, starts at the target.
+      const lane = layouts[next].nodes.find(n => n.kind === 'branch' && n.id === laneOf(p!));
+      const card = p.kind === 'action' || p.kind === 'fold';
+      let top = lane?.y ?? p.y;
+      if (card && (next === 'raw' || (p.y + Math.min(p.height, 360) - top) * zoom > box.height - TOP - 16)) top = p.y - 16;
+      // Across: as many of this state's lanes as fit, starting from its first, with the target lane always on screen.
+      const column = lane ?? p;
+      const lanes = layouts[next].nodes.filter(n => n.kind === 'branch' && n.parentId === column.parentId);
+      const span = box.width / zoom, pad = 24 / zoom;
+      let left = column.x + column.width / 2 - span / 2;
+      // A single action (a decision picked from the list) is centred; a state or a phase shows its lanes from the first.
+      const single = entity.kind === 'action' || entity.kind === 'fold';
+      if (lanes.length && !single) {
+        const lo = Math.min(...lanes.map(n => n.x)) - pad, hi = Math.max(...lanes.map(n => n.x + n.width)) + pad;
+        left = hi - lo <= span ? (lo + hi) / 2 - span / 2 : Math.min(Math.max(lo, column.x + column.width + pad - span), column.x - pad);
+      }
+      view = { x: -left * zoom, y: TOP - top * zoom, zoom };
+    }
+    flyTo(next, view);
+  }, [layouts, flyTo, revealStory]);
+  // A state on the overview: centred at the overview's zoom, the camera flying there from wherever it is.
+  const flyToState = useCallback((id: string) => {
+    const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
+    const n = layouts.states.nodes.find(m => m.id === id);
+    if (!box || !n) return;
+    overviewPinned.current = false; revealStory(id); setSelected(id);
+    const zoom = tierRef.current === 'states' ? rf.getViewport().zoom : .44;
+    flyTo('states', { x: box.width / 2 - (n.x + n.width / 2) * zoom, y: 58 - n.y * zoom, zoom });
+  }, [layouts, flyTo, rf, revealStory]);
+  // The story's depth decides the map's: the outcome on the overview, a step at its phases, a phase at its actions, an action at its records.
+  const fly = useCallback((id: string, depth: Depth) => { if (depth === 'states') flyToState(id); else moveTo(id, depth); }, [flyToState, moveTo]);
+  // Cards that appear with a new tier fade in where they land, so a tier change reads as the same map opening up.
+  useEffect(() => {
+    const el = canvasRef.current; if (!el) return;
+    el.dataset.entering = 'true';
+    const t = setTimeout(() => { delete el.dataset.entering; }, 420);
+    return () => clearTimeout(t);
+  }, [tier]);
+  useEffect(() => { const request = pendingJump.current; if (request && layouts.raw.nodes.some(n => n.id === request.id)) { pendingJump.current = null; moveTo(request.id, request.desired, request.revealInStory); } }, [layouts, moveTo]);
   const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
   const byId = useMemo(() => new Map<string, Entity>(all.map(e => [e.id, e])), [all]);
   // Every entity gets a ladder: the analyst's when written, else its title and its own sentences without the parent's summary.
@@ -156,15 +303,24 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     const parent = 'behavior' in e ? byId.get((e as Action).branch) : 'status' in e ? byId.get((e as Branch).state) : undefined;
     return [e.id, e.ladder ? fromReading(e.ladder) : localLadder(e.title, withoutParent(e.summary, parent?.summary))];
   })), [all, byId]);
-  const landmarks = useMemo(() => {
-    const isLandmark = (e: Entity) => !!e.move && landmarkMoves.includes(e.move);
-    const start = (id: string) => Math.min(...graph.actions.filter(a => a.id === id || a.branch === id).map(a => a.t_min ?? Infinity));
-    return new Map(graph.states.map(s => {
-      let list: Entity[] = graph.branches.filter(b => b.state === s.id && isLandmark(b));
-      if (list.length < 2) list = [...list, ...graph.actions.filter(a => a.state === s.id && isLandmark(a) && !list.some(b => b.id === a.branch))].slice(0, 4);
-      return [s.id, list.sort((a, b) => start(a.id) - start(b.id)).map((e): Landmark => ({ id: e.id, move: e.move!, label: shortName(e) }))];
-    }));
-  }, [graph]);
+  const landmarks = useMemo(() => new Map(graph.states.map(st => [st.id, decisions.filter(d => d.state === st.id).map((d): Landmark => ({ id: d.id, move: d.move, label: d.label, n: d.n }))])), [graph, decisions]);
+  const flow = useMemo(() => phaseFlow(graph), [graph]);
+  // Focus: below the overview, a selected card keeps its parent state, its neighbours in time and its reasons; the rest recede.
+  const focus = useMemo(() => {
+    if (!selected || tier === 'states' || !projected.nodes.some(n => n.id === selected && n.kind !== 'state')) return null;
+    const keep = new Set([selected]);
+    for (const e of projected.edges) if (e.source === selected) keep.add(e.target); else if (e.target === selected) keep.add(e.source);
+    const own = projected.nodes.find(n => n.id === selected);
+    if (own?.parentId) keep.add(own.parentId);
+    return keep;
+  }, [selected, tier, projected]);
+  // A small mark on each card that has reasons, so the dashed lines need not be drawn until asked for.
+  const why = useMemo(() => {
+    const m = new Map<string, { in: number; out: number }>();
+    const at = (id: string) => { if (!m.has(id)) m.set(id, { in: 0, out: 0 }); return m.get(id)!; };
+    for (const e of projected.edges) if (e.kind === 'informs') { at(e.target).in += e.count ?? 1; at(e.source).out += e.count ?? 1; }
+    return m;
+  }, [projected]);
   const nodes = useMemo<CardNode[]>(() => projected.nodes.map(p => {
     const parent = p.parentId ? layout.nodes.find(n => n.id === p.parentId) : null;
     const related = p.kind === 'fold' ? [] : graph.actions.filter(a => p.kind === 'state' ? a.state === p.id : a.branch === p.id);
@@ -174,43 +330,100 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
       position: { x: p.x - (parent?.x ?? 0), y: p.y - (parent?.y ?? 0) }, selected: p.id === selected,
       width: p.width, height: p.height, zIndex: p.kind === 'state' ? 0 : 3,
       data: { p, tier, observations: observationsFor(graph, p.id), actions: related, branches: graph.branches.filter(b => b.state === p.id).length,
-        records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: layout.nodes.filter(n => n.kind === 'state').findIndex(s => s.id === p.id), tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
+        records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
+        offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [], multiActor,
+        flowNo: p.kind === 'branch' ? flow.get(p.id)?.n : undefined, why: why.get(p.id), dim: !!focus && p.kind !== 'state' && !focus.has(p.id),
         fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
-  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited]);
+  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus]);
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
-    return projected.edges.map(e => {
+    const frames = projected.nodes.filter(n => n.kind === 'state').map(n => rects.get(n.id)!);
+    const overview = tier === 'states';
+    const out: Edge[] = [];
+    for (const projectedEdge of projected.edges) {
+      // The projection's own label is English and unconditional; each kind below decides its label, translated.
+      const { label: _plain, ...e } = projectedEdge;
       const stateEdge = ['transition', 'lineage', 'restore'].includes(e.kind);
-      const cross = !stateEdge && e.kind !== 'sequence';
       const informs = e.kind === 'informs';
-      const touched = e.source === selected || e.target === selected;
-      const color = e.kind === 'restore' ? '#7a4fa8' : informs ? moveColors.insight : stateEdge || e.kind === 'effect' ? '#2f7363' : cross ? '#8b78b0' : '#9fb0ba';
-      // Cross-links route around cards (ThoughtDAG's edge-path); structural chains stay straight.
-      const routed = cross ? { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } } : { type: 'smoothstep' };
-      return { ...e, ...routed, sourceHandle: cross ? 'right' : 'bottom', targetHandle: cross ? 'left' : 'top',
-        label: tier === 'states' && e.kind !== 'restore' || cross && !touched && !(informs && tier !== 'branches') ? undefined : `${e.label}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, zIndex: stateEdge ? 0 : informs ? 4 : 2,
-        markerEnd: { type: MarkerType.ArrowClosed, color, width: stateEdge ? 18 : 12, height: stateEdge ? 18 : 12 },
-        style: { stroke: color, opacity: cross && !touched && !informs ? .45 : 1, strokeWidth: stateEdge ? 2 : informs ? 2 : cross ? 1.5 : 1.2, vectorEffect: 'non-scaling-stroke', strokeDasharray: informs ? '5 4' : cross || e.kind === 'restore' ? '7 6' : undefined },
-        labelStyle: { fontSize: 13, fill: color, fontWeight: informs ? 600 : 400 }, labelBgStyle: { fill: '#f2f2f2', fillOpacity: .96 },
-      } as Edge;
-    });
-  }, [projected, layout, tier, selected]);
+      const touched = [selected, hovered].some(id => id && (e.source === id || e.target === id));
+      // Reasons are drawn only for the card being looked at; elsewhere a mark on the card says they exist.
+      if (informs && !overview && !touched) continue;
+      const dimmed = !!focus && !stateEdge && !touched;
+      const label = (text: string, color: string, extra: Partial<Edge> = {}) => ({ label: text, labelStyle: { fontSize: 13, fill: color, fontWeight: 600 }, labelBgStyle: { fill: '#f2f2f2', fillOpacity: .96 }, ...extra });
+      if (stateEdge) {
+        const onMain = !sideLine || main.has(e.source) && main.has(e.target);
+        const restore = e.kind === 'restore', color = restore ? '#7a4fa8' : '#2f7363';
+        if (overview) {
+          // The overview is the version tree: ancestry is the line the reader follows.
+          out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
+            style: { stroke: color, opacity: onMain ? 1 : .45, strokeWidth: onMain && sideLine ? 3.5 : 2, vectorEffect: 'non-scaling-stroke', strokeDasharray: restore ? '7 6' : undefined } } as Edge);
+        } else {
+          // Inside states the versions are the background: a wide pale band between frames, ↶ where an older version was restored.
+          const src = rects.get(e.source)!, tgt = rects.get(e.target)!;
+          out.push({ ...e, type: 'gutter', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
+            data: { start: { x: src.x + src.width / 2, y: src.y + src.height }, exit: 'down', srcFrame: src, tgt, frames },
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            style: { stroke: color, opacity: onMain ? .16 : .09, strokeWidth: 14, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', vectorEffect: 'non-scaling-stroke' } } as Edge);
+        }
+        continue;
+      }
+      if (e.kind === 'flow' || e.kind === 'parallel') {
+        const parallel = e.kind === 'parallel', color = parallel ? '#9aa0a6' : '#4b5563';
+        out.push({ ...e, type: 'straight', sourceHandle: 'right', targetHandle: 'left', zIndex: 3,
+          ...(parallel ? label(t(edgeLabels.parallel), color) : {}),
+          markerEnd: parallel ? undefined : { type: MarkerType.ArrowClosed, color, width: 14, height: 14 },
+          style: { stroke: color, strokeWidth: parallel ? 1.5 : 2.2, strokeDasharray: parallel ? '2 5' : undefined, opacity: dimmed ? .3 : 1, vectorEffect: 'non-scaling-stroke' } } as Edge);
+        continue;
+      }
+      if (e.kind === 'sequence') {
+        out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 2,
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#8b949e', width: 12, height: 12 },
+          style: { stroke: '#8b949e', strokeWidth: 1.4, opacity: dimmed ? .3 : 1, vectorEffect: 'non-scaling-stroke' } } as Edge);
+        continue;
+      }
+      const effect = e.kind === 'effect';
+      const color = informs ? moveColors.insight : effect ? '#2f7363' : '#8b78b0';
+      // A phase leads straight down into the version it made; an action, and every other cross link, routes around cards.
+      const phaseEffect = effect && tier === 'branches';
+      let routed: Partial<Edge>;
+      if (effect && rects.get(e.target)) {
+        // From the step that made the version, out of its frame and along the gutters into the new version's frame.
+        const from = rects.get(e.source)!, own = layout.nodes.find(n => n.id === e.source);
+        const srcFrame = rects.get(own?.parentId ?? '') ?? from;
+        routed = { type: 'gutter', data: phaseEffect
+          ? { start: { x: from.x + from.width / 2, y: from.y + from.height }, exit: 'down', srcFrame, tgt: rects.get(e.target)!, frames }
+          : { start: { x: from.x + from.width, y: from.y + Math.min(from.height / 2, 60) }, exit: 'right', laneX: from.x + from.width + 20, srcFrame, tgt: rects.get(e.target)!, frames } };
+      } else routed = { type: 'routed', data: { obstacles: cards.filter(id => id !== e.source && id !== e.target).map(id => rects.get(id)!), src: rects.get(e.source), tgt: rects.get(e.target) } };
+      const text = informs ? t(edgeLabels.because) : t(_plain ?? '');
+      out.push({ ...e, ...routed, sourceHandle: phaseEffect ? 'bottom' : 'right', targetHandle: phaseEffect ? 'top' : 'left', zIndex: informs ? 4 : 2,
+        ...(touched || informs ? label(`${text}${(e.count ?? 0) > 1 ? ` ×${e.count}` : ''}`, color) : {}),
+        markerEnd: { type: MarkerType.ArrowClosed, color, width: 12, height: 12 },
+        style: { stroke: color, opacity: dimmed ? .2 : effect || touched ? 1 : .45, strokeWidth: informs || effect ? 2 : 1.5, vectorEffect: 'non-scaling-stroke', strokeDasharray: informs ? '5 4' : effect ? undefined : '7 6' } } as Edge);
+    }
+    return out;
+  }, [projected, layout, tier, selected, hovered, focus, sideLine, main, t]);
   function showTier(next: Tier) {
-    if (next === 'states') { overview(); return; }
+    setStoryExpanded(expandStoryToTier(graph, next));
+    if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     const view = rf.getViewport();
     const cy = ((box?.height ?? 0) / 2 - view.y) / view.zoom;
-    const nearest = layout.nodes.filter(n => n.kind === 'state').sort((a, b) => Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
+    // Nothing selected: the state nearest the middle of the screen, preferring one with phases to show.
+    const hasPhases = (id: string) => graph.branches.some(b => b.state === id);
+    const nearest = layout.nodes.filter(n => n.kind === 'state').sort((a, b) => Number(hasPhases(b.id)) - Number(hasPhases(a.id)) || Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
     const stateId = p?.kind === 'state' ? p.id : p?.parentId ?? nearest?.id ?? graph.states[0].id;
-    moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next);
+    moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next, false);
   }
   function download() {
-    const value = { ...graph, format: 'coding-agent-state-trajectory' };
+    // Export what was imported, translations included, not the view in the current language.
+    const value = { ...original, format: 'coding-agent-state-trajectory' };
     const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: 'agent-state-trajectory.json' });
     a.click(); URL.revokeObjectURL(url);
@@ -219,38 +432,49 @@ function Reader({ graph, onImport, onHome }: { graph: Graph; onImport: (file: Fi
     <div className="toolbar">
       <ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
-          <FilePicker label="Import trajectory" onImport={onImport} />
-          <button onClick={() => { download(); dismiss(); }}>Export complete trace</button>
-          <button onClick={onHome}>Home</button>
+          <FilePicker label={t('Import trajectory')} onImport={onImport} />
+          <button onClick={() => { download(); dismiss(); }}>{t('Export complete trace')}</button>
+          <button onClick={onHome}>{t('Home')}</button>
         </div>
         <div className="viewer-menu-section">
-          <button onClick={() => { overview(true); dismiss(); }}><span>Fit view</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
-          <button onClick={() => { setSelected(null); setInspectorOpen(true); dismiss(); }}>Structure &amp; evidence</button>
-          <label className="viewer-menu-field">State relationships<select aria-label="State relationships" value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">Version tree</option><option value="chronology">Execution order</option></select></label>
-          <label className="viewer-menu-field">Canvas input<select aria-label="Canvas input mode" value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">Trackpad</option><option value="mouse">Mouse</option></select></label>
+          <button onClick={() => { overview(true); dismiss(); }}><span>{t('Fit view')}</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
+          <button onClick={() => { setSelected(null); showDetails(); dismiss(); }}>{t('Structure & evidence')}</button>
+          <label className="viewer-menu-field">{t('State relationships')}<select aria-label={t('State relationships')} value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">{t('Version tree')}</option><option value="chronology">{t('Execution order')}</option></select></label>
+          <label className="viewer-menu-field">{t('Canvas input')}<select aria-label={t('Canvas input mode')} value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">{t('Trackpad')}</option><option value="mouse">{t('Mouse')}</option></select></label>
         </div>
         <div className="viewer-menu-section">
-          {hasReading && <label className="viewer-menu-check" title="Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions"><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />Decisions only</label>}
-          <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />Cross-branch links</label>
-          <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />Untried ideas</label>
-          {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>Reading layer incomplete; showing all actions</p>}
+          {hasReading && <label className="viewer-menu-check" title={t('Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions')}><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />{t('Decisions only')}</label>}
+          <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />{t('Cross-branch links')}</label>
+          <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />{t('Untried ideas')}</label>
+          {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
-      <div className="zoom-levels" aria-label="Zoom detail levels">{(['states', 'branches', 'actions', 'raw'] as Tier[]).map((t, i) => <button key={t} className={tier === t ? 'active' : ''} aria-pressed={tier === t} onClick={() => showTier(t)}><span>0{i + 1}</span> {tierLabels[t]}</button>)}</div>
-      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => setInspectorOpen(v => !v)}>Details</button><button aria-pressed={chatOpen} onClick={() => setChatOpen(v => !v)}>Chat</button></div>
+      <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
+      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
     </div>
-    <main><div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) overviewPinned.current = false; }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
+    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
+      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
+      width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
+      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
-      {tier === 'states' && graph.journey && (journeyOpen
-        ? <aside className="journey"><div className="journey-head"><b>Run overview</b><button onClick={() => setJourneyOpen(false)}>Collapse</button></div><p>{graph.journey.text}</p><div className="journey-cites">{graph.journey.cites.map(id => byId.get(id)).filter((e): e is Entity => !!e).map(e => <button key={e.id} data-target={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => moveTo(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div></aside>
-        : <button className="journey-pill" onClick={() => setJourneyOpen(true)}>Overview</button>)}
-      {chatOpen && <ChatDialog graph={graph} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
-      <div className="map-legend">{tier === 'states' ? <><span><i style={{background:stateTones.better}} />Measured gain</span><span><i style={{background:stateTones.worse}} />Measured regression</span><span><i style={{background:stateTones.historical}} />Final selection</span><span>↶ Purple dashes: rollback</span></> : behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{b}</span>)}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {moveLabels[m]}</span>)}{tier !== 'states' && <span style={{ color: moveColors.insight }}>┄ Informs</span>}</>}</div></div>{inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); setInspectorOpen(true); }} close={() => setInspectorOpen(false)} />}</main>
+      {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
+      {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
+      {/* Details and chat share one dock beside the map: opening the second never narrows the map again, and nothing covers it.
+          The hidden panel stays mounted, so a chat request in flight survives a look at the details. */}
+      {(inspectorOpen || chatOpen) && <div className="side-dock" data-front={inspectorOpen && chatOpen ? front : inspectorOpen ? 'details' : 'chat'}>
+        {inspectorOpen && chatOpen && <div className="dock-tabs" role="tablist" aria-label={t('Side panel')}>
+          <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>{t('Details')}</button>
+          <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>{t('Chat')}</button>
+        </div>}
+        {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} focusRevision={focusRevision} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
+        {chatOpen && <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
+      </div>}</main>
   </div>;
 }
 
-export default function StateReader() {
+function App() {
+  const { t, lang } = useLang();
   const [handoff] = useState(() => {
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
@@ -284,11 +508,17 @@ export default function StateReader() {
     const controller = new AbortController();
     const request = fetch(path, { signal: controller.signal });
     void request
-      .then(r => { if (!r.ok) throw new Error('Could not load the trajectory. Check that the example is included, or import a local JSON file.'); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error(t('Could not load the trajectory. Check that the example is included, or import a local JSON file.')); return r.json(); })
       .then(value => { setGraph(parseGraph(value)); setLoading(false); })
       .catch(e => { if (!controller.signal.aborted) { setError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, []);
-  useEffect(() => { document.title = graph ? `${graph.title} · TraceVista` : 'TraceVista'; }, [graph]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>Close</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label="Import trajectory" onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+  // Everything an analyst or a model wrote follows the interface language when the file carries a translation.
+  const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
+  useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
+  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><div className="welcome-lang"><LangToggle /></div><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label={t('Import trajectory')} onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+}
+
+export default function StateReader() {
+  return <LangProvider><App /></LangProvider>;
 }

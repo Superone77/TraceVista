@@ -21,9 +21,12 @@
 ### 状态关系和右侧详情
 
 - “Version tree”按有证据的代码来源排成树。恢复旧版本成为旧版本的另一个子节点；被放弃的尝试仍保留。原始提交时间顺序可以切换到“Execution order”查看。
-- 卡片绿色/红色分别表示相对时间上前一次测量的数值改善/退化，文字显示百分比。它不是统计显著性结论。紫色虚线表示恢复代码，紫色最终选择卡片引用历史测量，不伪装成新 benchmark。
+- 卡片绿色/红色分别表示相对时间上前一次测量的数值改善/退化，文字显示百分比。它不是统计显著性结论。紫色虚线表示恢复代码，紫色最终选择卡片引用历史测量，不伪装成新 benchmark。没有测量的状态不再显示“No comparable measurement”。
+- **交付主线**：时间顺序的终点（没有后续转换的状态）记为交付状态，标“Delivered”并加紫色外圈。从它沿当前状态关系向上追到根，得到交付主线：主线连线加粗，主线外的状态与其内部卡片变淡并标“Side branch”，鼠标指向或选中时恢复。完全线性的运行不画支线。首屏按主线的横向跨度取景，缩放不低于 26%。
+- 状态卡右上角写这一步做了多少动作、主要是哪两类行为（如“42 actions · mostly Edit & Diagnose”）。状态编号 S0、S1… 按状态出现的先后，不随版本树的排布顺序变化。
 - 初始显示可读的状态卡片；“Fit view”可查看整个版本结构。缩放仍逐层显示分支、行为和原始轨迹。
-- 单击卡片或其标题自动打开右侧详情。这里包含完整描述、比较对象、版本来源、各类行为计数、可展开的内部行为、时间前后关系、变化证据和原始记录。双击或“View trace ↗”进入下一层。
+- 卡片高度按自己的内容估算，不再用固定高度：总览层的状态卡按结论的长度、有无测量和关键决策决定（150 到 380），总览卡上的缩放文字最低停在结论这一档；缩放低于 36% 时改为紧凑卡，按当时的缩放算出能放几行，依次放编号、结论、理由、测量和决策标签，放不下的从后往前省略，行数只在增减一整行时重算；工作阶段层每个状态的一行阶段卡取这一行里最长那张的高度（170 到 350），保持对齐。
+- 单击卡片或其标题自动打开右侧详情。详情先给核心：这一步新增了什么（takeaway 与 reason）、测量结果或行为类别、这一步里的关键决策（编号与左栏一致）、支撑它的观察。完整描述、引用原文、比较对象、版本来源、阶段与动作、追踪状态、时间前后关系、结构与证据、来源记录各自折叠，点击后在原处展开。从证据编号打开的原文显示在核心内容下方。双击或“View trace ↗”进入下一层。
 - 状态可以附带 `lineage: {parent, relation, reason, events}`，relation 为 derived/restored/retained。没有证据时沿用已有状态转移，不能仅凭分数下降猜测发生了回退。
 - 可选 `assessment` 提供 metric、unit、value、previous、previousState、higherIsBetter、tolerance、correctness、measurement、note；measurement=historical 禁止把历史评分计算为新的性能变化。
 
@@ -37,7 +40,8 @@
 边界使用小幅滞后，避免滚轮在临界点反复闪烁。工具栏是缩放到该层的快捷入口，
 日常可用触控板捏合缩放、双指平移、拖动或双击深入。只有视图改变，原始数据不被折叠操作修改。
 
-- 各层只为当前可见内容分配空间；隐藏的日志不再把总览拉成长条。切换层级时，保持鼠标下的卡片或其父状态在原位置。
+- 各层只为当前可见内容分配空间；隐藏的日志不再把总览拉成长条。没有记录工作阶段的状态在细节层只保留标题区高度。缩放切换层级时，保持鼠标下的卡片或其父状态在原位置。
+- 工具栏层级按钮的落点：工作阶段层把目标状态的标题和阶段行放在顶部；动作层把目标所在列的阶段卡放在顶部，横向从该状态第一列开始尽量多显示几列，目标列始终在屏幕内；原始记录层直接从目标卡片开始。未选中卡片时，取离屏幕中心最近、且有工作阶段的状态。
 - 行为层直接显示完整分析说明，卡片高度随文本在 340–640 之间调整；超长说明在卡片内滚动。原文卡片高度为 420、宽度为 360。
 - 默认“Trackpad”：双指平移、捏合或 ⌘/Ctrl + 滚轮缩放。切换到“Mouse”后，滚轮直接缩放。
 - 拖动空白处、卡片边框或标题可平移；按住空格也可以从正文区域拖动画布。正文保留文字选择和独立滚动。
@@ -46,9 +50,12 @@
 - 具体行为与原始轨迹节点显示 `Skill · 名称`。支持输入中的 `skill` 字段，以及原日志 `Skill` 工具调用的 JSON `skill` 参数；工具结果按同一会话的 call ID 继承。普通发言中的名称提及不当成调用。
 - `tokens_in` 若存在，按范围显示“Input”、“Cumulative input”或“Session input”，单位为 tok，不是正文长度，也不重新估算。
 - 一条原始事件可被多项分析引用；重复显示的是同一事件的引用，不是新执行。
-- 主线、顺序为实线；审查与跨分支依据为虚线。缩小时聚合到分支，放大后恢复具体行为端点。
+- **连线按三种关系分工**：总览层按版本树画，深绿实线箭头是代码的继承（主线加粗，支线变淡），紫色虚线加 ↶ 是回退到旧版本。进入状态以后以时间为轴：工作阶段按开始时间从左到右排列并编号（方框数字），先后相接的阶段之间画灰色实线箭头，开始时前一个阶段还没结束的标「同时进行」（灰色点线、不带箭头）；做出改动的那个阶段（动作层是那个动作）用绿色实线连到它产生的下一个版本；同一阶段里的动作自上而下用细箭头相连。版本关系在状态内退为状态框之间的淡色宽带，只有回退处标 ↶。数据里跨阶段的先后记录不再另画一遍。
+- **原因按需出现**：蓝色虚线「因为」只在鼠标指向或选中的卡片上画出；平时卡片顶部有一个「因为 N」标记，表示这一步有 N 条依据。
+- **聚焦**：在工作阶段层及以下选中一张卡片，它的上一步、下一步、依据、产生的版本和所在状态保持清楚，其余卡片和连线变淡；点空白处取消。
 - 点击节点可查看状态差异、分类依据和证据。未归入行为的日志仍在原始记录库。
-- 详情栏默认收起，通过工具栏“Details”打开；窄窗口中浮在画布右侧，不再占据底部空间。状态总览随窗口尺寸适应；放大后不会自动拉回总览。
+- 详情与 Chat 共用画布右侧的一栏，不再浮在地图上。两者都打开时，栏顶出现 Details / Chat 标签，一次显示一个，各占满整栏高度；隐藏的 Chat 保持挂载，进行中的请求不会中断。Chat 在前时点击卡片只更新对话焦点；点击证据编号切到 Details。窄于 1000px 的窗口里，这一栏浮在画布右侧。
+- 侧栏开合使画布变宽或变窄时，视野保持居中，选中的卡片留在屏幕内。整体空间不足以容纳 Story 和地图的最小宽度时，Story 自动收起，变宽后恢复。状态总览随窗口尺寸适应；放大后不会自动拉回总览。
 
 ## 通用输入约定 v1
 
@@ -87,18 +94,23 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 
 - **逐层展开的信息**：全图状态卡片保留 takeaway 和测量结果，不退化为提交编号。状态主题概括具体变化；工作阶段显示方向、结论和原因；行为层直接展示完整分析说明，原始记录在第四层展开。文件仍保留 topic ⊂ takeaway ⊂ brief 及证据摘句，详情区可查看引用。
 - **没有写 ladder 的节点**：用标题和自身摘要生成，并删掉与父节点摘要重复的部分。
-- **推理标记**：✕ 排除、◆ 决定、↪ 转向、? 未决、● 发现。总览中每个状态下方列出它的转向地标，点击即可跳转。没有标记的分支按常规工作显示为灰色。
+- **推理标记**：✕ 排除、◆ 决定、↪ 转向、? 未决、● 发现。总览中每个状态下方列出它的关键决策，点击即可跳转。关键决策按运行先后统一编号：每个状态取工作阶段层的排除、决定、转向、未决；不足两个时补动作层的，最多四个。同一编号出现在左栏、状态卡、阶段卡、动作卡和详情里。没有标记的分支按常规工作显示为灰色。
 - **依据边（informs）**：观察指向它改变的决定，用蓝色虚线表示，详情栏列出“Supporting observations”和“Decisions informed”。分支层只画同一状态内的依据边。
 - **Decisions only**：默认开启。连续 3 步以上、既不是转向、也不是依据端点、也不产生新状态的行为，折叠成“N routine steps”，点击即可展开。这个模式下隐藏分支之间的时间顺序线，取消勾选“Decisions only”可显示全部行为。
-- **历程**：总览左侧的一段话，说明从哪里开始、排除了什么、在哪里转向、落在哪里、还有什么没解决，引用的节点可以点击。
-- **连线避让**：跨分支连线遇到卡片时会侧向弯曲绕开。
+- **左栏 Story（故事线）**：固定在地图左侧，各层都在。整次运行写成一篇可以伸展的文字（StretchText），排版是阅读页的样式：暖白纸色、正文、页边一条细线串起各步。顺序是：交付了什么；两句概况（“More”在原处展开其余部分和它引用的节点）；每个状态一句，写它得出了什么、为什么。点一句话，下一层在这句话后面长出来，后面的文字往下让：状态展开成工作阶段，阶段展开成动作，动作展开成关联的全部原始记录。原始记录按源日志顺序显示，保留完整文字、记录 ID、消息或工具调用/返回类型、来源行号、call ID，以及日志里已有的模型、token 和 skill 信息；长记录在动作内滚动阅读，原文只读，不截断。点击记录 ID 可在详情栏打开对应原文。决策写成动词（Changed course、Ruled out、Decided、Left open、Found）并带全局编号；动作写成 Looked into、Planned、Changed、Ran、Checked、Diagnosed；没有阅读层标注的常规动作折成“…and N routine steps”。实心点是主线，空心点是被放下的尝试（写“A side attempt”），紫点是交付。“Hide”收起左栏，画布左上角“Story”重新打开；整体空间不足以容纳 Story 和地图的最小宽度时自动收起，变宽后恢复。
+- **统一展开层级**：工具栏的四个按钮同时控制地图层级和 Story 的展开深度。“System states”收起各状态内部内容；“Work phases”展开所有状态；“Actions”继续展开所有工作阶段；“Raw records”展开所有动作的完整原始记录。每一句仍可以单独展开或收起，之后点击层级按钮会重新统一展开到所选深度。
+- **左栏宽度**：拖动左栏右边缘调整宽度（最窄 280 像素，没有固定上限，地图至少保留 240 像素；打开右栏或缩小窗口时自动收窄）；聚焦右边缘后可用左右方向键调整（每次 16 像素，按住 Shift 为 64 像素），Home、End 到最窄、最宽；双击右边缘回到默认宽度。宽度记在这个浏览器里，刷新后保留。
+- **飞行定位**：在故事线里展开一句时，地图镜头飞到同一处，深度与文字一致：交付句到总览层的终点状态，状态到工作阶段层（一行比屏幕宽时从左边开始），阶段到动作层的那一列，动作到原始记录层的那张卡。同一层内平滑平移缩放；跨层时先在屏幕中心处换上目标层的布局再飞，途中不按缩放切换层级，读者自己拖动或缩放即刻接管。工具栏层级按钮、对话引用和详情里的跳转用同一种飞行；系统设置减少动态效果时直接跳到目标。反过来，在地图上点卡片，故事线展开到这张卡所在的那一句并滚过去。
+- **过渡**：层级切换时新出现的卡片在落点淡入；左栏、详情和对话里的展开都是高度与透明度一起过渡。系统设置减少动态效果时不做动画。
+- **图例**：默认收成左下角的“Legend”按钮，点击后展开，× 收起。
+- **连线避让**：跨分支连线遇到卡片时会侧向弯曲绕开。状态之间的线（版本带、产生下一个版本）只走框与框之间的空隙：先向下出框进入框下方的空隙，再沿一条不穿过其他框的竖向通道走到目标；目标在下方时从顶部进入，与来源同一行时从朝向来源的一侧进入。动作层从动作右侧出发，先沿泳道之间的空隙下行。
 - **工具指纹**：⌨️ 运行、📖 读取、✏️ 编辑、🔍 搜索各自的调用次数，可以看出某个方向"读得多还是跑得多"。
 
 字段说明和写作规范见 `skills/tracevista-skill/references/reading-layer.md`。阅读层属于分析者标注，不会替代原始证据。
 
 ## 追问这条轨迹（可选，浏览器直连模型）
 
-工具栏“Chat”打开对话框，在“API settings”中选择供应商、填写 API Key，再获取或手填模型 ID。请求直接从浏览器发往所选模型接口，不经过查看器后端。
+工具栏“Chat”打开对话框。未连接模型时，对话区只显示一张“Connect a model”卡片；点击它或标题栏的模型按钮（连接后显示模型名）展开设置，选择供应商、填写 API Key，再获取或手填模型 ID。导出与清空收在标题栏的“⋯”菜单里。上下文范围、额度和请求预览折叠成输入框上方的一行“Context · … · ~N tokens”，点击展开。请求直接从浏览器发往所选模型接口，不经过查看器后端。
 
 ### 供应商与模型列表
 
@@ -201,13 +213,19 @@ agent/task-specific interpretation rules.
 
 ## Interface and trajectory language
 
-The viewer uses English for navigation, controls, status labels, settings, and errors. Imported titles, summaries, reading layers, raw records, review comments, and attachments retain their original language. Chat replies follow the language of the question; quoted evidence stays in its source language.
+The EN / 中文 toggle in the toolbar (and on the home page) switches the interface and everything that was written about the run: titles, summaries, ladders, the story rail, the run overview, scope and notes, reasons, classification notes and observation summaries. What the agent itself said or received stays as recorded: raw records and the verbatim quotes taken from them are never translated. English is the default; the choice is remembered in this browser and sets the page language. Chat replies follow the language of the question. The two prompts on the home page stay in English because they are pasted into an agent as commands. Not yet translated: the field labels inside the Structure & evidence browser, the chat's advanced context notes and provider error messages.
+
+**Interface strings.** English text is the key: components call `t('English text')`, and Chinese lives in `viewer/src/trajectory/i18n.zh.json`, so component sources stay English-only (`test-ui-language.mjs`). `viewer/scripts/i18n-keys.mjs` reads every key from the source with the TypeScript parser; `test-i18n.mjs` requires a Chinese entry with the same placeholders for each key and rejects entries no key uses.
+
+**Generated text.** A trajectory may carry `"i18n": {"zh": {"<text as written>": "<translation>"}}`. The viewer swaps each annotated string for its translation when the interface language differs from the file's own `language`; a ladder topic stays inside its translated takeaway. Export writes the file as imported, translations included; chat reads the original. All five bundled examples carry a Chinese table covering every annotation (2,178 strings). The Pi Agent test checks that every key of the table is an annotation in that file.
 
 ## Interface type scale
 
-`viewer/src/trajectory/interface.css` defines screen-space UI sizes in `rem`: controls and panel text use `.875rem`, captions use `.75rem`. Narrow layouts wrap controls and reposition panels instead of shrinking text. Browser zoom and the user's base font size remain effective. The landing page keeps its larger serif text; only the decorative TraceVista title uses a bounded fluid size.
+`viewer/src/trajectory/interface.css` defines screen-space UI sizes in `rem`: controls and panel text use `.875rem`, captions use `.75rem`. Narrow layouts wrap controls and reposition panels instead of shrinking text. Browser zoom and the user's base font size remain effective. The landing page keeps its larger text size; only the decorative TraceVista title uses a bounded fluid size.
 
 Canvas card typography remains separate in `trajectory.css`: semantic zoom continues to reveal states, phases, actions and raw records without scaling the surrounding interface.
+
+One family for everything read or clicked, one for literal text: `--font-sans` (Inter, then PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC) and `--font-mono` (SF Mono, ui-monospace, Menlo, Consolas), both defined on `:root` in `trajectory.css`. Raw records, code and quoted source text use the mono family; every other surface, including the story rail and the home page, uses the sans family. No web fonts are fetched beyond the bundled Inter.
 
 ## Example library
 

@@ -1,4 +1,38 @@
-import type { Graph, Entity, Action, ProjectedEdge } from './model';
+import type { Graph, Entity, Action, ProjectedEdge, State, Move } from './model';
+
+// Kept local: the tests load this module on its own, without its neighbours. Mirrors model.ts landmarkMoves.
+const TURNS: readonly Move[] = ['ruleout', 'decision', 'pivot', 'open'];
+
+/** Readable width of an overview card, and how many characters of a plaque fit on one of its lines at a canvas font size. */
+const OVERVIEW_TEXT_W = 1150;
+const perLine = (text: string, font: number) => {
+  const cjk = (text.match(/[\u3400-\u9fff]/g) ?? []).length, latin = [...text].length - cjk;
+  return Math.max(1, Math.ceil((cjk * font + latin * font * .53) / OVERVIEW_TEXT_W));
+};
+/**
+ * The height an overview card needs, so it is not drawn as a fixed slab with its words floating in it.
+ * Plaque: the takeaway at its overview size (42px). Header, measurement and decision chips are drawn at a constant screen
+ * size; their canvas height is budgeted for zoom 0.36, below which cards switch to the compact reading that fills them.
+ */
+/** A phase card's height from its own text: header, the brief at its phase-tier size (21px on a 324px line), footer. */
+export function phaseHeight(b: Entity): number {
+  const brief = b.ladder ? `${b.ladder.takeaway} ${b.ladder.reason ?? ''}` : `${b.title} ${b.summary}`;
+  const cjk = (brief.match(/[\u3400-\u9fff]/g) ?? []).length, latin = [...brief].length - cjk;
+  const lines = Math.max(2, Math.ceil((cjk * 21 + latin * 21 * .56) / 310));
+  return Math.round(Math.min(BRANCH_H, Math.max(170, 112 + lines * 28.5)));
+}
+export function overviewHeight(s: State, g: Graph): number {
+  // On the overview the plaque shows the takeaway (42px); the brief level needs zoom 0.5, where the phase tier begins.
+  const takeaway = s.ladder?.takeaway ?? s.title;
+  const plaque = perLine(takeaway, 42) * 55.4;
+  const turn = (e: Entity) => !!e.move && TURNS.includes(e.move);
+  const chips = g.branches.some(b => b.state === s.id && turn(b)) || g.actions.some(a => a.state === s.id && turn(a));
+  const measured = !!s.assessment || s.lineage?.relation === 'restored';
+  // A restored version adds a badge to the measurement row, which then wraps to a second line.
+  const badge = !!s.assessment && s.lineage?.relation === 'restored';
+  const screenRows = (65 + (chips ? 77 : 0) + (measured ? 29 : 0) + (badge ? 44 : 0)) * (.44 / .36);
+  return Math.round(Math.min(380, Math.max(150, screenRows + plaque + 24)));
+}
 
 export type Tier = 'states' | 'branches' | 'actions' | 'raw';
 export const tierLabels: Record<Tier, string> = { states: 'System states', branches: 'Work phases', actions: 'Actions', raw: 'Raw records' };
@@ -17,6 +51,28 @@ export interface FoldItem { id: string; title: string; summary: string; events: 
 export interface LayoutOptions { fold?: boolean; openFolds?: ReadonlySet<string> }
 export const FOLD_MIN = 3;
 export const BRANCH_H = 350;
+/** Edge labels drawn on the map (translated where drawn). The projection keeps its own labels; these name the flow edges. */
+export const edgeLabels: Record<'flow' | 'parallel' | 'effect' | 'because' | 'review_request' | 'review_return' | 'sequence' | 'informs' | 'later', string> = {
+  flow: 'Then', parallel: 'In parallel', effect: 'Creates state', because: 'Because',
+  review_request: 'Review request', review_return: 'Review response', sequence: 'Continues', informs: 'Informs', later: 'Informs later work',
+};
+export interface PhaseTime { n: number; start: number; end: number; parallel: boolean }
+/**
+ * Inside a state, time is the reading order: each phase's number by when its first action started (file order where no
+ * time was recorded), and whether it started before an earlier phase had finished, i.e. ran alongside it.
+ */
+export function phaseFlow(g: Graph): Map<string, PhaseTime> {
+  const info = new Map<string, PhaseTime>();
+  for (const s of g.states) {
+    const phases = g.branches.filter(b => b.state === s.id).map((b, i) => {
+      const ts = g.actions.filter(a => a.branch === b.id && a.t_min != null).map(a => a.t_min!);
+      return { id: b.id, i, start: ts.length ? Math.min(...ts) : Infinity, end: ts.length ? Math.max(...ts) : -Infinity };
+    }).sort((x, y) => x.start - y.start || x.i - y.i);
+    let reach = -Infinity;
+    phases.forEach((p, k) => { info.set(p.id, { n: k + 1, start: p.start, end: p.end, parallel: k > 0 && Number.isFinite(p.start) && p.start < reach }); reach = Math.max(reach, p.end); });
+  }
+  return info;
+}
 const FOLD_H = 96;
 /** Actions a reader must see when routine steps fold: turns, what informed them, and what changed state. */
 export function keptActions(g: Graph): Set<string> {
@@ -48,12 +104,14 @@ export interface MapNode {
   x: number; y: number; width: number; height: number; parentId?: string;
 }
 export type StateMode = 'lineage' | 'chronology';
+/** Edge labels for version ancestry, translated where they are drawn. */
+export const connectionLabels: Record<'restored' | 'retained' | 'derived', string> = { restored: 'Restore this version', retained: 'Retain and finish', derived: 'Derived from this version' };
 export interface Layout { nodes: MapNode[]; width: number; height: number; stateMode?: StateMode }
 
 /** Lineage expresses version ancestry; chronological transitions remain intact. */
 export function stateConnections(g: Graph, mode: StateMode) {
   return g.states.flatMap(s => {
-    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: s.lineage.relation === 'restored' ? 'Restore this version' : s.lineage.relation === 'retained' ? 'Retain and finish' : 'Derived from this version' }];
+    if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: connectionLabels[s.lineage.relation] }];
     return g.transitions.filter(t => t.target === s.id).map(t => ({ source: t.source, target: t.target, kind: 'transition', label: t.label }));
   });
 }
@@ -65,8 +123,11 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
   // Reserve more room for longer descriptions; very long ones scroll inside the card.
   const actionHeight = (action: Action) => tier === 'raw' ? 420 : Math.min(640, Math.max(340,
     160 + Math.ceil([...(action.summary || action.title)].reduce((n, c) => n + (/[\u3400-\u9fff]/.test(c) ? 2 : 1), 0) / 38) * 26));
-  const actionTop = 192 + BRANCH_H + 12;
+  // Each state's row of phases is as tall as its tallest phase card, so the row stays aligned without a fixed slab.
+  const rowH = new Map(g.states.map(st => [st.id, Math.max(170, ...g.branches.filter(b => b.state === st.id).map(phaseHeight))]));
+  const actionTopOf = (id: string) => 192 + (rowH.get(id) ?? BRANCH_H) + 12;
   const keep = keptActions(g);
+  const flow = phaseFlow(g);
   const items = new Map(g.branches.map(b => [b.id, branchItems(g, b.id, opts, keep)]));
   const itemHeight = (item: Action | FoldItem) => isFold(item) ? FOLD_H : actionHeight(item);
   const nodes: MapNode[] = [];
@@ -88,14 +149,16 @@ export function layoutGraph(g: Graph, tier: Tier = 'raw', mode: StateMode = 'lin
     if (placed.has(s.id)) return;
     placed.add(s.id);
     const x0 = left + ((spans.get(s.id)! - 1) * (width + 120)) / 2;
-    const branches = g.branches.filter(b => b.state === s.id);
+    const branches = g.branches.filter(b => b.state === s.id).sort((a, b) => (flow.get(a.id)?.n ?? 0) - (flow.get(b.id)?.n ?? 0));
     const depth = Math.max(0, ...branches.map(b => items.get(b.id)!.reduce((h, item) => h + itemHeight(item) + 24, 0)));
-    const height = tier === 'states' ? 380 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
+    // A state with no recorded phases keeps only its heading below the overview, not an empty lane's height.
+    const actionTop = actionTopOf(s.id);
+    const height = tier === 'states' ? overviewHeight(s, g) : !branches.length ? 228 : detailed ? Math.max(actionTop + 56, actionTop + 16 + depth) : actionTop + 16;
     nodes.push({ id: s.id, kind: 'state', item: s, x: x0, y, width, height });
     const startX = x0 + (width - branches.length * 400 + 40) / 2;
     if (tier !== 'states') branches.forEach((b, lane) => {
       const x = startX + lane * 400;
-      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: BRANCH_H, parentId: s.id });
+      nodes.push({ id: b.id, kind: 'branch', item: b, x, y: y + 192, width: 360, height: rowH.get(s.id) ?? BRANCH_H, parentId: s.id });
       if (!detailed) return;
       let top = y + actionTop;
       for (const item of items.get(b.id)!) {
@@ -156,7 +219,24 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       chain.forEach((n, i) => edges.push({ id: `sequence:${n.id}`, source: i ? chain[i - 1].id : b.id, target: n.id, kind: 'sequence', label: '' }));
     }
   }
-  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: 'Creates state' });
+  if (detailed) for (const t of g.transitions) if (visible.has(t.action)) edges.push({ id: `effect:${t.action}:${t.target}`, source: t.action, target: t.target, kind: 'effect', label: edgeLabels.effect });
+  // Time inside a state: phase to phase in the order they started; a phase that ran alongside the previous one is marked, not arrowed.
+  const flow = phaseFlow(g);
+  for (const s of g.states) {
+    const ordered = g.branches.filter(b => b.state === s.id && visible.has(b.id)).sort((a, b) => flow.get(a.id)!.n - flow.get(b.id)!.n);
+    for (let i = 1; i < ordered.length; i++) {
+      const parallel = flow.get(ordered[i].id)!.parallel;
+      edges.push({ id: `flow:${ordered[i - 1].id}:${ordered[i].id}`, source: ordered[i - 1].id, target: ordered[i].id, kind: parallel ? 'parallel' : 'flow', label: parallel ? edgeLabels.parallel : '' });
+    }
+  }
+  // At the phase tier, the phase whose action made the next version leads to it, so time runs on from the phase, not the frame.
+  if (tier === 'branches') {
+    const byId = new Map(g.actions.map(a => [a.id, a]));
+    for (const t of g.transitions) {
+      const a = byId.get(t.action);
+      if (a && visible.has(a.branch) && visible.has(t.target)) edges.push({ id: `effect:${a.branch}:${t.target}`, source: a.branch, target: t.target, kind: 'effect', label: edgeLabels.effect });
+    }
+  }
   if (showLinks) {
     const actions = new Map(g.actions.map(a => [a.id, a]));
     const aggregate = new Map<string, ProjectedEdge>();
@@ -170,7 +250,7 @@ export function semanticProjection(g: Graph, layout: Layout, tier: Tier, showLin
       const id = `link:${source}:${target}:${l.kind}`;
       const prior = aggregate.get(id);
       if (prior) prior.count = (prior.count ?? 1) + 1;
-      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: l.kind === 'review_request' ? 'Review request' : l.kind === 'review_return' ? 'Review response' : l.kind === 'sequence' ? 'Continues' : l.kind === 'informs' ? 'Informs' : 'Informs later work' });
+      else aggregate.set(id, { id, source, target, kind: l.kind, count: 1, label: edgeLabels[(['review_request', 'review_return', 'sequence', 'informs'] as const).find(k => k === l.kind) ?? 'later'] });
     }
     edges.push(...aggregate.values());
   }
