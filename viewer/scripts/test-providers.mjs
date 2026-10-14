@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-const source = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/providers.ts', import.meta.url), 'utf8'));
-const { modelBudget, budgetKey, restoreInputBudgets, presets, normalizedBase, presetOf, switchPreset, changeEndpoint, restoreSettings, requestReady, canListModels, listModels, parseModels, streamChat, safeError, apiUrl } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const moduleUrls = new Map();
+function moduleUrl(name) {
+  if (moduleUrls.has(name)) return moduleUrls.get(name);
+  let code = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/' + name + '.ts', import.meta.url), 'utf8'));
+  for (const match of code.matchAll(/from '(\.\/([^']+))'/g)) code = code.replaceAll("'" + match[1] + "'", JSON.stringify(moduleUrl(match[2])));
+  const url = 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+  moduleUrls.set(name, url); return url;
+}
+const { modelBudget, budgetKey, restoreInputBudgets, presets, normalizedBase, presetOf, switchPreset, changeEndpoint, restoreSettings, requestReady, canListModels, listModels, parseModels, streamChat, safeError, apiUrl } = await import(moduleUrl('providers'));
 const settings = id => ({ ...presets[id], model: 'test-model', apiKey: 'synthetic-test-key', remember: false });
 
 // Destination binding: switching protocol, region or even path must not reuse a key/model.

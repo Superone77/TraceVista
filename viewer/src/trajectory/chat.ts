@@ -2,6 +2,7 @@
 // Focused questions carry the selected card and its preceding evidence, never an unrestricted
 // run summary. Session clocks are independent; cross-session evidence must have a cited bridge.
 import type { Entity, Graph, RawEvent } from './model';
+import { textForChat } from './input-images';
 
 import type { ChatMessage } from './providers';
 export { presets, readSSE, streamChat, parseModels, canListModels, listModels } from './providers';
@@ -25,8 +26,9 @@ export interface ChatTurn {
   contextStrategy?: 'direct' | 'smart'; retrieval?: SmartRetrieval;
 }
 
-const one = (s: string) => s.replace(/\s+/g, ' ').trim();
+const one = (s: string) => textForChat(s).replace(/\s+/g, ' ').trim();
 function clip(text: string, max: number): string {
+  text = textForChat(text);
   if (text.length <= max) return text;
   const head = Math.round(max * .72);
   return `${text.slice(0, head)}\n… (${text.length - max} characters omitted) …\n${text.slice(text.length - (max - head))}`;
@@ -47,7 +49,7 @@ export function outline(g: Graph): string {
   }
   const informs = g.links.filter(l => l.kind === 'informs');
   if (informs.length) lines.push('Evidence links (observation → decision):', ...informs.map(l => `  [[${l.source}]] → [[${l.target}]]: ${one(l.evidence)}`));
-  return lines.join('\n');
+  return textForChat(lines.join('\n'));
 }
 
 /** Words for matching: Latin words and CJK character pairs, the way ThoughtDAG's local ladder scores overlap. */
@@ -76,9 +78,20 @@ Rules:
 3. State the measurement scope: development scores, independent scores, and local timings are not interchangeable. Passing review does not establish correctness or a speedup.
 4. Session clocks are independent. Relative minutes cannot order different sessions. Linked evidence does not prove that the main agent had seen it at the time. Analyst context is not the original agent's complete context.
 5. Do not infer a final outcome when it falls outside the current scope. Records marked with omissions are not complete originals; missing details require the reader to revisit the record or use full text.
-6. Answer in the language of the user's question. Lead with the conclusion, then give concise supporting evidence. Preserve quoted trajectory text exactly in its original language; do not translate quotations.`;
+6. Answer in the language of the user's question. Lead with the conclusion, then give concise supporting evidence. Preserve quoted trajectory text exactly in its original language; do not translate quotations.
+7. Image content is excluded from chat. Image omission markers indicate visual evidence you have not seen; do not infer what those images depict.`;
 
-/** Resolve evidence boundaries without constructing or copying raw record text. */
+const chatRecords = new WeakMap<RawEvent, { original: string; record: RawEvent }>();
+function chatRecord(event: RawEvent): RawEvent {
+  const cached = chatRecords.get(event);
+  if (cached?.original === event.text) return cached.record;
+  const text = textForChat(event.text);
+  const record = text === event.text ? event : { ...event, text };
+  chatRecords.set(event, { original: event.text, record });
+  return record;
+}
+
+/** Resolve evidence boundaries and prepare image-free text for chat, leaving the graph intact. */
 export function selectChatScope(g: Graph, focusId: string | null, options: ContextOptions = {}) {
   const entities: Entity[] = [...g.states, ...g.branches, ...g.actions];
   const focus = entities.find(e => e.id === focusId);
@@ -87,7 +100,7 @@ export function selectChatScope(g: Graph, focusId: string | null, options: Conte
   const compact = mode === 'current' || mode === 'nearby';
   const compression = compact ? 'full' : options.compression ?? 'full';
   const inputTokens = options.inputTokens ?? DEFAULT_INPUT_TOKENS;
-  const timeline = g.timeline.timeline;
+  const timeline = g.timeline.timeline.map(chatRecord);
   const events = new Map(timeline.map(e => [e.id, e]));
   const positions = new Map(timeline.map((e, i) => [e.id, i]));
   const descendants = (e: Entity) => 'snapshot' in e
@@ -176,6 +189,7 @@ export function selectChatScope(g: Graph, focusId: string | null, options: Conte
 
 /** System text, messages for the provider, and the provenance of what was sent. */
 export function buildChat(g: Graph, focusId: string | null, question: string, history: ChatTurn[], options: ContextOptions = {}) {
+  question = textForChat(question);
   const { focus, mode, compact, compression, inputTokens, timeline, positions, own, frontiers,
     previous, summaryStates, selected, included } = selectChatScope(g, focusId, options);
   const items: ContextItem[] = [];
@@ -222,7 +236,7 @@ export function buildChat(g: Graph, focusId: string | null, question: string, hi
     const ask = history[i], answer = history[i + 1];
     if (ask.role === 'user' && answer.role === 'assistant' && ask.contextStrategy !== 'smart' && answer.contextStrategy !== 'smart'
       && ask.scopeKey === scopeKey && answer.scopeKey === scopeKey && !ask.error && !answer.error && ask.text && answer.text) {
-      messages.push({ role: 'user', content: ask.text }, { role: 'assistant', content: answer.text }); i++;
+      messages.push({ role: 'user', content: textForChat(ask.text) }, { role: 'assistant', content: textForChat(answer.text) }); i++;
     }
   }
   const historyTurns = messages.length;

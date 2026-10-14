@@ -73,3 +73,37 @@ export function imagesForRecords(records: RawEvent[]): RecordImage[] {
   }
   return images;
 }
+
+const CHAT_IMAGE_MARKER = '[Image omitted from chat context]';
+/** Text-only chat evidence. Never mutate the imported record or remove its surrounding prose. */
+export function textForChat(text: string): string {
+  if (!/image|\\\\u/i.test(text)) return text;
+  const scrub = (value: unknown): unknown => {
+    if (typeof value === 'string') return textForChat(value);
+    if (Array.isArray(value)) return value.map(scrub);
+    if (!value || typeof value !== 'object') return value;
+    const item = value as Record<string, unknown>;
+    if (['input_image', 'image_url', 'image'].includes(String(item.type))) return CHAT_IMAGE_MARKER;
+    const mime = item.media_type ?? item.mimeType;
+    return Object.fromEntries(Object.entries(item).map(([key, value]) => [key,
+      key === 'data' && typeof mime === 'string' && mime.startsWith('image/') ? CHAT_IMAGE_MARKER : scrub(value)]));
+  };
+  const starts = /\{\s*"(?:\\.|[^"\\])*"\s*:/g;
+  let cursor = 0, match: RegExpExecArray | null;
+  const parts: string[] = [];
+  while ((match = starts.exec(text))) {
+    const start = match.index, end = objectEnd(text, start);
+    if (end < 0) continue;
+    try {
+      const value = JSON.parse(text.slice(start, end));
+      const clean = JSON.stringify(scrub(value));
+      if (clean !== JSON.stringify(value)) {
+        parts.push(text.slice(cursor, start), clean);
+        cursor = end;
+      }
+      starts.lastIndex = end;
+    } catch { /* Non-JSON evidence stays literal; inline data URIs are removed below. */ }
+  }
+  parts.push(text.slice(cursor));
+  return parts.join('').replace(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/_=-]+/gi, CHAT_IMAGE_MARKER);
+}

@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
-async function moduleAt(path) {
-  let code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
-  if (path.endsWith('/chat.ts')) {
-    const providerCode = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/providers.ts', import.meta.url), 'utf8'));
-    code = code.replaceAll("'./providers'", JSON.stringify('data:text/javascript;base64,' + Buffer.from(providerCode).toString('base64')));
-  }
-  return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+const moduleUrls = new Map();
+function moduleUrl(name) {
+  if (moduleUrls.has(name)) return moduleUrls.get(name);
+  let code = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/' + name + '.ts', import.meta.url), 'utf8'));
+  for (const match of code.matchAll(/from '(\.\/([^']+))'/g)) code = code.replaceAll("'" + match[1] + "'", JSON.stringify(moduleUrl(match[2])));
+  const url = 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+  moduleUrls.set(name, url); return url;
 }
+const moduleAt = path => import(moduleUrl(path.split('/').at(-1).replace('.ts', '')));
 const { parseGraph } = await moduleAt('../src/trajectory/model.ts');
 const { outline, buildChat, retrieve, citations, readSSE, SYSTEM, parseModels, canListModels } = await moduleAt('../src/trajectory/chat.ts');
 const g = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-agent-lora.agent-state.json', import.meta.url), 'utf8')));

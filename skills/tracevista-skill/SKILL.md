@@ -106,6 +106,8 @@ Ask once when the source contains images: **keep embedded images for visual insp
 or omit image content for a smaller export?** Honor a choice already given in this task.
 Do not silently remove images or include them after the user chose omission. The viewer
 shows retained thumbnails at the Action level and full images on demand.
+Image retention affects export and visualization; Chat excludes image payloads even
+when they are retained in the file.
 
 Use `extract_timeline.py --images keep|omit`. Omission replaces embedded payloads in both
 records and archived sources with explicit markers (MIME, encoded size and hash), retaining

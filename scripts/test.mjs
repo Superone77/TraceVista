@@ -12,6 +12,7 @@ const commands=[
  [process.execPath,['viewer/scripts/test-ui-language.mjs']],
  [process.execPath,['viewer/scripts/test-i18n.mjs']],
  [process.execPath,['viewer/scripts/test-chat.mjs']],
+ [process.execPath,['viewer/scripts/test-chat-images.mjs']],
  [process.execPath,['viewer/scripts/test-smart-context.mjs']],
  [process.execPath,['viewer/scripts/test-providers.mjs']],
  [process.execPath,['viewer/scripts/test-handoff.mjs']],
