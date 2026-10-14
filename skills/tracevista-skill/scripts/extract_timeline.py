@@ -8,6 +8,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from image_policy import apply_image_policy
 
 BRIEF = {'user': 1500, 'note': 1500, 'thinking': 1500, 'call': 350, 'result': 350, 'status': 350}
 PART_CHARS = 50_000
@@ -422,6 +423,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('trajectory',type=Path,nargs='?');p.add_argument('--manifest',type=Path)
     p.add_argument('--out',type=Path,required=True);p.add_argument('--no-redact',action='store_true')
+    p.add_argument('--images', choices=('keep', 'omit'), default='keep', help='Keep embedded images or omit their payloads from events and source archives')
     p.add_argument('--secret-file',type=Path,action='append',default=[])
     args=p.parse_args()
     if bool(args.trajectory)==bool(args.manifest): p.error('Use either trajectory or --manifest')
@@ -439,10 +441,11 @@ def main():
         result=clean_metadata(result,clean)
     except (ValueError,KeyError,OSError) as exc:
         print('Extraction failed: '+clean(str(exc)),file=sys.stderr);return 2
+    if args.images == 'omit': result=apply_image_policy(result, 'omit')
     result['redacted']=not args.no_redact
     args.out.mkdir(parents=True,exist_ok=True,mode=0o700);args.out.chmod(0o700)
     save(args.out/'timeline.json',json.dumps(result,ensure_ascii=False,indent=1))
-    header=f"# Timeline\n\n{result['events']} events · {result['tool_calls']} tool calls · input tokens: {result['tokens_in']}\n\nTime is relative to each session; cross-session order is not inferred. Full text and complete source logs are retained in timeline.json.\n\n"
+    header=f"# Timeline\n\n{result['events']} events · {result['tool_calls']} tool calls · input tokens: {result['tokens_in']}\n\nTime is relative to each session; cross-session order is not inferred. Full text and source archives are retained in timeline.json; image retention follows the selected policy.\n\n"
     parts=[];current=header
     for e in result['timeline']:
         brief=e['text'].replace('\n',' ⏎ ');limit=BRIEF[e['kind']]

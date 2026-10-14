@@ -6,6 +6,7 @@ import { FONTS, levelText, type Ladder } from './ladder';
 import ZoomText, { LadderMorph, type Quote } from './ZoomText';
 import { labels } from './labels';
 import RawRecords from './RawRecords';
+import ImagePreviews from './ImagePreviews';
 import { useLang } from './i18n';
 import type { Behavior } from './model';
 
@@ -112,6 +113,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       <div className="card-top"><span>{flowNo != null && <b className="flow-no" title={t('Order in time within this state')}>{flowNo}</b>}{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} />{why && why.in > 0 && <em className="why-mark" title={t('Hover or select to see why')}>{t('because {n}', { n: why.in })}</em>}</span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
       {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
+      {p.kind === 'action' && <ImagePreviews records={records} />}
       {p.kind === 'action' && skillBadges}{verdicts}
       {!ladder && p.kind === 'branch' && <p className="branch-description">{p.item.summary}</p>}
       {p.kind === 'action'

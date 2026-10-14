@@ -1,3 +1,4 @@
+import type { RawEvent } from './model';
 /** Read explicit inline attachment objects without interpreting prose, paths or remote URLs. */
 export type InputPart = { kind: 'text'; text: string } | { kind: 'image'; src: string; raw: string };
 
@@ -53,4 +54,22 @@ export function inputImageParts(text: string): InputPart[] {
   }
   if (cursor < text.length) parts.push({ kind: 'text', text: text.slice(cursor) });
   return parts.length ? parts : [{ kind: 'text', text }];
+}
+
+export interface RecordImage { src: string; eventId: string; index: number }
+const imageCache = new WeakMap<RawEvent, RecordImage[]>();
+/** Only assigned input/result images; a preview never borrows evidence from another action. */
+export function imagesForRecords(records: RawEvent[]): RecordImage[] {
+  const images: RecordImage[] = [];
+  const seen = new Set<string>();
+  for (const record of records) {
+    if (!['user', 'result', 'tool_result'].includes(record.kind)) continue;
+    let found = imageCache.get(record);
+    if (!found) {
+      found = inputImageParts(record.text).filter(part => part.kind === 'image').map((part, i) => ({ src: part.src, eventId: record.id, index: i + 1 }));
+      imageCache.set(record, found);
+    }
+    for (const image of found) if (!seen.has(image.src)) { seen.add(image.src); images.push(image); }
+  }
+  return images;
 }

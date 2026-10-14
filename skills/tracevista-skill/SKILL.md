@@ -22,7 +22,9 @@ is not needed. See [opening.md](references/opening.md) for browser use and optio
    For “this trajectory”, “the last one” or a correction, follow the incremental workflow
    below. An existing export can be validated and opened directly without reconversion.
 2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md)
-   and its linked contracts. Extract the complete timeline, read the evidence, author
+   and its linked contracts. If images are present, ask whether to keep or omit them unless
+   the user has already chosen; pass `--images keep` or `--images omit` to extraction.
+   Extract the timeline using that choice, read the evidence, author
    `state-analysis.json`, then run `build_state_graph.py --require-reading-layer`.
    The invoking agent writes the interpretation; the compiler checks it.
 3. **Validate.** Run `scripts/validate_trace.py FILE --require-reading-layer
@@ -97,6 +99,21 @@ its paths, so temporary inputs can be removed without breaking later edits.
    make an interpretation appear supported.
 5. Validate the new file, import that revision into TraceVista, inspect the affected view and save a
    new session revision. Say the previous export was reused and name what changed.
+
+## Image choice
+
+Ask once when the source contains images: **keep embedded images for visual inspection,
+or omit image content for a smaller export?** Honor a choice already given in this task.
+Do not silently remove images or include them after the user chose omission. The viewer
+shows retained thumbnails at the Action level and full images on demand.
+
+Use `extract_timeline.py --images keep|omit`. Omission replaces embedded payloads in both
+records and archived sources with explicit markers (MIME, encoded size and hash), retaining
+text, event IDs and call relationships. The export records `image_policy.mode=omit`;
+its archives are image-omitted derivatives. Original source files stay untouched.
+For an existing export, use `python3 scripts/image_policy.py FILE --images omit --out NEW_FILE`,
+then validate NEW_FILE. Keeping images does not fetch remote URLs or locate missing files.
+User imports and large media stay local unless separately selected for a published example.
 
 ## Interpretation and quality
 

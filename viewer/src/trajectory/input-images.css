@@ -10,3 +10,9 @@
 .input-image-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .input-image-toolbar button { padding: 8px 12px; cursor: pointer; }
 .input-image-dialog > img { display: block; width: 100%; height: auto; max-height: calc(94dvh - 88px); object-fit: contain; }
+
+.action-image-previews { display: flex; flex-shrink: 0; gap: 8px; overflow-x: auto; max-width: 100%; padding: 6px 0; }
+.action-image-preview { flex: none; width: 112px; padding: 5px; border: 1px solid var(--line, #ddd); border-radius: 7px; background: #fff; color: var(--text-2, #666); cursor: zoom-in; }
+.action-image-preview img { display: block; width: 100px; height: 68px; object-fit: contain; }
+.action-image-preview span { display: block; font: 10px/1.6 ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.story-p > .action-image-previews { margin: 4px 0 10px; }

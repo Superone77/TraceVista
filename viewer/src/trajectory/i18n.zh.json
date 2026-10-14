@@ -236,5 +236,6 @@
  "Enlarge image {n}": "放大图片 {n}",
  "Click to enlarge": "点击放大",
  "Original image record": "原始图片记录",
- "Image could not be decoded. The original data is available below.": "图片无法解码，可在下方查看原始数据。"
+ "Image could not be decoded. The original data is available below.": "图片无法解码，可在下方查看原始数据。",
+ "Action images": "行为图片"
 }

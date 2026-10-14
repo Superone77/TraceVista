@@ -2,18 +2,25 @@
 
 ## 1. Identify and extract the input
 
+When the input contains images, use the user's choice of `--images keep` or `--images omit`.
+Ask if no choice was given. The CLI defaults to keep for compatibility with existing scripts;
+the skill must still resolve the choice with the user. Omission applies to embedded image
+payloads in events and source archives, with explicit image markers and an `image_policy`
+annotation. Source files are untouched. Ordinary text, IDs and call/result references remain.
+
 Use the user-selected run. Otherwise inspect recent candidates and their run timestamps,
 agent/model identity and first user message; ask only if the intended run remains ambiguous.
 Claude sessions are usually under `~/.claude/projects/`, Codex under `~/.codex/sessions/`;
 Pi accepts native session files or `pi --mode json` logs. Use recorded model IDs.
 
 ```sh
-python3 /absolute/skill/scripts/extract_timeline.py /absolute/session.jsonl --out /absolute/work/extracted
+python3 /absolute/skill/scripts/extract_timeline.py /absolute/session.jsonl --images keep --out /absolute/work/extracted
 # Multiple agents or attached reviewer artifacts:
-python3 /absolute/skill/scripts/extract_timeline.py --manifest /absolute/work/manifest.json --out /absolute/work/extracted
+python3 /absolute/skill/scripts/extract_timeline.py --manifest /absolute/work/manifest.json --images keep --out /absolute/work/extracted
 ```
 
-The extractor retains full event text, source logs, call IDs, positions and recorded usage.
+The extractor retains event text, call IDs, positions and recorded usage; embedded image
+payloads in events and archived sources follow the chosen image policy.
 Claude Code input also accepts runner logs whose native JSON records have an ISO 8601
 prefix, for example `[2026-06-12T09:03:08Z] {"type":"assistant",...}`. UTC offsets and
 fractional seconds are supported. Use the original runner log directly; do not strip its

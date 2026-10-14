@@ -69,3 +69,23 @@ assert(!full.includes('UNASSIGNED_RECORD_MUST_NOT_APPEAR'), 'An action never pul
 assert(!render(new Set(['s0', 'b0'])).includes('data-event-id='), 'The Actions depth keeps raw evidence folded');
 assert(!render(new Set()).includes('data-event-id='), 'The System states depth returns to a compact story');
 console.log('PASS: real Story renderer retains full source text, metadata, ordering and disclosure boundaries');
+
+// The Action reading level shows visual evidence before opening raw text.
+graph.timeline.timeline[0].kind = 'user';
+graph.timeline.timeline[0].text += '\n' + JSON.stringify({type:'input_image',image_url:'data:image/png;base64,YWJj'});
+const actionPreview = render(new Set(['s0','b0']));
+assert(actionPreview.includes('action-image-previews'), 'Action level includes image thumbnails');
+assert(actionPreview.includes('data:image/png;base64,YWJj'));
+assert(!actionPreview.includes('CALL_TAIL_'), 'Thumbnails do not unfold raw text');
+console.log('PASS: Action level previews image evidence without opening raw records');
+
+const { ReactFlowProvider } = requirePackage('@xyflow/react');
+const MapCard = load(fileURLToPath(new URL('../src/trajectory/MapCard.tsx', import.meta.url))).default;
+const mapAction = renderToStaticMarkup(React.createElement(ReactFlowProvider, null, React.createElement(MapCard, {id:'a0',type:'trajectory',selected:false,data:{
+  p:{id:'a0',kind:'action',item:graph.actions[0],width:340,height:340}, tier:'actions', observations:[], actions:[], ordinal:0,
+  tools:[],records:graph.timeline.timeline.filter(e=>graph.actions[0].events.includes(e.id)),ladder:null,quotes:[],landmarks:[],fingerprint:[],routine:false,
+  enter:()=>{},inspect:()=>{},expand:()=>{},evidence:()=>{}
+}})));
+assert(mapAction.includes('action-image-previews') && mapAction.includes('data:image/png;base64,YWJj'), 'Map Action cards show assigned image thumbnails');
+assert(!mapAction.includes('CALL_TAIL_'), 'Map Action cards keep raw text closed');
+console.log('PASS: Map Action card previews assigned images');

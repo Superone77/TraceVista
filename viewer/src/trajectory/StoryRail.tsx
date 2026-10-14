@@ -11,6 +11,7 @@ import { phaseFlow } from './semantic';
 import Stretch from './Stretch';
 import { useLang } from './i18n';
 import RawRecords from './RawRecords';
+import ImagePreviews from './ImagePreviews';
 import { storyActionRecordsVisible, storyRecordsForAction, toggleStoryDisclosure } from './storyDisclosure';
 
 export type Depth = 'states' | 'branches' | 'actions' | 'raw';
@@ -87,6 +88,7 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count={t('{n} raw records', { n: recordsByAction.get(a.id)?.length ?? 0 })}>
       <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{t(doing[a.behavior] ?? a.behavior)}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
     </Sentence>
+    {!open.has(a.id) && <ImagePreviews records={recordsByAction.get(a.id) ?? []} />}
     {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{storyActionRecordsVisible(graph, open, a) && evidence(a)}</Stretch>}
   </div>;
   const phase = (b: Branch) => {

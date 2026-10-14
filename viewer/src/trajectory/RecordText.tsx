@@ -4,7 +4,7 @@ import { inputImageParts } from './input-images';
 import { useLang } from './i18n';
 import './input-images.css';
 
-function ImageDialog({ src, label, close }: { src: string; label: string; close: () => void }) {
+export function ImageDialog({ src, label, close }: { src: string; label: string; close: () => void }) {
   const { t } = useLang();
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
