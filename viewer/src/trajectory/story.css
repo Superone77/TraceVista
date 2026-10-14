@@ -7,7 +7,7 @@
    Warm paper and a serif body for reading; small sans labels for the interface; a margin line for the storyline. */
 .reader .story-rail {
   --paper: #fbfaf7; --ink: #1d1b18; --soft: #5d5850; --faint: #8f897e; --rule: #e6e1d8; --mark: #efe9dc; --end: #7a51a8;
-  position: relative; flex: none; width: 27rem; min-height: 0; display: flex; flex-direction: column;
+  position: relative; flex: none; width: 27rem; max-width: 100%; box-sizing: border-box; min-height: 0; display: flex; flex-direction: column;
   background: var(--paper); color: var(--ink); border-right: 1px solid var(--rule);
 }
 .story-top { flex: none; display: flex; justify-content: flex-end; padding: .5rem .875rem 0; background: var(--paper); }

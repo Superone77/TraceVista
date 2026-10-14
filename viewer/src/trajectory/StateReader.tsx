@@ -24,7 +24,7 @@ import { datasetRequest } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 
 const nodeTypes = { trajectory: MapCard };
-const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, RAIL_MAX = 760, MAP_MIN = 620;
+const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
 const edgeTypes = { routed: RoutedEdge, gutter: GutterEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
@@ -56,11 +56,19 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
   const [journeyOpen, setJourneyOpen] = useState(true);
   const [storyExpanded, setStoryExpanded] = useState<Set<string>>(() => new Set());
-  // The story rail's width: dragged by the reader, kept in this browser. The map keeps at least MAP_MIN beside it.
+  // Reading can take most of the workspace; keep a narrow map beside it rather than a fixed rail cap.
   const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
-  const [railWidth, setRailWidth] = useState<number>(() => { try { const v = Number(localStorage.getItem(RAIL_STORE)); return v > 0 ? v : railDefault(); } catch { return railDefault(); } });
+  const [railWidth, setRailWidth] = useState<number>(() => { try { const v = Number(localStorage.getItem(RAIL_STORE)); return Number.isFinite(v) && v >= RAIL_MIN ? v : railDefault(); } catch { return railDefault(); } });
+  const [railLimit, setRailLimit] = useState(() => Math.max(RAIL_MIN, window.innerWidth - MAP_MIN));
   const railRef = useRef(railWidth); railRef.current = railWidth;
-  const railMax = () => { const map = canvasRef.current?.getBoundingClientRect().width ?? 0; return Math.max(RAIL_MIN, Math.min(RAIL_MAX, railRef.current + map - MAP_MIN)); };
+  const railSpace = () => {
+    const workspace = canvasRef.current?.parentElement;
+    if (!workspace) return window.innerWidth;
+    const dock = workspace.querySelector<HTMLElement>(':scope > .side-dock');
+    const occupied = dock && getComputedStyle(dock).position !== 'absolute' ? dock.getBoundingClientRect().width : 0;
+    return workspace.getBoundingClientRect().width - occupied;
+  };
+  const railMax = () => Math.max(RAIL_MIN, railSpace() - MAP_MIN);
   const resizeRail = useCallback((px: number) => setRailWidth(Math.round(Math.max(RAIL_MIN, Math.min(railMax(), px)))), []);
   const storeRail = (w: number | null) => { try { if (w == null) localStorage.removeItem(RAIL_STORE); else localStorage.setItem(RAIL_STORE, String(w)); } catch { /* private mode: the width lasts for this page */ } };
   // Kept whenever it changes, except mid-drag; a drag is kept when it ends. Double-click returns to the default.
@@ -166,9 +174,12 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     let last = el.getBoundingClientRect();
     const observer = new ResizeObserver(() => {
       const box = el.getBoundingClientRect();
-      // The run overview covers a third of a narrow map: tuck it away while a side panel takes the room, bring it back after.
-      if (box.width < 600 && !document.body.classList.contains('resizing-story')) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
-      else if (journeyTucked.current && box.width - railRef.current >= 640) { journeyTucked.current = false; setJourneyOpen(true); }
+      const available = railSpace(), limit = Math.max(RAIL_MIN, available - MAP_MIN);
+      setRailLimit(limit);
+      setRailWidth(width => Math.min(width, limit));
+      // A deliberately narrow map is fine. Tuck the story only when both panels cannot fit at their minimums.
+      if (available < RAIL_MIN + MAP_MIN && !document.body.classList.contains('resizing-story')) setJourneyOpen(open => { if (open) journeyTucked.current = true; return false; });
+      else if (journeyTucked.current && available >= RAIL_MIN + MAP_MIN + 40) { journeyTucked.current = false; setJourneyOpen(true); }
       if (overviewPinned.current) overview();
       else if (last.width > 0 && last.height > 0 && (box.width !== last.width || box.height !== last.height)) {
         // Keep what was in the middle of the map in the middle, then make sure the selected card is still on screen.
@@ -184,6 +195,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       last = box;
     });
     observer.observe(el);
+    if (canvasRef.current?.parentElement) observer.observe(canvasRef.current.parentElement);
     return () => observer.disconnect();
   }, [overview, rf]);
   useEffect(() => {
@@ -442,7 +454,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
       onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
-      width={{ now: railWidth, min: RAIL_MIN, max: journeyOpen ? railMax() : RAIL_MAX }} onResize={resizeRail} onResizeEnd={saveRail} />}
+      width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
