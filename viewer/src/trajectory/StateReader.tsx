@@ -7,6 +7,8 @@ import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
 import RoutedEdge, { GutterEdge, type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
 import ChatDialog from './ChatDialog';
+import PanelResizeHandle from './PanelResizeHandle';
+import { chatBounds, clampChatWidth } from './panelSizing';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
@@ -24,6 +26,7 @@ import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff'
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
+const CHAT_STORE = 'tracevista.chatWidth';
 const edgeTypes = { routed: RoutedEdge, gutter: GutterEdge };
 
 function FilePicker({ label, onImport }: { label: string; onImport: (file: File) => void }) {
@@ -82,6 +85,40 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
   const [focusRevision, setFocusRevision] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
+  const chatDefault = () => 28 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
+  const [chatWidth, setChatWidth] = useState(() => {
+    try { const value = Number(localStorage.getItem(CHAT_STORE)); return Number.isFinite(value) && value > 0 ? value : chatDefault(); }
+    catch { return chatDefault(); }
+  });
+  const chatWidthRef = useRef(chatWidth); chatWidthRef.current = chatWidth;
+  const [chatLimit, setChatLimit] = useState(() => chatBounds(window.innerWidth, false, true));
+  const measureChat = useCallback(() => {
+    const workspace = canvasRef.current?.parentElement;
+    const dock = workspace?.querySelector<HTMLElement>(':scope > .side-dock');
+    return chatBounds(workspace?.getBoundingClientRect().width ?? window.innerWidth,
+      !!dock && getComputedStyle(dock).position === 'absolute', !!workspace?.querySelector(':scope > .story-rail'));
+  }, []);
+  const resizeChat = useCallback((px: number) => {
+    const next = clampChatWidth(px, measureChat(), chatDefault());
+    chatWidthRef.current = next; setChatWidth(next);
+  }, [measureChat]);
+  const saveChat = useCallback((reset?: boolean) => {
+    if (reset) resizeChat(chatDefault());
+    try { localStorage.setItem(CHAT_STORE, String(chatWidthRef.current)); } catch { /* page-only width when storage is unavailable */ }
+  }, [resizeChat]);
+  useLayoutEffect(() => {
+    if (!chatOpen) return;
+    const workspace = canvasRef.current?.parentElement;
+    if (!workspace) return;
+    const update = () => {
+      const bounds = measureChat();
+      setChatLimit(previous => previous.min === bounds.min && previous.max === bounds.max ? previous : bounds);
+      resizeChat(chatWidthRef.current);
+    };
+    update();
+    const observer = new ResizeObserver(update); observer.observe(workspace);
+    return () => observer.disconnect();
+  }, [chatOpen, journeyOpen, measureChat, resizeChat]);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
   const pendingJump = useRef<{ id: string; desired?: Tier; revealInStory: boolean } | null>(null);
   const revealStory = useCallback((id: string) => setStoryExpanded(previous => revealStoryPath(original, previous, id)), [original]);
@@ -466,7 +503,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     </ReactFlow>
       {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
-      {chatOpen && <div className="side-dock">
+      {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
+        <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />
         <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={jump} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />
       </div>}</main>
   </div>;
