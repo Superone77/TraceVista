@@ -6,13 +6,12 @@ import { layoutGraph, semanticProjection, semanticTier, rebaseViewport, recordsF
 import MapCard, { COMPACT_ZOOM, type CardNode, type Landmark } from './MapCard';
 import RoutedEdge, { GutterEdge, type Rect } from './RoutedEdge';
 import { fromReading, localLadder, withoutParent, readingCoverage } from './ladder';
-import Inspector from './Inspector';
 import ChatDialog from './ChatDialog';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import StoryRail, { type Depth } from './StoryRail';
-import { expandStoryToTier, revealStoryPath } from './storyDisclosure';
+import { eventDestination, revealStoryEvidence, expandStoryToTier, revealStoryPath } from './storyDisclosure';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
 import { LangProvider, LangToggle, useLang } from './i18n';
@@ -43,7 +42,6 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const zoomReadout = useRef<HTMLSpanElement>(null);
   const pendingViewport = useRef<Viewport | null>(null);
   const overviewPinned = useRef(true);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [wheelPans, setWheelPans] = useState(true);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [showLinks, setShowLinks] = useState(true);
@@ -84,16 +82,11 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
   const [focusRevision, setFocusRevision] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
-  // With both panels open the dock shows one at a time: details or chat, each at full height.
-  const [front, setFront] = useState<'details' | 'chat'>('details');
-  const chatFront = useRef(false); chatFront.current = chatOpen && front === 'chat';
-  const showDetails = useCallback(() => { setInspectorOpen(true); setFront('details'); }, []);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
   const pendingJump = useRef<{ id: string; desired?: Tier; revealInStory: boolean } | null>(null);
   const revealStory = useCallback((id: string) => setStoryExpanded(previous => revealStoryPath(original, previous, id)), [original]);
-  const inspect = useCallback((id: string) => { overviewPinned.current = false; revealStory(id); setSelected(id); setInspectorOpen(true); if (!chatFront.current) setFront('details'); }, [revealStory]);
+  const inspect = useCallback((id: string) => { overviewPinned.current = false; setFocusEvent(null); revealStory(id); setSelected(id); journeyTucked.current = false; setJourneyOpen(true); }, [revealStory]);
   const expand = useCallback((foldId: string) => setOpenFolds(s => new Set(s).add(foldId)), []);
-  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); setFocusRevision(revision => revision + 1); showDetails(); }, [showDetails]);
   const layouts = useMemo(() => Object.fromEntries((['states', 'branches', 'actions', 'raw'] as Tier[]).map(t => [t, layoutGraph(graph, t, stateMode, { fold: decisionsOnly, openFolds })])) as Record<Tier, ReturnType<typeof layoutGraph>>, [graph, stateMode, decisionsOnly, openFolds]);
   const layout = layouts[tier];
   const decisions = useMemo(() => keyDecisions(graph), [graph]);
@@ -277,6 +270,20 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     }
     flyTo(next, view);
   }, [layouts, flyTo, revealStory]);
+  const jump = useCallback((id: string) => {
+    setFocusEvent(null);
+    journeyTucked.current = false; setJourneyOpen(true);
+    moveTo(id, graph.actions.some(action => action.id === id) ? 'actions' : undefined);
+  }, [graph, moveTo]);
+  const evidence = useCallback((eventId: string) => {
+    const target = eventDestination(original, eventId, selected);
+    if (!target) return;
+    journeyTucked.current = false; setJourneyOpen(true);
+    setFocusEvent(eventId); setFocusRevision(revision => revision + 1);
+    if (target.node) moveTo(target.node, target.action ? 'raw' : undefined);
+    else overview(false, true);
+    setStoryExpanded(previous => revealStoryEvidence(original, previous, eventId, selected));
+  }, [original, selected, moveTo, overview]);
   // A state on the overview: centred at the overview's zoom, the camera flying there from wherever it is.
   const flyToState = useCallback((id: string) => {
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
@@ -334,10 +341,10 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
         offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [], multiActor,
         flowNo: p.kind === 'branch' ? flow.get(p.id)?.n : undefined, why: why.get(p.id), dim: !!focus && p.kind !== 'state' && !focus.has(p.id),
-        fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, cited: cited.has(p.id) },
+        fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, focusEvent, focusRevision, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
-  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus]);
+  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus, focusEvent, focusRevision]);
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
@@ -428,7 +435,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     const a = Object.assign(document.createElement('a'), { href: url, download: 'agent-state-trajectory.json' });
     a.click(); URL.revokeObjectURL(url);
   }
-  return <div className={`reader ${inspectorOpen ? 'inspector-open' : ''}`} aria-label={graph.title}>
+  return <div className="reader" aria-label={graph.title}>
     <div className="toolbar">
       <ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
@@ -438,7 +445,6 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
         </div>
         <div className="viewer-menu-section">
           <button onClick={() => { overview(true); dismiss(); }}><span>{t('Fit view')}</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
-          <button onClick={() => { setSelected(null); showDetails(); dismiss(); }}>{t('Structure & evidence')}</button>
           <label className="viewer-menu-field">{t('State relationships')}<select aria-label={t('State relationships')} value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">{t('Version tree')}</option><option value="chronology">{t('Execution order')}</option></select></label>
           <label className="viewer-menu-field">{t('Canvas input')}<select aria-label={t('Canvas input mode')} value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">{t('Trackpad')}</option><option value="mouse">{t('Mouse')}</option></select></label>
         </div>
@@ -450,9 +456,9 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
         </div>
       </>}</ViewerMenu>
       <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
-      <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
+      <div className="view-options"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><LangToggle /></div>
     </div>
-    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
+    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
       onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
       width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
@@ -460,15 +466,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     </ReactFlow>
       {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
-      {/* Details and chat share one dock beside the map: opening the second never narrows the map again, and nothing covers it.
-          The hidden panel stays mounted, so a chat request in flight survives a look at the details. */}
-      {(inspectorOpen || chatOpen) && <div className="side-dock" data-front={inspectorOpen && chatOpen ? front : inspectorOpen ? 'details' : 'chat'}>
-        {inspectorOpen && chatOpen && <div className="dock-tabs" role="tablist" aria-label={t('Side panel')}>
-          <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>{t('Details')}</button>
-          <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>{t('Chat')}</button>
-        </div>}
-        {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} focusRevision={focusRevision} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
-        {chatOpen && <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
+      {chatOpen && <div className="side-dock">
+        <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={jump} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />
       </div>}</main>
   </div>;
 }

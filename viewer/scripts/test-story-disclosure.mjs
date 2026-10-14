@@ -116,3 +116,20 @@ test('evidence excludes unassigned quotes and call partners and handles an actio
   assert.deepEqual(storyRecordsForAction(graph, { ...graph.actions[0], events: ['result'] }).map(event => event.id), ['result'], 'A result cannot invent an unassigned call partner');
   assert.deepEqual(storyRecordsForAction(emptyGraph, graph.actions[0]), []);
 });
+
+test('event references resolve explicit ownership, prefer the current action, and do not guess a chronological owner', async () => {
+  const source = stripTypeScriptTypes(readFileSync(new URL('../src/trajectory/storyDisclosure.ts', import.meta.url), 'utf8'));
+  const { eventDestination, revealStoryEvidence, evidenceSelectionNodes } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+  assert.equal(typeof eventDestination, 'function');
+  assert.deepEqual(eventDestination(graph, 'call'), { event: 'call', node: 'read', action: 'read' });
+  assert.equal(eventDestination(graph, 'missing-event'), null);
+  assert.deepEqual(eventDestination(graph, 'unassigned'), { event: 'unassigned', node: null, action: null });
+  const shared = {...graph, actions: [...graph.actions, {...graph.actions[1], id:'also-read',events:['call']}]};
+  assert.equal(eventDestination(shared, 'call', 'also-read').node, 'also-read');
+  const revealed = revealStoryEvidence(graph,new Set(['after']),'call');
+  assert.deepEqual(ids(revealed), ['after','before','inspect','inspect::routine','read']);
+  assert.equal(storyActionRecordsVisible(graph,revealed,graph.actions[0]),true);
+  assert.deepEqual(ids(evidenceSelectionNodes(graph,['call'])), ['before','inspect','read']);
+  assert.deepEqual(ids(evidenceSelectionNodes(graph,[])), []);
+  assert.deepEqual(ids(evidenceSelectionNodes(graph,['unassigned'])), []);
+});

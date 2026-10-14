@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import RecordText from './RecordText';
 import type { RawEvent } from './model';
 import { labels } from './labels';
@@ -14,9 +15,20 @@ function recordType(e: RawEvent) {
 }
 
 /** Literal source text, not summaries. A single scroll surface keeps long output intact. */
-export default function RawRecords({ records, onEvidence }: { records: RawEvent[]; onEvidence?: (id: string) => void }) {
+export default function RawRecords({ records, onEvidence, focusEvent, focusRevision = 0 }: { records: RawEvent[]; onEvidence?: (id: string) => void; focusEvent?: string | null; focusRevision?: number }) {
   const { t } = useLang();
-  return <div className="raw-records nodrag nopan" tabIndex={0} aria-label={t('Raw trajectory text')} onWheelCapture={e => {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusEvent) return;
+    const timer = setTimeout(() => {
+      const container = root.current, target = container?.querySelector<HTMLElement>('[data-event-id="' + CSS.escape(focusEvent) + '"]');
+      if (!container || !target) return;
+      const box = container.getBoundingClientRect(), scale = box.height / container.offsetHeight || 1;
+      container.scrollTop += (target.getBoundingClientRect().top - box.top) / scale - 12;
+    }, 380);
+    return () => clearTimeout(timer);
+  }, [focusEvent, focusRevision]);
+  return <div ref={root} className="raw-records nodrag nopan" tabIndex={0} aria-label={t('Raw trajectory text')} onWheelCapture={e => {
     // Keep text scrolling local, but let pinch and modified wheel reach the canvas zoom handler.
     if (!e.ctrlKey && !e.metaKey && !e.currentTarget.closest('.space-pan')) e.stopPropagation();
   }}>
@@ -24,7 +36,7 @@ export default function RawRecords({ records, onEvidence }: { records: RawEvent[
       const type = recordType(e);
       return <div className="raw-record-wrap" key={e.id}>
         {i > 0 && <div className="raw-record-arrow" aria-hidden>↓</div>}
-        <article className={`raw-record ${type.kind}`} data-event-id={e.id}>
+        <article className={`raw-record ${type.kind}`} data-event-id={e.id} data-focused={focusEvent === e.id || undefined}>
           <div className="raw-record-meta">{onEvidence ? <button className="raw-event-reference" onClick={() => onEvidence(e.id)}>{e.id} ↗</button> : <span>{e.id}</span>}{e.model && <span className="model-tag">{e.model}</span>}{e.tokens_in != null && <span title={t(e.tokens_scope === 'session_cumulative' ? 'Cumulative input through this event, including cached tokens; not the input token count for this call' : 'Input tokens reported in the log; not the length of this text')}>{t(e.tokens_scope === 'session_cumulative' ? 'Cumulative input' : e.tokens_scope === 'session_total' ? 'Session input' : 'Input')} {e.tokens_in} tok</span>}</div>
           <h3><span>{type.icon}</span> {t(labels[e.actor ?? 'agent'] ?? e.actor ?? '')} · {t(type.label)}{e.tool ? ` · ${e.tool}` : ''}</h3>
           {e.skill && <div className="raw-skill"><span className="skill-tag">Skill · {e.skill}</span></div>}

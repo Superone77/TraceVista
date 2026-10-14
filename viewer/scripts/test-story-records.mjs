@@ -52,10 +52,10 @@ const graph = {
     { id: 'E-unassigned', kind: 'result', actor: 'agent', text: 'UNASSIGNED_RECORD_MUST_NOT_APPEAR' },
   ], sources: [] },
 };
-const render = expanded => renderToStaticMarkup(React.createElement(StoryRail, {
+const render = (expanded, options = {}) => renderToStaticMarkup(React.createElement(StoryRail, {
   graph, main: new Set(['s0']), delivered: 's0', decisionNo: new Map(), selected: null,
   expanded, onExpandedChange: () => {}, onFly: () => {}, onCite: () => {}, onEvidence: () => {},
-  onHide: () => {}, width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {},
+  onHide: () => {}, width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {}, ...options,
 }));
 
 const full = render(new Set(['s0', 'b0', 'a0']));
@@ -89,3 +89,10 @@ const mapAction = renderToStaticMarkup(React.createElement(ReactFlowProvider, nu
 assert(mapAction.includes('action-image-previews') && mapAction.includes('data:image/png;base64,YWJj'), 'Map Action cards show assigned image thumbnails');
 assert(!mapAction.includes('CALL_TAIL_'), 'Map Action cards keep raw text closed');
 console.log('PASS: Map Action card previews assigned images');
+
+const eventFocus = render(new Set(['s0','b0','a0']), {focusEvent:'E-result'});
+assert.equal((eventFocus.match(/data-focused="true"/g) ?? []).length, 1, 'Only the requested record gets focused');
+assert(eventFocus.includes('data-event-id="E-result" data-focused="true"'));
+const unassigned = render(new Set(), {focusEvent:'E-unassigned'});
+assert(unassigned.includes('Record without an action annotation') && unassigned.includes('UNASSIGNED_RECORD_MUST_NOT_APPEAR'), 'Unassigned evidence is explicitly visible without inventing a node owner');
+console.log('PASS: focused raw records and explicit unassigned-event navigation');

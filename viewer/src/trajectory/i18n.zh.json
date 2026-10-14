@@ -51,7 +51,6 @@
  "Delivered line": "交付主线",
  "Delivered.": "交付。",
  "Derived from this version": "由这个版本派生",
- "Details": "详情",
  "Diagnose": "诊断",
  "Diagnosed": "诊断",
  "Edit": "编辑",
@@ -157,7 +156,6 @@
  "Sends a short test prompt without trajectory data. A small API charge may apply.": "发送一句不含轨迹数据的测试提示，可能产生少量 API 费用。",
  "Session input": "会话输入",
  "Side branch": "支线",
- "Side panel": "侧栏",
  "Smart context": "智能上下文",
  "Source line not recorded": "未记录原始行号",
  "Source line {n}": "原始行 {n}",
@@ -167,7 +165,6 @@
  "Stop": "停止",
  "Story": "故事线",
  "Story detail levels": "故事线展开层级",
- "Structure & evidence": "结构与证据",
  "Structure and evidence": "结构与证据",
  "Succeeded": "成功",
  "Supporting observations · {n}": "支撑的观察 · {n}",
@@ -237,5 +234,6 @@
  "Click to enlarge": "点击放大",
  "Original image record": "原始图片记录",
  "Image could not be decoded. The original data is available below.": "图片无法解码，可在下方查看原始数据。",
- "Action images": "行为图片"
+ "Action images": "行为图片",
+ "Record without an action annotation": "没有行为归属的原始记录"
 }

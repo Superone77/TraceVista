@@ -18,7 +18,7 @@ export type CardData = Record<string, unknown> & {
   tools: string[]; records: RawEvent[]; enter: (id: string) => void; inspect: (id: string) => void;
   ladder: Ladder | null; quotes: Quote[]; landmarks: Landmark[]; fingerprint: ToolMark[]; routine: boolean;
   expand: (foldId: string) => void; evidence: (eventId: string) => void; cited?: boolean;
-  offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: Behavior[]; multiActor?: boolean;
+  focusEvent?: string | null; focusRevision?: number; offMain?: boolean; delivered?: boolean; decisionNo?: number; mix?: Behavior[]; multiActor?: boolean;
   flowNo?: number; why?: { in: number; out: number }; dim?: boolean;
 };
 export type CardNode = Node<CardData, 'trajectory'>;
@@ -59,7 +59,7 @@ function CompactReading({ height, width, ordinal, takeaway, reason, metric, land
 }
 
 export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
-  const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor, flowNo, why, dim } = data;
+  const { p, tier, observations, actions, ordinal, enter, inspect, tools, records, ladder, quotes, landmarks, routine, expand, evidence, cited, offMain, delivered, decisionNo, mix, multiActor, flowNo, why, dim, focusEvent, focusRevision } = data;
   const { t } = useLang();
   const label = (key: string) => t(labels[key] ?? key);
   // Only overview cards subscribe to the zoom, and only to which side of the compact threshold it is on.
@@ -108,7 +108,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
     </> : p.kind === 'action' && tier === 'raw' ? <>
       <div className="raw-action-heading"><span style={{ color }}>{t(action.behavior)}</span><MoveStamp move={move} n={decisionNo} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{t(records.length === 1 ? '{n} raw record' : '{n} raw records', { n: records.length })}</span></div>
       {skillBadges}
-      <RawRecords records={records} />
+      <RawRecords records={records} focusEvent={focusEvent} focusRevision={focusRevision} />
     </> : <>
       <div className="card-top"><span>{flowNo != null && <b className="flow-no" title={t('Order in time within this state')}>{flowNo}</b>}{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} />{why && why.in > 0 && <em className="why-mark" title={t('Hover or select to see why')}>{t('because {n}', { n: why.in })}</em>}</span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}

@@ -161,8 +161,6 @@
 .reader .side-dock { flex: none; width: 28rem; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); }
 .reader .side-dock > .inspector { position: static; width: auto; max-width: none; flex: 1 1 0; min-height: 0; border: 0; box-shadow: none; }
 .reader .side-dock > .chat-dialog { position: relative; inset: auto; z-index: auto; width: auto; height: auto; flex: 1 1 0; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
-.reader .side-dock[data-front=chat] > .inspector,
-.reader .side-dock[data-front=details] > .chat-dialog { display: none; }
 .reader .dock-tabs { display: flex; gap: .25rem; padding: .5rem .75rem; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .reader .dock-tabs button { flex: 1; font-size: var(--ui-text); min-height: var(--ui-control-height); border-color: transparent; background: transparent; color: var(--text-2); }
 .reader .dock-tabs button[aria-selected=true] { background: var(--surface); border-color: var(--line-strong); color: var(--text); font-weight: 600; }
