@@ -33,11 +33,11 @@ function Verb({ move, n }: { move?: Move | null; n?: number }) {
   return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{t(verbs[move])}</span>;
 }
 
-export default function StoryRail({ graph, main, delivered, decisionNo, selected, focusEvent, focusRevision = 0, expanded: open, onExpandedChange, onFly, onCite, onEvidence, onHide, width, onResize, onResizeEnd }: {
+export default function StoryRail({ graph, main, delivered, decisionNo, selected, focusEvent, focusRevision = 0, expanded: open, onExpandedChange, onFly, onCite, onEvidence, width, onResize, onResizeEnd }: {
   graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
   focusEvent?: string | null; focusRevision?: number;
   expanded: ReadonlySet<string>; onExpandedChange: (update: (previous: ReadonlySet<string>) => Set<string>) => void;
-  onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
+  onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void;
   width: { now: number; min: number; max: number }; onResize: (px: number) => void; onResizeEnd: (reset?: boolean) => void;
 }) {
   const { t } = useLang();
@@ -159,15 +159,13 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     <div className="story-resize" role="separator" aria-orientation="vertical" tabIndex={0} aria-label={t('Resize the story')} title={t('Resize the story')}
       aria-valuenow={Math.round(width.now)} aria-valuemin={Math.round(width.min)} aria-valuemax={Math.round(width.max)}
       onPointerDown={drag} onKeyDown={keys} onDoubleClick={() => onResizeEnd(true)} />
-    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')} title={t('Hide the story')}>‹</button></div>
     <div className="story-body">
-      <h2>{t('How the agent got there')}</h2>
-      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Delivered.')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
-      {lead && <div className="story-gist"><p>{lead}</p>
+      {lead && <div className="story-gist"><h2>{t('Summary')}</h2><p>{lead}</p>
         {(rest || cited.length > 0) && <><Stretch open={more}>{rest && <p>{rest}</p>}
           {cited.length > 0 && <div className="story-cites">{cited.map(e => <button key={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => onCite(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div>}</Stretch>
           <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{t(more ? 'Less' : 'More')}</button></>}
       </div>}
+      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Outcome')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
       <ol className="story-text">{graph.states.map(step)}</ol>
       {extraRecord && <section className="story-extra-record"><h3>{t('Record without an action annotation')}</h3><RawRecords records={[extraRecord]} onEvidence={onEvidence} focusEvent={focusEvent} focusRevision={focusRevision} /></section>}
     </div>

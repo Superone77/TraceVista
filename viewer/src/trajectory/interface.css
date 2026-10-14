@@ -27,6 +27,7 @@
 }
 .reader .zoom-levels button span { font-size: var(--ui-caption); margin-right: .3125rem; }
 .reader .view-options { justify-self: end; justify-content: flex-end; gap: .375rem .5rem; min-width: 0; }
+.reader .view-options.story-controls { justify-self: start; justify-content: flex-start; }
 .reader .view-options label,
 .reader .zoom-readout,
 .reader .reading-gap-note { font-size: var(--ui-caption); }
@@ -180,6 +181,7 @@ body.resizing-panel, body.resizing-panel .react-flow__pane { cursor: col-resize;
   .reader .toolbar { grid-template-columns: 1fr auto 1fr; }
   .reader .viewer-menu { grid-column: 1; grid-row: 1; }
   .reader .toolbar > .view-options { grid-column: 3; grid-row: 1; flex-wrap: nowrap; }
+  .reader .toolbar > .story-controls { grid-column: 1; grid-row: 1; }
   .reader .zoom-levels { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 }
 @media (max-width: 48rem) {

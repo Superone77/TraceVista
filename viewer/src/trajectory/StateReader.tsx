@@ -474,7 +474,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   }
   return <div className="reader" aria-label={graph.title}>
     <div className="toolbar">
-      <ViewerMenu>{dismiss => <>
+      <div className="view-options story-controls"><ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
           <FilePicker label={t('Import trajectory')} onImport={onImport} />
           <button onClick={() => { download(); dismiss(); }}>{t('Export complete trace')}</button>
@@ -492,16 +492,16 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
+      <button aria-pressed={journeyOpen} onClick={() => { journeyTucked.current = false; setJourneyOpen(open => !open); }}>{t('Story')}</button></div>
       <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
       <div className="view-options"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><LangToggle /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
-      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
+      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence}
       width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
-      {!journeyOpen && <button className="journey-pill" onClick={() => { journeyTucked.current = false; setJourneyOpen(true); }}>{t('Story')}</button>}
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
         <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />

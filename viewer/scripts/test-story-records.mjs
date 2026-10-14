@@ -55,10 +55,16 @@ const graph = {
 const render = (expanded, options = {}) => renderToStaticMarkup(React.createElement(StoryRail, {
   graph, main: new Set(['s0']), delivered: 's0', decisionNo: new Map(), selected: null,
   expanded, onExpandedChange: () => {}, onFly: () => {}, onCite: () => {}, onEvidence: () => {},
-  onHide: () => {}, width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {}, ...options,
+  width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {}, ...options,
 }));
 
 const full = render(new Set(['s0', 'b0', 'a0']));
+const storyIntro = render(new Set(), { graph: { ...graph, journey: { text: 'Summary of the task. Configuration of the run.', cites: [] } } });
+assert(!storyIntro.includes('How the agent got there'), 'Story does not repeat the old introductory heading');
+assert(!storyIntro.includes('Delivered.'), 'The final-state label describes an outcome rather than assuming delivery');
+assert(storyIntro.includes('Summary') && storyIntro.includes('Outcome'), 'Summary and outcome remain clearly labeled');
+assert(storyIntro.indexOf('Summary of the task.') < storyIntro.indexOf('class="story-outcome"'), 'The final outcome follows the run summary');
+assert(!storyIntro.includes('Hide the story'), 'Panel visibility is controlled by the toolbar rather than a second rail button');
 assert(full.includes('CALL_TAIL_&lt;tag&gt;'), 'Expanded Story retains tool input beyond 600 characters and escapes literal markup');
 assert(full.includes('RESULT_TAIL_✓'), 'Expanded Story retains the complete tool result, not only the first excerpt');
 assert(full.includes('CUSTOM_RECORD_完整原文'), 'Unknown record types remain visible as original text');
