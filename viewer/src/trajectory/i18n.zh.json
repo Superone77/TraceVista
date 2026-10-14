@@ -230,5 +230,11 @@
  "Order in time within this state": "在这个状态里的时间顺序",
  "Hover or select to see why": "悬停或选中查看原因",
  "because {n}": "因为 {n}",
- "Version": "版本"
+ "Version": "版本",
+ "Close image": "关闭图片",
+ "Image {n}": "图片 {n}",
+ "Enlarge image {n}": "放大图片 {n}",
+ "Click to enlarge": "点击放大",
+ "Original image record": "原始图片记录",
+ "Image could not be decoded. The original data is available below.": "图片无法解码，可在下方查看原始数据。"
 }

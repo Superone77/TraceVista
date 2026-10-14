@@ -1,3 +1,4 @@
+import RecordText from './RecordText';
 import type { RawEvent } from './model';
 import { labels } from './labels';
 import { useLang } from './i18n';
@@ -27,7 +28,7 @@ export default function RawRecords({ records, onEvidence }: { records: RawEvent[
           <div className="raw-record-meta">{onEvidence ? <button className="raw-event-reference" onClick={() => onEvidence(e.id)}>{e.id} ↗</button> : <span>{e.id}</span>}{e.model && <span className="model-tag">{e.model}</span>}{e.tokens_in != null && <span title={t(e.tokens_scope === 'session_cumulative' ? 'Cumulative input through this event, including cached tokens; not the input token count for this call' : 'Input tokens reported in the log; not the length of this text')}>{t(e.tokens_scope === 'session_cumulative' ? 'Cumulative input' : e.tokens_scope === 'session_total' ? 'Session input' : 'Input')} {e.tokens_in} tok</span>}</div>
           <h3><span>{type.icon}</span> {t(labels[e.actor ?? 'agent'] ?? e.actor ?? '')} · {t(type.label)}{e.tool ? ` · ${e.tool}` : ''}</h3>
           {e.skill && <div className="raw-skill"><span className="skill-tag">Skill · {e.skill}</span></div>}
-          <pre>{e.text || t('No visible text in the source log')}</pre>
+          <RecordText text={e.text} kind={e.kind} />
           {e.error && <div className="raw-record-error">{t('Marked as an error in the log')}</div>}
           <div className="raw-record-source">{e.source_line != null ? t('Source line {n}', { n: e.source_line }) : t('Source line not recorded')}{e.call_id ? ` · call ${e.call_id}` : ''}</div>
         </article>

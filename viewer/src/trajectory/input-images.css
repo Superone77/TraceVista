@@ -1,0 +1,12 @@
+.input-image-attachment { margin: 12px 14px; }
+.input-image-thumbnail { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 420px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--text); cursor: zoom-in; text-align: left; }
+.input-image-thumbnail img { display: block; width: 100%; height: 180px; object-fit: contain; }
+.input-image-thumbnail span, .input-image-attachment summary { font-size: 12px; }
+.input-image-attachment details { margin-top: 8px; }
+.input-image-attachment summary { cursor: pointer; color: var(--text-2); }
+.input-image-attachment details pre { max-height: 240px; overflow: auto; margin: 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.input-image-dialog { width: min(1200px, 94vw); max-width: 94vw; max-height: 94dvh; padding: 16px; box-sizing: border-box; border: 1px solid #727780; border-radius: 12px; background: #fff; color: #20242b; }
+.input-image-dialog::backdrop { background: #000b; }
+.input-image-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.input-image-toolbar button { padding: 8px 12px; cursor: pointer; }
+.input-image-dialog > img { display: block; width: 100%; height: auto; max-height: calc(94dvh - 88px); object-fit: contain; }

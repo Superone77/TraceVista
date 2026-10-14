@@ -1,3 +1,4 @@
+import RecordText from './RecordText';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { behaviors, colors, stateVisual, correctnessLabel, moveColors, moveGlyphs, moveLabels, type Graph, type Entity, type Action, type State, type Branch } from './model';
 import Observations from './Observations';
@@ -91,5 +92,5 @@ function Fold({ title, open = false, children }: { title: string; open?: boolean
 
 function RawEvidence({ raw, close }: { raw: { id: string; actor?: string; kind: string; tool?: string; source_line?: number | null; text: string }; close: () => void }) {
   const { t } = useLang();
-  return <section className="raw" id="selected-raw-evidence"><button className="close" onClick={close}>{t('Close evidence ×')}</button><h3>{raw.id}</h3><p>{raw.actor} · {raw.kind} · {raw.tool ?? ''} · {t('Source line {n}', { n: raw.source_line ?? t('Not provided') })}</p><pre>{raw.text || t('No visible text in the source log')}</pre></section>;
+  return <section className="raw" id="selected-raw-evidence"><button className="close" onClick={close}>{t('Close evidence ×')}</button><h3>{raw.id}</h3><p>{raw.actor} · {raw.kind} · {raw.tool ?? ''} · {t('Source line {n}', { n: raw.source_line ?? t('Not provided') })}</p><RecordText key={raw.id} text={raw.text} kind={raw.kind} /></section>;
 }
