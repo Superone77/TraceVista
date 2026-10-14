@@ -11,7 +11,8 @@ import { phaseFlow } from './semantic';
 import Stretch from './Stretch';
 import { useLang } from './i18n';
 import RawRecords from './RawRecords';
-import { storyActionRecordsVisible, storyRecordsForAction, toggleStoryDisclosure } from './storyDisclosure';
+import ImagePreviews from './ImagePreviews';
+import { eventDestination, storyActionRecordsVisible, storyRecordsForAction, toggleStoryDisclosure } from './storyDisclosure';
 
 export type Depth = 'states' | 'branches' | 'actions' | 'raw';
 const verbs: Record<Move, string> = { pivot: 'Changed course', ruleout: 'Ruled out', decision: 'Decided', open: 'Left open', insight: 'Found' };
@@ -32,10 +33,11 @@ function Verb({ move, n }: { move?: Move | null; n?: number }) {
   return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{t(verbs[move])}</span>;
 }
 
-export default function StoryRail({ graph, main, delivered, decisionNo, selected, expanded: open, onExpandedChange, onFly, onCite, onEvidence, onHide, width, onResize, onResizeEnd }: {
+export default function StoryRail({ graph, main, delivered, decisionNo, selected, focusEvent, focusRevision = 0, expanded: open, onExpandedChange, onFly, onCite, onEvidence, width, onResize, onResizeEnd }: {
   graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
+  focusEvent?: string | null; focusRevision?: number;
   expanded: ReadonlySet<string>; onExpandedChange: (update: (previous: ReadonlySet<string>) => Set<string>) => void;
-  onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void; onHide: () => void;
+  onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void;
   width: { now: number; min: number; max: number }; onResize: (px: number) => void; onResizeEnd: (reset?: boolean) => void;
 }) {
   const { t } = useLang();
@@ -52,6 +54,8 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
   const byId = useMemo(() => new Map<string, Entity>([...graph.states, ...graph.branches, ...graph.actions].map(e => [e.id, e])), [graph]);
   const cited = (graph.journey?.cites ?? []).map(id => byId.get(id)).filter((e): e is Entity => !!e);
   const end = graph.states.find(s => s.id === delivered);
+  const eventTarget = focusEvent ? eventDestination(graph, focusEvent, selected) : null;
+  const extraRecord = eventTarget && !eventTarget.action ? graph.timeline.timeline.find(event => event.id === focusEvent) : undefined;
 
   const openAll = (ids: string[]) => {
     setMounted(s => { const n = new Set(s); ids.forEach(id => n.add(id)); return n; });
@@ -76,17 +80,28 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     return () => clearTimeout(t);
   }, [selected, graph]);
 
+  useEffect(() => {
+    if (!focusEvent) return;
+    const timer = setTimeout(() => {
+      const owner = eventDestination(graph, focusEvent, selected)?.action;
+      const scope = owner ? root.current?.querySelector('[data-story-action="' + CSS.escape(owner) + '"]') : root.current?.querySelector('.story-extra-record');
+      scope?.querySelector('[data-event-id="' + CSS.escape(focusEvent) + '"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    }, 440);
+    return () => clearTimeout(timer);
+  }, [focusEvent, focusRevision, selected, graph]);
+
   const evidence = (a: Action) => {
     const records = recordsByAction.get(a.id) ?? [];
     return <div className="story-records">
       <div className="story-records-heading"><b>{t('Complete original records')}</b><span>{t('{n} raw records', { n: records.length })}</span></div>
-      {records.length ? <RawRecords records={records} onEvidence={onEvidence} /> : <p className="story-note">{t('No raw records assigned to this action')}</p>}
+      {records.length ? <RawRecords records={records} onEvidence={onEvidence} focusEvent={focusEvent} focusRevision={focusRevision} /> : <p className="story-note">{t('No raw records assigned to this action')}</p>}
     </div>;
   };
-  const actionSentence = (a: Action) => <div className="story-p" key={a.id}>
+  const actionSentence = (a: Action) => <div className="story-p" key={a.id} data-story-action={a.id}>
     <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count={t('{n} raw records', { n: recordsByAction.get(a.id)?.length ?? 0 })}>
       <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{t(doing[a.behavior] ?? a.behavior)}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
     </Sentence>
+    {!open.has(a.id) && <ImagePreviews records={recordsByAction.get(a.id) ?? []} />}
     {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{storyActionRecordsVisible(graph, open, a) && evidence(a)}</Stretch>}
   </div>;
   const phase = (b: Branch) => {
@@ -144,16 +159,15 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     <div className="story-resize" role="separator" aria-orientation="vertical" tabIndex={0} aria-label={t('Resize the story')} title={t('Resize the story')}
       aria-valuenow={Math.round(width.now)} aria-valuemin={Math.round(width.min)} aria-valuemax={Math.round(width.max)}
       onPointerDown={drag} onKeyDown={keys} onDoubleClick={() => onResizeEnd(true)} />
-    <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')} title={t('Hide the story')}>‹</button></div>
     <div className="story-body">
-      <h2>{t('How the agent got there')}</h2>
-      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Delivered.')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
-      {lead && <div className="story-gist"><p>{lead}</p>
+      {lead && <div className="story-gist"><h2>{t('Summary')}</h2><p>{lead}</p>
         {(rest || cited.length > 0) && <><Stretch open={more}>{rest && <p>{rest}</p>}
           {cited.length > 0 && <div className="story-cites">{cited.map(e => <button key={e.id} style={{ '--cite-tone': entityColor(e) } as CSSProperties} onClick={() => onCite(e.id)}>{e.move ? `${moveGlyphs[e.move]} ` : ''}{shortName(e)}</button>)}</div>}</Stretch>
           <button className="story-more" onClick={() => setMore(v => !v)} aria-expanded={more}>{t(more ? 'Less' : 'More')}</button></>}
       </div>}
+      {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Outcome')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
       <ol className="story-text">{graph.states.map(step)}</ol>
+      {extraRecord && <section className="story-extra-record"><h3>{t('Record without an action annotation')}</h3><RawRecords records={[extraRecord]} onEvidence={onEvidence} focusEvent={focusEvent} focusRevision={focusRevision} /></section>}
     </div>
   </aside>;
 }

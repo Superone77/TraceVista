@@ -52,13 +52,19 @@ const graph = {
     { id: 'E-unassigned', kind: 'result', actor: 'agent', text: 'UNASSIGNED_RECORD_MUST_NOT_APPEAR' },
   ], sources: [] },
 };
-const render = expanded => renderToStaticMarkup(React.createElement(StoryRail, {
+const render = (expanded, options = {}) => renderToStaticMarkup(React.createElement(StoryRail, {
   graph, main: new Set(['s0']), delivered: 's0', decisionNo: new Map(), selected: null,
   expanded, onExpandedChange: () => {}, onFly: () => {}, onCite: () => {}, onEvidence: () => {},
-  onHide: () => {}, width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {},
+  width: { now: 432, min: 280, max: 760 }, onResize: () => {}, onResizeEnd: () => {}, ...options,
 }));
 
 const full = render(new Set(['s0', 'b0', 'a0']));
+const storyIntro = render(new Set(), { graph: { ...graph, journey: { text: 'Summary of the task. Configuration of the run.', cites: [] } } });
+assert(!storyIntro.includes('How the agent got there'), 'Story does not repeat the old introductory heading');
+assert(!storyIntro.includes('Delivered.'), 'The final-state label describes an outcome rather than assuming delivery');
+assert(storyIntro.includes('Summary') && storyIntro.includes('Outcome'), 'Summary and outcome remain clearly labeled');
+assert(storyIntro.indexOf('Summary of the task.') < storyIntro.indexOf('class="story-outcome"'), 'The final outcome follows the run summary');
+assert(!storyIntro.includes('Hide the story'), 'Panel visibility is controlled by the toolbar rather than a second rail button');
 assert(full.includes('CALL_TAIL_&lt;tag&gt;'), 'Expanded Story retains tool input beyond 600 characters and escapes literal markup');
 assert(full.includes('RESULT_TAIL_✓'), 'Expanded Story retains the complete tool result, not only the first excerpt');
 assert(full.includes('CUSTOM_RECORD_完整原文'), 'Unknown record types remain visible as original text');
@@ -69,3 +75,30 @@ assert(!full.includes('UNASSIGNED_RECORD_MUST_NOT_APPEAR'), 'An action never pul
 assert(!render(new Set(['s0', 'b0'])).includes('data-event-id='), 'The Actions depth keeps raw evidence folded');
 assert(!render(new Set()).includes('data-event-id='), 'The System states depth returns to a compact story');
 console.log('PASS: real Story renderer retains full source text, metadata, ordering and disclosure boundaries');
+
+// The Action reading level shows visual evidence before opening raw text.
+graph.timeline.timeline[0].kind = 'user';
+graph.timeline.timeline[0].text += '\n' + JSON.stringify({type:'input_image',image_url:'data:image/png;base64,YWJj'});
+const actionPreview = render(new Set(['s0','b0']));
+assert(actionPreview.includes('action-image-previews'), 'Action level includes image thumbnails');
+assert(actionPreview.includes('data:image/png;base64,YWJj'));
+assert(!actionPreview.includes('CALL_TAIL_'), 'Thumbnails do not unfold raw text');
+console.log('PASS: Action level previews image evidence without opening raw records');
+
+const { ReactFlowProvider } = requirePackage('@xyflow/react');
+const MapCard = load(fileURLToPath(new URL('../src/trajectory/MapCard.tsx', import.meta.url))).default;
+const mapAction = renderToStaticMarkup(React.createElement(ReactFlowProvider, null, React.createElement(MapCard, {id:'a0',type:'trajectory',selected:false,data:{
+  p:{id:'a0',kind:'action',item:graph.actions[0],width:340,height:340}, tier:'actions', observations:[], actions:[], ordinal:0,
+  tools:[],records:graph.timeline.timeline.filter(e=>graph.actions[0].events.includes(e.id)),ladder:null,quotes:[],landmarks:[],fingerprint:[],routine:false,
+  enter:()=>{},inspect:()=>{},expand:()=>{},evidence:()=>{}
+}})));
+assert(mapAction.includes('action-image-previews') && mapAction.includes('data:image/png;base64,YWJj'), 'Map Action cards show assigned image thumbnails');
+assert(!mapAction.includes('CALL_TAIL_'), 'Map Action cards keep raw text closed');
+console.log('PASS: Map Action card previews assigned images');
+
+const eventFocus = render(new Set(['s0','b0','a0']), {focusEvent:'E-result'});
+assert.equal((eventFocus.match(/data-focused="true"/g) ?? []).length, 1, 'Only the requested record gets focused');
+assert(eventFocus.includes('data-event-id="E-result" data-focused="true"'));
+const unassigned = render(new Set(), {focusEvent:'E-unassigned'});
+assert(unassigned.includes('Record without an action annotation') && unassigned.includes('UNASSIGNED_RECORD_MUST_NOT_APPEAR'), 'Unassigned evidence is explicitly visible without inventing a node owner');
+console.log('PASS: focused raw records and explicit unassigned-event navigation');

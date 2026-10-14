@@ -1,9 +1,11 @@
+import { evidenceSelectionNodes } from './storyDisclosure';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { moveColors, type Entity, type Graph } from './model';
 import { buildChat, citations, contextLabels, type ChatTurn, type ContextOptions } from './chat';
 import { useLang } from './i18n';
+import ProviderPicker from './ProviderPicker';
 import { buildSmartContext, runSmartChat, type SmartStatus } from './smartContext';
-import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presets, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
+import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
 import './smart-context.css';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
@@ -28,6 +30,16 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const [settings, setSettings] = useState<ChatSettings>(() => restoreSettings(store.get(SETTINGS_KEY, {})));
   const [turns, setTurns] = useState<ChatTurn[]>(() => store.get<ChatTurn[]>(historyKey, []).map(t => t.role === 'assistant' && !t.text && !t.error ? { ...t, error: 'The previous request was interrupted. Ask your question again.' } : t));
   const [draft, setDraft] = useState('');
+  const [openEvidence, setOpenEvidence] = useState<Set<string>>(() => new Set());
+  const selectionKey = JSON.stringify([...new Set(turns.filter(turn => openEvidence.has(turn.id)).flatMap(turn => turn.retrieval?.selectedEventIds ?? []))].sort());
+  const highlighted = useMemo(() => evidenceSelectionNodes(graph, JSON.parse(selectionKey) as string[]), [graph, selectionKey]);
+  useEffect(() => { onCited(highlighted); return () => onCited(new Set()); }, [highlighted, onCited]);
+  function toggleEvidence(id: string, open: boolean) {
+    setOpenEvidence(previous => {
+      if (previous.has(id) === open) return previous;
+      const next = new Set(previous); if (open) next.add(id); else next.delete(id); return next;
+    });
+  }
   const [contextStrategy, setContextStrategy] = useState<'direct' | 'smart'>('smart');
   const [contextMode, setContextMode] = useState<NonNullable<ContextOptions['mode']>>('prefix');
   const [compression, setCompression] = useState<ContextOptions['compression']>('full');
@@ -161,7 +173,6 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       }
       const cites = [...new Set(citations(text, known).flatMap(p => 'id' in p && p.kind !== 'unknown' ? [p.id] : []))];
       update({ text, cites });
-      onCited(new Set(cites.filter(id => ids.has(id))));
     } catch (e) {
       update({ text, error: controller.signal.aborted ? typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped' : safeError(e, settings) });
     } finally { window.clearTimeout(timer); activeRequest.current = null; setBusy(null); }
@@ -189,13 +200,11 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       <button className="chat-model-button" onClick={() => setShowSettings(v => !v)} aria-pressed={showSettings} title={tr('Model and API settings')}>{ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
       <details className="chat-more"><summary aria-label={tr('More chat actions')}>⋯</summary><div>
         <button onClick={exportChat} disabled={!turns.length}>{tr('Export conversation')}</button>
-        <button onClick={() => { setTurns([]); onCited(new Set()); }} disabled={!turns.length || !!busy}>{tr('Clear conversation')}</button>
+        <button onClick={() => { setTurns([]); setOpenEvidence(new Set()); }} disabled={!turns.length || !!busy}>{tr('Clear conversation')}</button>
       </div></details>
       <button onClick={close} aria-label="Close chat">×</button></span></header>
     {showSettings && <fieldset className="chat-settings" disabled={locked}>
-      <label>{tr('Provider')}<select aria-label="Model provider" value={preset} onChange={e => editConnection(switchPreset(settings, e.target.value))}>
-        {(['Cloud APIs', 'Local servers', 'Custom'] as const).map(group => <optgroup key={group} label={group}>{Object.entries(presets).filter(([, p]) => p.group === group).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}</optgroup>)}
-      </select></label>
+      <div className="chat-provider-field"><span>{tr('Provider')}</span><ProviderPicker value={preset} disabled={locked} onChange={value => editConnection(switchPreset(settings, value))} /></div>
       <label>{tr('Base URL')}<input aria-label="API base URL" value={settings.baseUrl} placeholder="https://…/v1" onChange={e => editConnection(changeEndpoint(settings, e.target.value))} /></label>
       <label>{tr('Key')}<input aria-label="API Key" type="password" autoComplete="off" value={settings.apiKey} placeholder={selectedPreset(settings).noKey || preset === 'custom' ? tr('Optional if authentication is disabled') : tr('Enter the API key for this provider')} onChange={e => { setProbe({ busy: false, text: '' }); setSettings(s => ({ ...s, apiKey: e.target.value })); }} /></label>
       {selectedPreset(settings).keyUrl && <a className="chat-provider-link" href={selectedPreset(settings).keyUrl} target="_blank" rel="noreferrer">{tr('Get a key for {name} ↗', { name: selectedPreset(settings).label })}</a>}
@@ -229,7 +238,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           {t.role === 'assistant' && !t.text && !t.error && <span className="chat-wait" role="status" aria-live="polite">{progressText} {waitSeconds}s</span>}</div>
         {t.error && <div className="chat-error">{t.error}</div>}
         {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextStrategy === 'smart' ? 'Smart context · ' : ''}{t.contextMode ? contextLabels[t.contextMode] : 'Legacy context'} · {t.context.filter(c => c.event).length} original records sent{t.compression === 'excerpts' ? ' (historical excerpts)' : ''}{t.cites?.length ? ` · ${t.cites.length} citations` : ''}</small>}
-        {t.role === 'assistant' && t.retrieval && <details className="chat-retrieval">
+        {t.role === 'assistant' && t.retrieval && <details className="chat-retrieval" open={openEvidence.has(t.id)} onToggle={e => toggleEvidence(t.id, e.currentTarget.open)}>
           <summary>View evidence selection · {t.retrieval.requests.length} requests</summary>
           <p>Summaries and index: approximately {t.retrieval.selectionEstimatedTokens.toLocaleString()} tokens;{' '}
             {t.retrieval.requests.some(r => r.phase === 'answering') ? `Answer request: approximately ${(t.retrieval.answerEstimatedTokens ?? 0).toLocaleString()} tokens.` : 'Original text has not been sent.'}</p>

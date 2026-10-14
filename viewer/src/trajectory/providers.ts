@@ -1,3 +1,4 @@
+import { textForChat } from './input-images';
 // Provider presets and live model discovery follow ThoughtDAG's runtime-providers.ts
 // (MIT, © 2026 Xia Chen). This viewer uses browser-direct requests, without its proxy.
 export type ChatProvider = 'anthropic' | 'openai';
@@ -171,6 +172,8 @@ export function readSSE(buffer: string, provider: ChatProvider, onText: (t: stri
 /** Direct browser request. The optional connection test uses this same transport, with no trajectory. */
 export async function streamChat(s: ChatSettings, system: string, messages: ChatMessage[], onText: (t: string) => void, signal: AbortSignal, onStatus?: (s: StreamStatus) => void, outputTokens = modelBudget(s).outputTokens) {
   if (!positiveTokens(outputTokens)) throw new Error('The output allowance must be a positive integer.');
+  system = textForChat(system);
+  messages = messages.map(message => ({ ...message, content: textForChat(message.content) }));
   const body = s.provider === 'anthropic'
     ? { model: s.model.trim(), max_tokens: outputTokens, system, messages, stream: true }
     : { model: s.model.trim(), messages: [{ role: 'system', content: system }, ...messages], stream: true,

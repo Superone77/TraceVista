@@ -52,3 +52,32 @@ export function storyRecordsForAction(graph: Graph, action: Action): RawEvent[] 
   const ids = new Set(action.events);
   return graph.timeline.timeline.filter(event => ids.has(event.id));
 }
+
+/** Use recorded membership only. An unannotated event has no invented action owner. */
+export function eventDestination(graph: Graph, event: string, preferred?: string | null): { event: string; node: string | null; action: string | null } | null {
+  if (!graph.timeline.timeline.some(record => record.id === event)) return null;
+  const owners = graph.actions.filter(action => action.events.includes(event));
+  const action = owners.find(action => action.id === preferred) ?? owners[0];
+  if (action) return { event, node: action.id, action: action.id };
+  const node = graph.branches.find(branch => branch.events.includes(event)) ?? graph.states.find(state => state.events.includes(event));
+  return { event, node: node?.id ?? null, action: null };
+}
+
+/** Event citations open the complete path through an action to its literal records. */
+export function revealStoryEvidence(graph: Graph, expanded: ReadonlySet<string>, event: string, preferred?: string | null): Set<string> {
+  const target = eventDestination(graph, event, preferred);
+  const next = target?.node ? revealStoryPath(graph, expanded, target.node) : new Set(expanded);
+  if (target?.action) next.add(target.action);
+  return next;
+}
+
+/** Highlight all explicit owners and their containers at the map's current level. */
+export function evidenceSelectionNodes(graph: Graph, events: string[]): Set<string> {
+  const selected = new Set(events), nodes = new Set<string>();
+  for (const action of graph.actions) if (action.events.some(id => selected.has(id))) {
+    nodes.add(action.id); nodes.add(action.branch); nodes.add(action.state);
+  }
+  for (const branch of graph.branches) if (branch.events.some(id => selected.has(id))) { nodes.add(branch.id); nodes.add(branch.state); }
+  for (const state of graph.states) if (state.events.some(id => selected.has(id))) nodes.add(state.id);
+  return nodes;
+}

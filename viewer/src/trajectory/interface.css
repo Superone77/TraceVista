@@ -27,6 +27,7 @@
 }
 .reader .zoom-levels button span { font-size: var(--ui-caption); margin-right: .3125rem; }
 .reader .view-options { justify-self: end; justify-content: flex-end; gap: .375rem .5rem; min-width: 0; }
+.reader .view-options.story-controls { justify-self: start; justify-content: flex-start; }
 .reader .view-options label,
 .reader .zoom-readout,
 .reader .reading-gap-note { font-size: var(--ui-caption); }
@@ -157,12 +158,15 @@
 .reader .chat-probe button { flex-shrink: 0; }
 .reader .chat-input textarea { min-width: 0; }
 
-/* Details and chat share one dock beside the map. Both open: tabs on top, one panel at full height; the map keeps its width. */
-.reader .side-dock { flex: none; width: 28rem; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); }
+/* Chat resizes beside the map, or floats over it on narrow screens. */
+.reader .side-dock { position: relative; flex: none; width: 28rem; display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); }
+.chat-resize { position: absolute; top: 0; left: -4px; bottom: 0; width: 8px; z-index: 3; cursor: col-resize; touch-action: none; }
+.chat-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
+.chat-resize:hover::after, .chat-resize:focus-visible::after, body.resizing-panel .chat-resize::after { background: var(--accent); }
+.chat-resize:focus-visible { outline: none; }
+body.resizing-panel, body.resizing-panel .react-flow__pane { cursor: col-resize; user-select: none; }
 .reader .side-dock > .inspector { position: static; width: auto; max-width: none; flex: 1 1 0; min-height: 0; border: 0; box-shadow: none; }
 .reader .side-dock > .chat-dialog { position: relative; inset: auto; z-index: auto; width: auto; height: auto; flex: 1 1 0; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
-.reader .side-dock[data-front=chat] > .inspector,
-.reader .side-dock[data-front=details] > .chat-dialog { display: none; }
 .reader .dock-tabs { display: flex; gap: .25rem; padding: .5rem .75rem; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .reader .dock-tabs button { flex: 1; font-size: var(--ui-text); min-height: var(--ui-control-height); border-color: transparent; background: transparent; color: var(--text-2); }
 .reader .dock-tabs button[aria-selected=true] { background: var(--surface); border-color: var(--line-strong); color: var(--text); font-weight: 600; }
@@ -171,12 +175,13 @@
 @media (max-width: 62.5rem) {
   .reader .inspector { width: min(26rem, calc(100% - 1.5rem)); max-width: none; }
   /* A narrow map cannot spare the width: the dock floats over its right edge instead. */
-  .reader .side-dock { position: absolute; top: 0; right: 0; bottom: 0; z-index: 12; width: min(28rem, calc(100% - 1.5rem)); box-shadow: -8px 0 24px var(--shadow-lg); }
+  .reader .side-dock { position: absolute; top: 0; right: 0; bottom: 0; z-index: 12; max-width: calc(100% - 1.5rem); box-shadow: -8px 0 24px var(--shadow-lg); }
 }
 @media (max-width: 54rem) {
   .reader .toolbar { grid-template-columns: 1fr auto 1fr; }
   .reader .viewer-menu { grid-column: 1; grid-row: 1; }
   .reader .toolbar > .view-options { grid-column: 3; grid-row: 1; flex-wrap: nowrap; }
+  .reader .toolbar > .story-controls { grid-column: 1; grid-row: 1; }
   .reader .zoom-levels { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 }
 @media (max-width: 48rem) {
