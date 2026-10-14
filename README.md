@@ -24,7 +24,7 @@ A coding session can contain hundreds of messages, edits, and tool calls. TraceV
 | **Actions** | Explore, Plan, Edit, Execute, Verify, and Diagnose—with descriptions, outcomes, and who did the work. |
 | **Raw records** | Original messages, recorded reasoning, tool inputs and outputs, and reviewer feedback. |
 
-Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its details and follow its evidence.
+Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its path in **Story** and follow its evidence.
 
 [![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
@@ -34,11 +34,13 @@ See what the agent tried, what it learned, and what happened next. Decision mark
 
 Switch between **Version tree** and **Execution order** to follow both code ancestry and the sequence of work. Restored versions, abandoned candidates, and final selections stay visible. Measurements sit alongside the states they describe.
 
+Press **Play** for a guided walkthrough. Story opens the current step while Map moves to the same place. Pause, move backward or forward, change the pace, or open the original evidence. Exit returns to your previous view.
+
 [![Comparing the version tree with execution order and inspecting a regressed candidate](docs/images/version-history.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## Go straight to the evidence
 
-Open a card's details, then read the original messages, code, tool calls, and results behind it. Follow the agent's explanation all the way to the recorded work.
+Expand a card's sentence in **Story**, then read the original messages, code, tool calls, and results behind it. Full explanations appear beneath the short labels as you expand. Follow the agent's explanation all the way to the recorded work.
 
 [![Opening action details, reading the original tool call, and checking its result](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
@@ -51,6 +53,8 @@ Select a node, open **Chat**, and ask about that step or the run around it:
 > Why did the agent abandon this approach? What evidence led to the next version?
 
 **Smart context** first reads node summaries and an index of the raw records, then selects the records to read in full. Answers include clickable citations that take you back to the relevant nodes and events.
+
+Ask how a decision happened to get a linked flow diagram, or compare attempts in a table. Click a claim or its evidence to locate it in Story and Map. The answer distinguishes recorded observations, interpretations, and open questions.
 
 [![A real model answer with Smart context: inspect the selected records, click a cited action to jump to it, and open an original measurement from the answer](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
@@ -86,6 +90,8 @@ then open https://tracevista.pages.dev/ in my browser and import it.
 ```
 
 Use `$tracevista-skill` in Codex or `/tracevista-skill` in Claude Code. The skill reads the logs, builds the state map and summaries, validates the export, and opens it in the viewer. You can ask the agent to refine the same map as you explore.
+
+Its [writing guide](skills/tracevista-skill/references/clear-writing.md) borrows from ASD-STE100: concrete verbs, consistent terms, and one idea per sentence. Explanations connect what the agent did, what the evidence showed, and what it chose next, with the technical conditions intact.
 
 Works with **Claude Code, Codex, and Pi** session logs, **InferenceBench** traces, and **SWE-rebench OpenHands** trajectories. Combine main-agent and reviewer sessions in a single export.
 

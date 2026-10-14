@@ -76,12 +76,14 @@ class ReaderReadyTest(unittest.TestCase):
             d = Path(d); a, t = ready_fixture(); graph = compile_graph(a, t)
             source, patch, output = [d / n for n in ['graph.json', 'patch.json', 'patched.json']]
             source.write_text(json.dumps(graph))
-            patch.write_text(json.dumps({'entities': {a['actions'][0]['id']: {'move': 'decision'}}}))
+            summary = 'The patch changed A to B. Correctness has not been checked in these records.'
+            patch.write_text(json.dumps({'entities': {a['actions'][0]['id']: {'move': 'decision', 'summary': summary}}}))
             p = subprocess.run([sys.executable, str(SCRIPTS / 'ladder.py'), str(source), '--patch', str(patch), '--out', str(output), '--require-reading-layer'], capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
             result = json.loads(output.read_text())
             self.assertEqual(result['timeline'], graph['timeline'])
             self.assertEqual(result['actions'][0]['move'], 'decision')
+            self.assertEqual(result['actions'][0]['summary'], summary)
             self.assertNotIn('move', json.loads(source.read_text())['actions'][0])
 
 

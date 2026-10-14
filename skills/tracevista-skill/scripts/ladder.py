@@ -168,7 +168,7 @@ def write_private_json(path, value):
 def main():
     parser = argparse.ArgumentParser(description='Check a reading-layer patch against a state graph.')
     parser.add_argument('graph', help='a .agent-state.json file')
-    parser.add_argument('--patch', help='{"entities": {id: {ladder, move}}, "links": [...], "journey": {...}}')
+    parser.add_argument('--patch', help='{"entities": {id: {summary, ladder, move}}, "links": [...], "journey": {...}}')
     parser.add_argument('--out', help='Save the validated graph, including the patch, to a new file')
     parser.add_argument('--quality-report', help='Write the structural coverage and gaps as JSON')
     parser.add_argument('--require-reading-layer', action='store_true', help='Fail if reader-ready coverage is incomplete')
@@ -194,12 +194,14 @@ def main():
 
 
 def apply_patch(graph, patch):
-    """Merge authored ladders, moves, informs links and journey into a graph (in place)."""
+    """Revise authored reading text and links without changing raw evidence or structure."""
     items = {i['id']: i for i in [*graph['states'], *graph['branches'], *graph['actions']]}
     for key, fields in patch.get('entities', {}).items():
         if key not in items:
             raise SystemExit(f'FAIL: unknown entity {key}')
-        for field in ('ladder', 'move'):
+        if 'summary' in fields and (not isinstance(fields['summary'], str) or not fields['summary'].strip()):
+            raise SystemExit(f'FAIL: {key}: summary must be nonempty text')
+        for field in ('summary', 'ladder', 'move'):
             if field in fields:
                 items[key][field] = fields[field]
     actions = {a['id'] for a in graph['actions']}

@@ -8,6 +8,12 @@ Files without it stay valid; the viewer falls back to titles and summaries.
 Everything here is analyst interpretation. Write it while reading the timeline, cite raw
 events, and keep it apart from facts. Rendering this layer never calls a model; the viewer has a separate optional chat feature.
 
+Read [clear-writing.md](clear-writing.md) when authoring or revising this layer. Write the
+full explanation in each entity's `summary` first, then choose its card text. The ladder
+budgets below control display density; they are not a target for the full explanation.
+Keep conditions and evidence limits in the takeaway when omitting them would change its
+meaning. Put the remaining operation, observation and decision detail in `summary`.
+
 ## 1. Ladder on a state, branch or action
 
 ```json
@@ -43,6 +49,9 @@ Write like this:
   unresolved limit. Branch briefs explain the direction and its evidence; action
   summaries preserve the concrete operation, observation, and consequence for the next step.
 - Reuse the terms of earlier plaques so a reader scanning down sees the thinking progress.
+- Prefer “Cache helps only with reused objects” to “Cache succeeds”. Its summary can then
+  explain the fresh-object test, comparison values and whether the agent kept the cache.
+  Use short complete sentences for explanations, rather than strings of compressed nouns.
 - No dash characters inside topic, takeaway or reason; use commas or colons.
 - For the abstract, prefer the agent's visible messages (`note` events) and measurement or
   error lines from tool results: they show what it saw and said. Do not quote `thinking` events;
@@ -92,6 +101,10 @@ task it is solving. Explain a task abbreviation when needed to understand the ob
 Then say where the run started, what it ruled out, where it turned, where it landed, and what remains open.
 Only the turns that mattered. At most 260 CJK characters or 110 words. Cite every entity it
 narrates.
+Name the recorded configuration needed to interpret the result: model, environment and
+budget when relevant and available. If it does not fit, put the full configuration in the
+initial state's summary. Do not replace a missing configuration with a likely default.
+Use the same terms as the cards, and keep observed results separate from the agent's claims.
 
 ## Validation
 
@@ -116,3 +129,7 @@ or discover a decision the analyst missed. Inspect these manually against raw re
 Partial annotations remain displayable, with all actions visible initially. A user can still
 choose decision folding manually. A complete reading layer enables folding by default.
 To save a checked patch, add `--out new.agent-state.json` to the patch command above.
+An entity patch may contain `summary` as well as `ladder` and `move`; `summary` must be
+nonempty text. This lets a reading revision add a full explanation without changing
+events, source archives, entity IDs or state relationships. Review revised summaries
+against their existing event citations; new evidence membership requires a structure edit.

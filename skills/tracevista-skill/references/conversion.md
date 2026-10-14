@@ -75,7 +75,7 @@ reusing citations. Record which structure was reused and which interpretations w
 
 ## 2. Author structure and the reading layer together
 
-Read all timeline parts, then write `state-analysis.json` following [state-graph.md](state-graph.md), [observations.md](observations.md) and [reading-layer.md](reading-layer.md).
+Read all timeline parts, then write `state-analysis.json` following [state-graph.md](state-graph.md), [observations.md](observations.md), [reading-layer.md](reading-layer.md) and [clear-writing.md](clear-writing.md).
 Declare the tracked state scope. Only evidenced successful Edit/Execute effects in that scope
 create states; tests and new knowledge attach to the existing state. Code ancestry, observed
 chronology and informational dependencies are independent relationships. Serial attempts can
@@ -88,6 +88,10 @@ Mark missing or inapplicable evidence explicitly; review PASS is not measured sp
 
 For the current viewer, author these reading fields by default:
 
+- Write each important entity's `summary` before shortening its ladder. State what changed
+  or was tried, what the records showed, and which next decision the agent explicitly made.
+  Keep missing results or missing reasons visible. A routine action does not need an invented
+  decision. Use the trajectory's language unless the user requested another language.
 - Every state and branch gets `ladder.topic` and `ladder.takeaway`; add `reason` explaining
   this step's contribution and cited verbatim `abstract` quotes where available.
 - Important actions get their own ladder. Always cover marked moves, state-changing actions
@@ -102,6 +106,12 @@ For the current viewer, author these reading fields by default:
 A child's takeaway explains what it adds; it must not repeat its parent's conclusion.
 Use measurements with their scope and retain uncertainty. Quoted excerpts are navigation aids;
 the full source text remains in the export. See [reading-layer.md](reading-layer.md) for budgets and evidence rules.
+
+For example, replace “Optimized caching and validated the improvement” with “The agent added
+a cache keyed by object identity. With reused objects, local latency fell from 12 ms to 8 ms.
+With fresh objects, latency was 13 ms. The agent then removed the cache.” This rewrite is
+valid only when the records establish all four statements; keep the cited event IDs on the
+entity. If the removal reason is absent, say so instead of claiming the test caused it.
 
 ## 3. Build, inspect coverage and review meaning
 
@@ -119,6 +129,10 @@ The report lists missing ladders/journey plus missing reasons, quotes and decisi
 Structural readiness is not proof of semantic accuracy or complete decision discovery.
 Review each gap; when the source cannot establish a quote or dependency, explain it in the
 entity's reason/summary and export notes instead of inventing evidence to silence a warning.
+Then check meaning: identify the agent and task in the overview, read the main state path
+without raw text, and confirm that each comparison names its scope and baseline. Check a
+failed or restored path when present. Use the review prompts in [clear-writing.md](clear-writing.md).
+The checker does not judge writing quality or certify ASD-STE100 conformance.
 
 For a previously exported graph, author a reading patch without changing raw text or IDs:
 

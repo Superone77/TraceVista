@@ -74,6 +74,7 @@ assert(full.includes('test-model') && full.includes('Source line 11') && full.in
 assert(!full.includes('UNASSIGNED_RECORD_MUST_NOT_APPEAR'), 'An action never pulls in unrelated evidence');
 assert(!render(new Set(['s0', 'b0'])).includes('data-event-id='), 'The Actions depth keeps raw evidence folded');
 assert(!render(new Set()).includes('data-event-id='), 'The System states depth returns to a compact story');
+assert(full.includes('The starting version') && full.includes('Read its complete evidence'), 'Expanded Story retains full state and phase explanations beyond compact labels');
 console.log('PASS: real Story renderer retains full source text, metadata, ordering and disclosure boundaries');
 
 // The Action reading level shows visual evidence before opening raw text.

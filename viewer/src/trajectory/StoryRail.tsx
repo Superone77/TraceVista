@@ -23,8 +23,8 @@ const sentence = (t: string) => { const s = t.trim(); return !s || /[.!?。！�
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-function Sentence({ id, open, onToggle, count, className = '', children }: { id: string; open: boolean; onToggle: () => void; count?: string; className?: string; children: ReactNode }) {
-  return <span className={`story-s ${className}`} role="button" tabIndex={0} aria-expanded={open} data-story={id} onClick={onToggle}
+function Sentence({ id, open, onToggle, count, active, className = '', children }: { id: string; open: boolean; onToggle: () => void; count?: string; active?: boolean; className?: string; children: ReactNode }) {
+  return <span className={`story-s ${className}`} role="button" tabIndex={0} aria-expanded={open} aria-current={active ? 'step' : undefined} data-story={id} onClick={onToggle}
     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}>{children}{count && <span className="story-count">{count}</span>}</span>;
 }
 function Verb({ move, n }: { move?: Move | null; n?: number }) {
@@ -33,9 +33,10 @@ function Verb({ move, n }: { move?: Move | null; n?: number }) {
   return <span className="story-verb" style={{ '--move': moveColors[move] } as CSSProperties}>{n != null && <b className="decision-no">{n}</b>}{t(verbs[move])}</span>;
 }
 
-export default function StoryRail({ graph, main, delivered, decisionNo, selected, focusEvent, focusRevision = 0, expanded: open, onExpandedChange, onFly, onCite, onEvidence, width, onResize, onResizeEnd }: {
+export default function StoryRail({ graph, main, delivered, decisionNo, selected, focusEvent, focusRevision = 0, playbackNode, restoreScroll, onScrollRestored, expanded: open, onExpandedChange, onFly, onCite, onEvidence, width, onResize, onResizeEnd }: {
   graph: Graph; main: Set<string>; delivered: string | null; decisionNo: Map<string, number>; selected: string | null;
   focusEvent?: string | null; focusRevision?: number;
+  playbackNode?: string; restoreScroll?: { top: number; revision: number } | null; onScrollRestored?: () => void;
   expanded: ReadonlySet<string>; onExpandedChange: (update: (previous: ReadonlySet<string>) => Set<string>) => void;
   onFly: (id: string, depth: Depth) => void; onCite: (id: string) => void; onEvidence: (eventId: string) => void;
   width: { now: number; min: number; max: number }; onResize: (px: number) => void; onResizeEnd: (reset?: boolean) => void;
@@ -73,15 +74,24 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
       return added.length ? new Set([...previous, ...added]) : previous;
     });
   }, [open]);
-  // A card picked on the map: open the text down to it and bring its sentence into view.
   useEffect(() => {
-    if (!selected) return;
-    const t = setTimeout(() => root.current?.querySelector(`[data-story="${CSS.escape(selected)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 360);
+    if (!restoreScroll) return;
+    const timer = setTimeout(() => {
+      const body = root.current?.querySelector('.story-body');
+      if (body) body.scrollTop = restoreScroll.top;
+      onScrollRestored?.();
+    }, 380);
+    return () => clearTimeout(timer);
+  }, [restoreScroll, onScrollRestored]);
+  // Restoring playback has its own scroll target, including when the rail remounts.
+  useEffect(() => {
+    if (!selected || restoreScroll) return;
+    const t = setTimeout(() => root.current?.querySelector(`[data-story="${CSS.escape(selected)}"]`)?.scrollIntoView({ block: 'nearest', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }), 360);
     return () => clearTimeout(t);
   }, [selected, graph]);
 
   useEffect(() => {
-    if (!focusEvent) return;
+    if (!focusEvent || restoreScroll) return;
     const timer = setTimeout(() => {
       const owner = eventDestination(graph, focusEvent, selected)?.action;
       const scope = owner ? root.current?.querySelector('[data-story-action="' + CSS.escape(owner) + '"]') : root.current?.querySelector('.story-extra-record');
@@ -97,22 +107,29 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
       {records.length ? <RawRecords records={records} onEvidence={onEvidence} focusEvent={focusEvent} focusRevision={focusRevision} /> : <p className="story-note">{t('No raw records assigned to this action')}</p>}
     </div>;
   };
+  const explanation = (item: Entity) => {
+    const normalize = (text: string) => text.replace(/\s+/g, ' ').trim();
+    const compact = [item.ladder?.takeaway ?? item.title, item.ladder?.reason ?? ''].join(' ');
+    return item.summary && normalize(item.summary) !== normalize(compact)
+      ? <p className="story-explanation">{item.summary}</p> : null;
+  };
   const actionSentence = (a: Action) => <div className="story-p" key={a.id} data-story-action={a.id}>
-    <Sentence id={a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count={t('{n} raw records', { n: recordsByAction.get(a.id)?.length ?? 0 })}>
+    <Sentence id={a.id} active={playbackNode === a.id} open={open.has(a.id)} onToggle={() => toggle(a.id, 'raw')} count={t('{n} raw records', { n: recordsByAction.get(a.id)?.length ?? 0 })}>
       <Verb move={a.move} n={decisionNo.get(a.id)} /><span className="story-doing">{t(doing[a.behavior] ?? a.behavior)}</span> {sentence(a.ladder?.takeaway ?? a.title)}{a.ladder?.reason && <> <span className="story-reason">{sentence(a.ladder.reason)}</span></>}
     </Sentence>
     {!open.has(a.id) && <ImagePreviews records={recordsByAction.get(a.id) ?? []} />}
-    {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{storyActionRecordsVisible(graph, open, a) && evidence(a)}</Stretch>}
+    {mounted.has(a.id) && <Stretch open={open.has(a.id)}>{storyActionRecordsVisible(graph, open, a) && <>{explanation(a)}{evidence(a)}</>}</Stretch>}
   </div>;
   const phase = (b: Branch) => {
     const acts = graph.actions.filter(a => a.branch === b.id);
     const shown = acts.filter(a => a.move || a.ladder), quiet = acts.filter(a => !(a.move || a.ladder));
     const quietId = `${b.id}::routine`;
     return <div className="story-p" key={b.id}>
-      <Sentence id={b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? t(acts.length > 1 ? '{n} steps' : '{n} step', { n: acts.length }) : undefined} className={b.move ? '' : 'routine'}>
+      <Sentence id={b.id} active={playbackNode === b.id} open={open.has(b.id)} onToggle={() => toggle(b.id, 'actions')} count={acts.length ? t(acts.length > 1 ? '{n} steps' : '{n} step', { n: acts.length }) : undefined} className={b.move ? '' : 'routine'}>
         <span className="story-flow-no">{flow.get(b.id)?.n}</span>{flow.get(b.id)?.parallel && <span className="story-parallel">∥ {t('In parallel')} </span>}<Verb move={b.move} n={decisionNo.get(b.id)} />{sentence(b.ladder?.takeaway ?? b.title)}{b.ladder?.reason && <> <span className="story-reason">{sentence(b.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(b.id) && <Stretch open={open.has(b.id)}><div className="story-layer">
+        {explanation(b)}
         {shown.map(actionSentence)}
         {quiet.length > 0 && <div className="story-p">
           <Sentence id={quietId} open={open.has(quietId)} onToggle={() => open.has(quietId) ? onExpandedChange(s => toggleStoryDisclosure(s, quietId)) : openAll([quietId])} className="routine">{t(quiet.length > 1 ? '…and {n} routine steps.' : '…and {n} routine step.', { n: quiet.length })}</Sentence>
@@ -129,10 +146,11 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const lead = s.ladder?.topic ?? shortName(s);
     const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}\\s*[:,：，]?\\s*`, 'i'), '');
     return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
-      <Sentence id={s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? t(phases.length > 1 ? '{n} phases' : '{n} phase', { n: phases.length }) : undefined}>
+      <Sentence id={s.id} active={playbackNode === s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? t(phases.length > 1 ? '{n} phases' : '{n} phase', { n: phases.length }) : undefined}>
         {side && <span className="story-side">{t('A side attempt.')} </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(s.id) && <Stretch open={open.has(s.id)}><div className="story-layer">
+        {explanation(s)}
         {phases.length ? phases.map(phase) : <p className="story-note">{t('Nothing more was recorded inside this step.')}</p>}
       </div></Stretch>}
     </li>;
