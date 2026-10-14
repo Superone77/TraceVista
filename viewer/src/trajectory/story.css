@@ -14,7 +14,6 @@
 .story-hide { font: 500 .75rem/1 var(--font-sans); color: var(--faint); background: transparent; border: 0; padding: .375rem .5rem; border-radius: 6px; }
 .story-hide:hover { background: var(--mark); color: var(--ink); }
 .story-body { flex: 1; min-height: 0; overflow-y: auto; padding: .75rem 1.5rem 4rem; font: 15px/1.7 var(--font-sans); }
-.story-kicker { font: 500 .6875rem/1.4 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 0 0 .5rem; }
 .story-body h2 { font: 650 1.45rem/1.25 var(--font-sans); letter-spacing: -.01em; margin: 0 0 .75rem; color: var(--ink); }
 .story-outcome { font-size: 1.02rem; margin: 0 0 1.25rem; }
 .story-outcome b { color: var(--end); font-weight: 600; }

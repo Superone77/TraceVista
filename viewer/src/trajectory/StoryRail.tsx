@@ -151,7 +151,6 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
       onPointerDown={drag} onKeyDown={keys} onDoubleClick={() => onResizeEnd(true)} />
     <div className="story-top"><button className="story-hide" onClick={onHide} aria-label={t('Hide the story')} title={t('Hide the story')}>‹</button></div>
     <div className="story-body">
-      <p className="story-kicker">{graph.title}</p>
       <h2>{t('How the agent got there')}</h2>
       {end && <p className="story-outcome"><Sentence id={`${end.id}::end`} open={false} onToggle={() => onFly(end.id, 'states')}><b>{t('Delivered.')}</b> {sentence(end.ladder?.takeaway ?? end.title)}</Sentence></p>}
       {lead && <div className="story-gist"><p>{lead}</p>
