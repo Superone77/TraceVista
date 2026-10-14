@@ -46,9 +46,21 @@
 .story-layer { margin: .5rem 0 .375rem 2px; padding-left: 14px; border-left: 2px solid var(--rule); font-size: .94em; }
 .story-p { margin: 0 0 .55rem; }
 .story-note { font: .78rem/1.5 var(--font-sans); color: var(--faint); margin: 0 0 .5rem; }
-.story-quote { margin: .375rem 0 .625rem; padding: .5rem .875rem; background: #fff; border: 1px solid var(--rule); border-radius: 8px; font: 12.5px/1.6 var(--font-mono); color: #3b3833; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 16rem; overflow-y: auto; }
-.story-who { display: flex; justify-content: space-between; gap: .5rem; font: 600 .66rem/1.4 var(--font-sans); letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: .25rem; }
-.story-who button { border: 0; background: none; padding: 0; font: .6875rem var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--soft); text-decoration: underline; text-underline-offset: 2px; }
+.story-records { margin: .5rem 0 .875rem; min-width: 0; }
+.story-records-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .25rem .5rem; padding-bottom: .375rem; border-bottom: 1px solid var(--rule); font: 500 .6875rem/1.5 var(--font-sans); color: var(--soft); }
+.story-records-heading b { font-weight: 600; color: var(--ink); }
+.story-records .raw-records { max-height: min(60vh, 640px); overflow: auto; padding: .5rem 0; }
+.story-records .raw-record-wrap { min-width: 0; }
+.story-records .raw-record-meta { padding: .5rem .75rem; font-size: .6875rem; }
+.story-records .raw-record-meta > span { min-width: 0; }
+.story-records .raw-event-reference { min-width: 0; max-width: 100%; min-height: 0; padding: .125rem .375rem; border-radius: 4px; font: .6875rem/1.5 var(--font-mono); white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.story-records .raw-record h3 { margin: .625rem .75rem .5rem; font-size: .8125rem; line-height: 1.55; }
+.story-records .raw-record pre { margin: 0 .75rem .75rem; max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; font: .8125rem/1.7 var(--font-sans); }
+.story-records .raw-record.call pre, .story-records .raw-record.result pre { font: .78125rem/1.7 var(--font-mono); }
+.story-records .raw-record-source { padding: .5rem .75rem; font-size: .6875rem; line-height: 1.5; }
+.story-records .raw-record-error { margin: .5rem .75rem; font-size: .6875rem; line-height: 1.5; }
+.story-records .raw-skill { margin: 0 .75rem .625rem; }
+.story-records .skill-tag { max-width: 100%; box-sizing: border-box; white-space: normal; }
 .reader .journey-pill { top: 14px; left: 14px; }
 
 /* The delivered line leads; side branches recede until the reader points at them. */

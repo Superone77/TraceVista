@@ -5,6 +5,8 @@ const commands=[
  ['python3',['-m','unittest','discover','-s','skills/tracevista-skill/tests','-v']],
  [process.execPath,['viewer/scripts/test-state-trajectory.mjs']],
  [process.execPath,['viewer/scripts/test-semantic-trajectory.mjs']],
+ [process.execPath,['viewer/scripts/test-story-disclosure.mjs']],
+ [process.execPath,['viewer/scripts/test-story-records.mjs']],
  [process.execPath,['viewer/scripts/test-observations.mjs']],
  [process.execPath,['viewer/scripts/test-reading-layer.mjs']],
  [process.execPath,['viewer/scripts/test-ui-language.mjs']],

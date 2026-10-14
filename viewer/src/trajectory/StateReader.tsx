@@ -12,6 +12,7 @@ import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import StoryRail, { type Depth } from './StoryRail';
+import { expandStoryToTier, revealStoryPath } from './storyDisclosure';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
 import { LangProvider, LangToggle, useLang } from './i18n';
@@ -54,6 +55,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const [decisionsOnly, setDecisionsOnly] = useState(readingStatus.ready);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
   const [journeyOpen, setJourneyOpen] = useState(true);
+  const [storyExpanded, setStoryExpanded] = useState<Set<string>>(() => new Set());
   // The story rail's width: dragged by the reader, kept in this browser. The map keeps at least MAP_MIN beside it.
   const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
   const [railWidth, setRailWidth] = useState<number>(() => { try { const v = Number(localStorage.getItem(RAIL_STORE)); return v > 0 ? v : railDefault(); } catch { return railDefault(); } });
@@ -72,16 +74,18 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   // The card under the pointer shows its reasons (informs links) the same way a selected card does.
   const [hovered, setHovered] = useState<string | null>(null);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
+  const [focusRevision, setFocusRevision] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   // With both panels open the dock shows one at a time: details or chat, each at full height.
   const [front, setFront] = useState<'details' | 'chat'>('details');
   const chatFront = useRef(false); chatFront.current = chatOpen && front === 'chat';
   const showDetails = useCallback(() => { setInspectorOpen(true); setFront('details'); }, []);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
-  const pendingJump = useRef<string | null>(null);
-  const inspect = useCallback((id: string) => { overviewPinned.current = false; setSelected(id); setInspectorOpen(true); if (!chatFront.current) setFront('details'); }, []);
+  const pendingJump = useRef<{ id: string; desired?: Tier; revealInStory: boolean } | null>(null);
+  const revealStory = useCallback((id: string) => setStoryExpanded(previous => revealStoryPath(original, previous, id)), [original]);
+  const inspect = useCallback((id: string) => { overviewPinned.current = false; revealStory(id); setSelected(id); setInspectorOpen(true); if (!chatFront.current) setFront('details'); }, [revealStory]);
   const expand = useCallback((foldId: string) => setOpenFolds(s => new Set(s).add(foldId)), []);
-  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); showDetails(); }, [showDetails]);
+  const evidence = useCallback((eventId: string) => { setFocusEvent(eventId); setFocusRevision(revision => revision + 1); showDetails(); }, [showDetails]);
   const layouts = useMemo(() => Object.fromEntries((['states', 'branches', 'actions', 'raw'] as Tier[]).map(t => [t, layoutGraph(graph, t, stateMode, { fold: decisionsOnly, openFolds })])) as Record<Tier, ReturnType<typeof layoutGraph>>, [graph, stateMode, decisionsOnly, openFolds]);
   const layout = layouts[tier];
   const decisions = useMemo(() => keyDecisions(graph), [graph]);
@@ -208,13 +212,14 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     const point = e && typeof e.clientX === 'number' ? { x: e.clientX - box.left, y: e.clientY - box.top } : { x: box.width / 2, y: box.height / 2 };
     setView(next, rebaseViewport(layouts[previous], layouts[next], viewport, point));
   }, [layouts, setView]);
-  const moveTo = useCallback((id: string, desired?: Tier) => {
+  const moveTo = useCallback((id: string, desired?: Tier, revealInStory = true) => {
+    if (revealInStory) revealStory(id);
     const entity = layouts.raw.nodes.find(n => n.id === id);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     if (!entity) {
       // A folded action: open its fold, then jump once the layout has it.
       const fold = layouts.raw.nodes.find(n => n.kind === 'fold' && (n.item as FoldItem).actions.some(a => a.id === id));
-      if (fold) { pendingJump.current = id; setOpenFolds(s => new Set(s).add(fold.id)); }
+      if (fold) { pendingJump.current = { id, desired, revealInStory }; setOpenFolds(s => new Set(s).add(fold.id)); }
       return;
     }
     if (!box) return;
@@ -259,16 +264,16 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       view = { x: -left * zoom, y: TOP - top * zoom, zoom };
     }
     flyTo(next, view);
-  }, [layouts, flyTo]);
+  }, [layouts, flyTo, revealStory]);
   // A state on the overview: centred at the overview's zoom, the camera flying there from wherever it is.
   const flyToState = useCallback((id: string) => {
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
     const n = layouts.states.nodes.find(m => m.id === id);
     if (!box || !n) return;
-    overviewPinned.current = false; setSelected(id);
+    overviewPinned.current = false; revealStory(id); setSelected(id);
     const zoom = tierRef.current === 'states' ? rf.getViewport().zoom : .44;
     flyTo('states', { x: box.width / 2 - (n.x + n.width / 2) * zoom, y: 58 - n.y * zoom, zoom });
-  }, [layouts, flyTo, rf]);
+  }, [layouts, flyTo, rf, revealStory]);
   // The story's depth decides the map's: the outcome on the overview, a step at its phases, a phase at its actions, an action at its records.
   const fly = useCallback((id: string, depth: Depth) => { if (depth === 'states') flyToState(id); else moveTo(id, depth); }, [flyToState, moveTo]);
   // Cards that appear with a new tier fade in where they land, so a tier change reads as the same map opening up.
@@ -278,7 +283,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     const t = setTimeout(() => { delete el.dataset.entering; }, 420);
     return () => clearTimeout(t);
   }, [tier]);
-  useEffect(() => { const id = pendingJump.current; if (id && layouts.raw.nodes.some(n => n.id === id)) { pendingJump.current = null; moveTo(id); } }, [layouts, moveTo]);
+  useEffect(() => { const request = pendingJump.current; if (request && layouts.raw.nodes.some(n => n.id === request.id)) { pendingJump.current = null; moveTo(request.id, request.desired, request.revealInStory); } }, [layouts, moveTo]);
   const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
   const byId = useMemo(() => new Map<string, Entity>(all.map(e => [e.id, e])), [all]);
   // Every entity gets a ladder: the analyst's when written, else its title and its own sentences without the parent's summary.
@@ -392,6 +397,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     return out;
   }, [projected, layout, tier, selected, hovered, focus, sideLine, main, t]);
   function showTier(next: Tier) {
+    setStoryExpanded(expandStoryToTier(graph, next));
     if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
@@ -401,7 +407,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     const hasPhases = (id: string) => graph.branches.some(b => b.state === id);
     const nearest = layout.nodes.filter(n => n.kind === 'state').sort((a, b) => Number(hasPhases(b.id)) - Number(hasPhases(a.id)) || Math.abs(a.y + a.height / 2 - cy) - Math.abs(b.y + b.height / 2 - cy))[0];
     const stateId = p?.kind === 'state' ? p.id : p?.parentId ?? nearest?.id ?? graph.states[0].id;
-    moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next);
+    moveTo((next === 'actions' || next === 'raw') && (p?.kind === 'branch' || p?.kind === 'action') ? p.id : stateId, next, false);
   }
   function download() {
     // Export what was imported, translations included, not the view in the current language.
@@ -431,10 +437,10 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
-      <div className="zoom-levels" aria-label={t('Zoom detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
+      <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
       <div className="view-options"><button aria-pressed={inspectorOpen} onClick={() => { if (!inspectorOpen || chatOpen && front !== 'details') showDetails(); else setInspectorOpen(false); }}>{t('Details')}</button><button aria-pressed={chatOpen} onClick={() => { if (!chatOpen || inspectorOpen && front !== 'chat') { setChatOpen(true); setFront('chat'); } else { setChatOpen(false); setCited(new Set()); } }}>{t('Chat')}</button><LangToggle /></div>
     </div>
-    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} onFly={fly}
+    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
       onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence} onHide={() => { journeyTucked.current = false; setJourneyOpen(false); }}
       width={{ now: railWidth, min: RAIL_MIN, max: journeyOpen ? railMax() : RAIL_MAX }} onResize={resizeRail} onResizeEnd={saveRail} />}
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
@@ -449,7 +455,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
           <button role="tab" aria-selected={front === 'details'} onClick={() => setFront('details')}>{t('Details')}</button>
           <button role="tab" aria-selected={front === 'chat'} onClick={() => setFront('chat')}>{t('Chat')}</button>
         </div>}
-        {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
+        {inspectorOpen && <Inspector key={selected ?? 'overview'} graph={graph} item={item} focusEvent={focusEvent} focusRevision={focusRevision} jump={id => { moveTo(id); showDetails(); }} close={() => setInspectorOpen(false)} />}
         {chatOpen && <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={id => { moveTo(id, graph.actions.some(a => a.id === id) ? 'actions' : undefined); setSelected(id); }} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />}
       </div>}</main>
   </div>;

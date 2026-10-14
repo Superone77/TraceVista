@@ -6,13 +6,13 @@ import { useLang } from './i18n';
 import type { ReactNode } from 'react';
 import { labels } from './labels';
 
-export default function Inspector({ graph, item, jump, close, focusEvent }: { graph: Graph; item: Entity | null; jump: (id: string) => void; close: () => void; focusEvent?: string | null }) {
+export default function Inspector({ graph, item, jump, close, focusEvent, focusRevision = 0 }: { graph: Graph; item: Entity | null; jump: (id: string) => void; close: () => void; focusEvent?: string | null; focusRevision?: number }) {
   const { t: tr } = useLang();
   const label = (key: string) => tr(labels[key] ?? key);
   const [rawOpen, setRawOpen] = useState(false);
   const [rawQuery, setRawQuery] = useState('');
   const [activeEvent, setActiveEvent] = useState<string | null>(focusEvent ?? null);
-  useEffect(() => { if (focusEvent) { setActiveEvent(focusEvent); requestAnimationFrame(() => document.getElementById('selected-raw-evidence')?.scrollIntoView({ block: 'nearest' })); } }, [focusEvent]);
+  useEffect(() => { if (focusEvent) { setActiveEvent(focusEvent); requestAnimationFrame(() => document.getElementById('selected-raw-evidence')?.scrollIntoView({ block: 'nearest' })); } }, [focusEvent, focusRevision]);
   const eventMap = useMemo(() => new Map(graph.timeline.timeline.map(e => [e.id, e])), [graph]);
   const refs = item?.events ?? [];
   const action = item && 'behavior' in item ? item as Action : null;
