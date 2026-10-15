@@ -112,6 +112,44 @@ Ask how a decision happened to get a linked flow diagram, or compare attempts in
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
 
+## Designed for informed decisions
+
+<details>
+<summary>TraceVista lets you decide whether to trust an agent run, and which steps to check, <strong>without reading the whole log</strong>.</summary>
+
+A single agent run can leave more text than anyone will read. The [Pi Agent example](https://tracevista.pages.dev/?example=pi-agent-lora) ran for about 45 minutes and left 556 events and a session log of 2.26 million characters.
+
+![Left: one screen of the raw session log, 363 lines and 2.26 million characters in all. Right: the same run in Story, the outcome first and then one sentence per step.](docs/images/log-vs-story.png)
+
+</details>
+
+<details>
+<summary>TraceVista turns the session log into a Story that <strong>starts with what the run delivered</strong>.</summary>
+
+Then it gives one sentence per step. Segel and Heer (2010) call this a **martini-glass structure**. The author leads at first, through the narrow stem; then the reader explores the wide bowl, which here is the map, the raw records and Chat. ▶ Play steps through the story and moves the map with it.
+
+[![Play highlights one Story sentence at a time while the map moves to the matching state and work phase](docs/images/story-play.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
+<details>
+<summary>TraceVista lets you <strong>unfold any sentence in place</strong>.</summary>
+
+Click it and its work phases open underneath; click a phase for its actions, and an action for its raw records. Ted Nelson called this **StretchText** (1967). The rest of the story stays where it was, and the map switches to the same level.
+
+[![One Story sentence unfolds into work phases, then actions, then raw records, while the map switches to the same level](docs/images/story-unfold.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
+<details>
+<summary>TraceVista keeps <strong>the agent's own records word for word</strong>, and every sentence about them opens down to those records.</summary>
+
+The records are never translated. Summaries written by a model tend to sound more certain than their sources. In our checks of [TextFold](https://github.com/chenxiachan/textfold)'s paper summaries, one had turned *potentially harmful* into *harmful*. Because the records are always there to check, readers can match their trust to the evidence (Lee & See, 2004).
+
+[![The action sentence "Launch large-scale tile search" above the tool call and tool result it summarizes, with the source line and call ID](docs/images/story-evidence.png)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
 ## Run locally
 
 Requires **Node.js 24.x** and **pnpm 11.19.0**.

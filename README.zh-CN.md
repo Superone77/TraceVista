@@ -112,6 +112,44 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 
 支持连接 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax、OpenRouter，或你自己的兼容接口。本地模型可以通过 Ollama 和 LM Studio 使用。
 
+## 为知情决策而设计
+
+<details>
+<summary>有了 TraceVista，<strong>不必读完整份日志</strong>，你也能判断一次 agent 运行是否可信、哪些步骤值得核查。</summary>
+
+一次 agent 运行留下的文字，往往多到没人读得完。[Pi Agent 示例](https://tracevista.pages.dev/?example=pi-agent-lora)运行了约 45 分钟，留下 556 条事件和一份 226 万字符的会话日志。
+
+![左：原始会话日志的一屏，全文 363 行、226 万字符。右：同一次运行的故事线，先写结果，再一步一句。](docs/images/log-vs-story.png)
+
+</details>
+
+<details>
+<summary>TraceVista 把会话日志整理成故事线，<strong>开头先写这次运行交付了什么</strong>。</summary>
+
+之后用一句话讲一步。Segel 和 Heer（2010）把这种结构叫作**马提尼杯**。开头由作者带读，走过窄窄的杯柄；之后由读者自己探索宽阔的杯口，在这里就是地图、原始记录和对话。▶ 播放会逐句走完故事线，地图同步移动。
+
+[![播放时故事线逐句高亮，地图同步移到对应的状态和工作阶段](docs/images/story-play.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
+<details>
+<summary>TraceVista 让<strong>每一句话都能在原处展开</strong>。</summary>
+
+点一句话，它的工作阶段在下方展开；点一个阶段，展开其中的动作；点一个动作，展开原始记录。Ted Nelson 把这种写法叫作 **StretchText**（1967）。故事线的其余部分保持原位，地图同步切换到同一层级。
+
+[![故事线中的一句话依次展开成工作阶段、动作和原始记录，地图同步切换到同一层级](docs/images/story-unfold.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
+<details>
+<summary>TraceVista <strong>逐字保留 agent 自己的记录</strong>，关于这些记录的每一句话都能一路展开到记录本身。</summary>
+
+这些记录不做翻译。模型写的摘要往往比原文说得更肯定。我们核对 [TextFold](https://github.com/chenxiachan/textfold) 的论文摘要时，发现有一处把 potentially harmful（可能有害）写成了 harmful（有害）。原始记录随时可查，读者就能按证据调整自己的信任（Lee & See, 2004）。
+
+[![动作句子「Launch large-scale tile search」下方，是它概括的工具调用和工具结果，带源文件行号和调用 ID](docs/images/story-evidence.png)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+</details>
+
 ## 本地运行
 
 需要 **Node.js 24.x** 和 **pnpm 11.19.0**。
