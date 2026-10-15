@@ -17,9 +17,9 @@ For coding, research, and creative workflows.
 
 **English** · [简体中文](README.zh-CN.md)
 
-[![Switching the map from system states to work phases and actions while Story expands to the same place](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
 </div>
+
+https://github.com/user-attachments/assets/2a7f474b-ba02-4f01-85b6-4652edecaf76
 
 **You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
 
@@ -79,6 +79,8 @@ Explore the same run at four connected levels:
 | **Raw records** | Original messages, recorded reasoning, tool inputs and outputs, and reviewer feedback. |
 
 Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its path in **Story** and follow its evidence.
+
+[![Switching the map from system states to work phases and actions while Story expands to the same place](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## Follow the decisions
 

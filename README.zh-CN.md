@@ -17,9 +17,9 @@
 
 [English](README.md) · **简体中文**
 
-[![地图从系统状态切换到工作阶段和动作，故事线同步展开到相同位置](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
 </div>
+
+https://github.com/user-attachments/assets/2a7f474b-ba02-4f01-85b6-4652edecaf76
 
 **你让 agent 跑了一整夜。它说"完成了"，留下几千行日志。它到底是怎么做到的？**
 
@@ -79,6 +79,8 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 | **原始记录** | 原始消息、记录下来的推理过程、工具的输入输出，以及 reviewer 的反馈。 |
 
 在同一张画布上平移和缩放，或者用工具栏在层级间跳转。选中任意卡片，会在 **故事线** 中展开它所在的路径，并可以继续追溯证据。
+
+[![地图从系统状态切换到工作阶段和动作，故事线同步展开到相同位置](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## 跟着决策走
 
