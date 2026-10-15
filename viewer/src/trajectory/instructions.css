@@ -14,7 +14,7 @@
 .welcome-hero { position: relative; min-width: 0; text-align: center; }
 .welcome.welcome-with-instructions h1 {
   font-family: inherit;
-  font-size: 4.5rem;
+  font-size: 5.5rem;
   font-weight: 450;
   line-height: 1.1;
   letter-spacing: -.065em;
@@ -94,13 +94,13 @@
 .instruction-copy-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .instruction-copy-error { display: block; margin-top: 10px; color: var(--danger-ink); font-size: .75rem; }
 @media (max-width: 760px) {
-  .welcome.welcome-with-instructions { padding: 16px 24px; }
-  .welcome.welcome-with-instructions h1 { font-size: 3.5rem; }
+  .welcome.welcome-with-instructions { padding: 64px 24px 24px; }
+  .welcome.welcome-with-instructions h1 { font-size: 4rem; }
   .welcome-layout { gap: 20px; }
   .welcome .welcome-tagline { font-size: 1rem; margin-bottom: 12px; }
   .instruction-steps { grid-template-columns: 1fr; gap: 12px; }
 }
 @media (max-width: 400px) {
   .welcome.welcome-with-instructions { padding-right: 18px; padding-left: 18px; }
-  .welcome.welcome-with-instructions h1 { font-size: 3rem; }
+  .welcome.welcome-with-instructions h1 { font-size: 3.5rem; }
 }

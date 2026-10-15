@@ -14,7 +14,7 @@
   position: relative;
   z-index: 20;
   gap: .5rem 1rem;
-  padding: .5rem 1rem;
+  padding: .5rem .5rem .5rem 1rem;
 }
 .reader .zoom-levels { flex-wrap: wrap; justify-content: center; gap: .25rem; }
 .reader .toolbar button,
@@ -203,4 +203,10 @@ body.resizing-panel, body.resizing-panel .react-flow__pane { cursor: col-resize;
 }
 @media (max-width: 36rem) {
   .reader .zoom-levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 30rem) {
+  .reader .toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .reader .toolbar > .story-controls { grid-column: 1 / -1; }
+  .reader .toolbar > .header-controls { grid-column: 2; grid-row: 2; }
+  .reader .zoom-levels { grid-row: 3; }
 }
