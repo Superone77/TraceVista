@@ -108,6 +108,15 @@ assert(!escaped.includes('<script>') && !escaped.includes('<img ') && escaped.in
 assert(render(partial, true).includes('Building the explanation…') && !render(partial, true).includes('&quot;version&quot;'));
 assert(render(partial).includes('original response') && render(partial).includes('&quot;version&quot;'));
 assert(render('Answer **supported** by [[a1]] and [[main:1]].').includes('<b>supported</b>'), 'legacy plain replies and citations still render');
+const emphasis = '**Conclusion: the gain depended on replaying the *same* tensors [a1].** Use `x*y`.\n';
+const renderedEmphasis = render(emphasis + block(flow));
+assert(renderedEmphasis.includes('<b>Conclusion: the gain depended on replaying the <em>same</em> tensors <button')
+  && renderedEmphasis.includes('data-source-id="a1"') && renderedEmphasis.includes('<code>x*y</code>') && !renderedEmphasis.includes('**'), 'nested emphasis, citations and code render as Markdown');
+assert(renderedEmphasis.includes('class="explanation-flow"'), 'explanation views still follow emphasized text');
+const streamingEmphasis = render('**Conclusion: replaying the *same', true);
+assert(streamingEmphasis.includes('<b>Conclusion: replaying the <em>same</em></b>') && !streamingEmphasis.includes('*'), 'an unclosed marker in a streaming answer already applies');
+assert(render('**Conclusion: replaying the *same').includes('**Conclusion'), 'a finished answer keeps an unmatched marker literal');
+assert(render(emphasis + partial, true).includes('<em>same</em>') && render(emphasis + partial, true).includes('Building the explanation…'), 'only the part still being written stays open');
 const headings = Array.from({ length: 6 }, (_, i) => '#'.repeat(i + 1) + ` Level ${i + 1}`).join('\n');
 const renderedHeadings = render(headings);
 for (let level = 1; level <= 6; level++) assert(renderedHeadings.includes(`<h${level} class="chat-markdown-heading"><span>Level ${level}</span></h${level}>`), `level ${level} becomes a semantic heading`);

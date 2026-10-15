@@ -11,7 +11,7 @@ function moduleUrl(name) {
 }
 const moduleAt = path => import(moduleUrl(path.split('/').at(-1).replace('.ts', '')));
 const { parseGraph } = await moduleAt('../src/trajectory/model.ts');
-const { outline, buildChat, retrieve, citations, readSSE, SYSTEM, parseModels, canListModels } = await moduleAt('../src/trajectory/chat.ts');
+const { outline, buildChat, retrieve, citations, inlineMarkdown, readSSE, SYSTEM, parseModels, canListModels } = await moduleAt('../src/trajectory/chat.ts');
 const g = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-agent-lora.agent-state.json', import.meta.url), 'utf8')));
 const events = new Map(g.timeline.timeline.map(e => [e.id, e]));
 
@@ -121,6 +121,20 @@ assert.deepEqual(parts.filter(p => p.id).map(p => [p.id, p.kind]), [['a458', 'no
 assert.equal(parts.filter(p => 'text' in p).map(p => p.text).join(''), '精度修复 见  与 ，另见 。');
 const single = citations('见 [a458] 和 [main:E458]，[1] 是脚注，[main:E99999] 不存在。', known);
 assert.deepEqual(single.filter(p => p.id).map(p => [p.id, p.kind]), [['a458', 'node'], ['main:E458', 'event']], 'single brackets count only for known ids');
+
+// Inline Markdown: emphasis nests and wraps citations; code and identifiers stay literal; streaming closes early.
+const md = parts => parts.map(p => 'text' in p ? p.text : 'code' in p ? `<code>${p.code}</code>` : 'id' in p ? `{${p.id}}`
+  : 'strong' in p ? `<b>${md(p.strong)}</b>` : `<i>${md(p.em)}</i>`).join('');
+const conclusion = '**Conclusion: identity caching was abandoned because its gain depended on the caller replaying the *same* tensor objects.** See [a458].';
+assert.equal(md(inlineMarkdown(conclusion, known)), '<b>Conclusion: identity caching was abandoned because its gain depended on the caller replaying the <i>same</i> tensor objects.</b> See {a458}.');
+assert.equal(md(inlineMarkdown('**bold [a458]** and *see [[main:E458]]*.', known)), '<b>bold {a458}</b> and <i>see {main:E458}</i>.');
+assert.equal(md(inlineMarkdown('`x**2` and **`[a458]` is code**; 2 * 3, snake_case, __init__.py', known)), '<code>x**2</code> and <b><code>[a458]</code> is code</b>; 2 * 3, snake_case, __init__.py');
+assert.equal(md(inlineMarkdown('***both*** and *a **b** c*', known)), '<i><b>both</b></i> and <i>a <b>b</b> c</i>');
+for (const unclosed of ['**not\n\nacross paragraphs**', '**Conclusion: replaying the *same', 'call `foo('])
+  assert.equal(md(inlineMarkdown(unclosed, known)), unclosed, 'a finished answer keeps unmatched markers literal');
+assert.equal(md(inlineMarkdown('**Conclusion: replaying the *same', known, true)), '<b>Conclusion: replaying the <i>same</i></b>', 'a streaming answer applies a marker before it is closed');
+assert.equal(md(inlineMarkdown('Done *one\n\nSee [a458] and **', known, true)), 'Done *one\n\nSee {a458} and ', 'only the paragraph being written stays open; a bare marker waits for text');
+assert.equal(md(inlineMarkdown('call `foo(**x**', known, true)), 'call <code>foo(**x**</code>');
 
 // Streams: both providers, chunks split anywhere, errors surface.
 let text = '';

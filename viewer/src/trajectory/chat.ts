@@ -281,3 +281,86 @@ export function citations(text: string, known: (id: string) => 'node' | 'event' 
   if (last < text.length) out.push({ text: text.slice(last) });
   return out;
 }
+
+export type Inline = { text: string } | { id: string; kind: 'node' | 'event' | 'unknown' } | { code: string }
+  | { strong: Inline[] } | { em: Inline[] };
+type Marker = { run: string; length: number; open: boolean; close: boolean };
+
+/** Inline Markdown for model text: `code`, *emphasis* and **strong** around the citations above. Only
+ *  asterisks mark emphasis, so snake_case and __init__ stay literal. Unmatched markers stay literal; while
+ *  the text is still streaming (`open`), markers that have not been closed yet apply to the end instead. */
+export function inlineMarkdown(text: string, known: (id: string) => 'node' | 'event' | null, open = false): Inline[] {
+  const atoms: Inline[] = [], ticks = [...text.matchAll(/`+/g)];
+  let last = 0;
+  ticks.forEach((m, k) => {
+    if (m.index! < last) return;
+    const end = ticks.slice(k + 1).find(r => r[0] === m[0] && r.index! >= last);
+    if (!end && !open) return;
+    atoms.push(...citations(text.slice(last, m.index), known));
+    const code = text.slice(m.index! + m[0].length, end?.index);
+    atoms.push({ code: /^ .*\S.* $/s.test(code) ? code.slice(1, -1) : code });
+    last = end ? end.index! + end[0].length : text.length;
+  });
+  atoms.push(...citations(text.slice(last), known));
+  // Flanking rules as in CommonMark. A citation or code span counts as punctuation beside a marker and
+  // either end of the text as space, except the growing end of a streaming answer.
+  const space = (c: string) => /\s/u.test(c), mark = (c: string) => /[\p{P}\p{S}]/u.test(c);
+  const items: (Inline | Marker)[] = [];
+  atoms.forEach((atom, i) => {
+    if (!('text' in atom)) { items.push(atom); return; }
+    const before = i > 0 ? '[' : ' ', after = i < atoms.length - 1 ? '[' : open ? 'a' : ' ';
+    let from = 0;
+    // A blank line ends a paragraph, which emphasis never crosses.
+    for (const m of atom.text.matchAll(/\*+|\n[\t ]*\n\s*/g)) {
+      if (m[0][0] === '\n') {
+        if (m.index! > from) items.push({ text: atom.text.slice(from, m.index) });
+        items.push({ run: m[0], length: 0, open: false, close: false });
+        from = m.index! + m[0].length; continue;
+      }
+      const prev = atom.text[m.index! - 1] ?? before, next = atom.text[m.index! + m[0].length] ?? after;
+      const left = !space(next) && (!mark(next) || space(prev) || mark(prev));
+      const right = !space(prev) && (!mark(prev) || space(next) || mark(next));
+      if (!left && !right) continue;
+      if (m.index! > from) items.push({ text: atom.text.slice(from, m.index) });
+      items.push({ run: m[0], length: m[0].length, open: left, close: right });
+      from = m.index! + m[0].length;
+    }
+    if (from < atom.text.length) items.push({ text: atom.text.slice(from) });
+  });
+  const isMarker = (item: Inline | Marker): item is Marker => 'run' in item;
+  const literal = (list: (Inline | Marker)[]) => list.reduce<Inline[]>((out, item) => {
+    const text = isMarker(item) ? item.run : 'text' in item ? item.text : null, previous = out.at(-1);
+    if (text === null) out.push(item as Inline);
+    else if (previous && 'text' in previous) previous.text += text;
+    else if (text) out.push({ text });
+    return out;
+  }, []);
+  const emphasis = (n: number, inner: Inline[]): Inline => n === 2 ? { strong: inner } : { em: inner };
+  // Each closer takes the nearest compatible opener; markers left between them become literal text.
+  for (let i = 0; i < items.length; i++) {
+    const closer = items[i];
+    if (!isMarker(closer) || !closer.close) continue;
+    let j = i - 1;
+    for (const o of items.slice(0, i).reverse()) {
+      if (isMarker(o) && (!o.length || o.open && !((o.close || closer.open)
+        && (o.length + closer.length) % 3 === 0 && (o.length % 3 || closer.length % 3)))) break;
+      j--;
+    }
+    if (j < 0 || !(items[j] as Marker).length) continue;
+    const opener = items[j] as Marker, n = opener.run.length >= 2 && closer.run.length >= 2 ? 2 : 1;
+    opener.run = opener.run.slice(n); closer.run = closer.run.slice(n);
+    const replaced = [...(opener.run ? [opener] : []), emphasis(n, literal(items.slice(j + 1, i))), ...(closer.run ? [closer] : [])];
+    items.splice(j, i - j + 1, ...replaced);
+    i = j + replaced.length - (closer.run ? 2 : 1);
+  }
+  for (let j = items.length - 1; open && j >= 0; j--) {
+    const opener = items[j];
+    if (isMarker(opener) && !opener.length) break;
+    if (!isMarker(opener) || !opener.open) continue;
+    const inner = literal(items.slice(j + 1)), n = Math.min(opener.run.length, 2);
+    opener.run = opener.run.slice(n);
+    items.splice(j, Infinity, ...(opener.run ? [opener] : []), ...(inner.length ? [emphasis(n, inner)] : []));
+    if (opener.run) j++;
+  }
+  return literal(items);
+}
