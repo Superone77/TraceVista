@@ -17,7 +17,7 @@
     {
       "id": "s0",
       "title": "Baseline",
-      "summary": "Pi Agent must accelerate batched multi-LoRA shrink/expand with fp16 inputs, fp32 accumulation and a 2% relative tolerance. Only kernel_utils.py, lora_shrink_op.py and lora_expand_op.py are editable. The run allows 90 minutes and at most 16 submissions. It first saves the Python baseline, writes its own reference and 10 local cases, then implements grouped Triton kernels.",
+      "summary": "Pi Agent starts from Python code that loops over LoRA adapters and performs separate matrix operations. It must accelerate batched shrink/expand while preserving fp16 inputs, fp32 accumulation and 2% relative tolerance. Only three vLLM files are editable. Before submitting a change, the agent saves the baseline, builds an fp64 reference and checks ten local cases. These scratch activities remain under the baseline state because states track submitted code and final selection.",
       "events": [
         "main:E1",
         "main:E3",
@@ -32,15 +32,15 @@
         "Selection status": "Not submitted"
       },
       "ladder": {
-        "topic": "Python loop baseline",
-        "takeaway": "Starting point is the Python loop baseline, 3 to 17 ms per call",
-        "reason": "Wrote the grouped Triton kernel here, and discovered that host launch (~45 µs) is the actual lower bound"
+        "topic": "Python baseline",
+        "takeaway": "Python baseline needs milliseconds per call before grouped kernels",
+        "reason": "Scratch checks establish a local reference. States track submitted code, so pre-submission experiments remain here."
       }
     },
     {
       "id": "s1",
       "title": "V1 · Grouped kernel",
-      "summary": "Replaced shrink/expand with a grouped Triton kernel; first submission passed correctness with dev_speedup 18.671×. Then shifted focus to tile configuration and Python launch cost; local timing was temporarily skewed by automatic diagnostic instrumentation.",
+      "summary": "Submission 1 replaces the Python adapter loop with grouped Triton shrink and expand kernels. The development evaluator reports correctness PASS and 18.671× speedup against its baseline. Local tests also pass, but timing changes when diagnostic instrumentation is disabled. The agent therefore separates GPU execution from host launch cost before choosing its next optimization.",
       "events": [
         "ledger:E1"
       ],
@@ -68,15 +68,15 @@
         "note": "dev_speedup in the same round's submission receipt; color only indicates measured value change, not statistical significance."
       },
       "ladder": {
-        "topic": "Grouped Triton kernel",
-        "takeaway": "Grouped Triton kernel: submission 1 passes correctness at 18.67× development speedup",
-        "reason": "Bottleneck shifted to host launch, so tried tile scanning, direct launch, and raw stream"
+        "topic": "Grouped kernels",
+        "takeaway": "Grouped kernels pass correctness at 18.67× development speedup",
+        "reason": "Submission 1 removes the adapter loop. Host launch becomes the next measured target."
       }
     },
     {
       "id": "s2",
       "title": "V2 · Direct launch",
-      "summary": "Directly launched CompiledKernel using the real launcher signature and used raw stream, combined with tile configuration. dev_speedup 33.369×, about 78.7% higher than submission 1. Saved this version as a source for later rollback and comparison.",
+      "summary": "Submission 2 adds direct calls to CompiledKernel, cheaper CUDA stream lookup and measured tile settings. The development score rises from 18.671× to 33.369×, with correctness PASS. A local breakdown measures about 21.65 µs per operation after the host changes. The agent saves this code for comparison and possible restoration before trying object-identity caching.",
       "events": [
         "ledger:E2"
       ],
@@ -107,14 +107,14 @@
       },
       "ladder": {
         "topic": "Direct launch",
-        "takeaway": "Direct launch with raw stream: submission 2 reaches 33.37× development speedup",
-        "reason": "Also tried CUDA Graph and identity caching: Graph was excluded, identity benefit unconfirmed"
+        "takeaway": "Direct launch and raw stream raise development speedup to 33.37×",
+        "reason": "Submission 2 passes correctness. The agent saves this code before trying identity caching."
       }
     },
     {
       "id": "s3",
       "title": "V3 · Identity cache",
-      "summary": "Tried identity launch caching, CUDA Graph, and reducing slice views. Graph integration benefit was insufficient and was removed; identity was faster in local tests reusing objects, but the submission score was only 30.834×, about 7.6% lower than submission 2. Correctness still passed.",
+      "summary": "Submission 3 retains an object-identity cache and slice-offset changes. CUDA Graph caching was tried and removed before this submission. Local A/B tests with reused tensors favor the candidate, but the development score falls from 33.369× to 30.834×; correctness still passes. Subsequent fresh and rotating object tests expose a cache limitation. They suggest a possible explanation for the regression, but do not reveal the evaluator's actual input pattern.",
       "events": [
         "ledger:E3"
       ],
@@ -144,15 +144,15 @@
         "previousState": "s2"
       },
       "ladder": {
-        "topic": "Identity caching",
-        "takeaway": "Identity caching: submission 3 remains correct but regresses to 30.83×",
-        "reason": "Compared fresh vs. rotating objects, then abandoned and reverted to submission 2's code"
+        "topic": "Identity cache",
+        "takeaway": "Identity cache passes correctness but development speedup falls to 30.83×",
+        "reason": "Reused-object local tests were faster. Later fresh and rotating object tests expose a limitation."
       }
     },
     {
       "id": "s4",
       "title": "V4 · New specialization key",
-      "summary": "The fresh/rotating object experiments exposed limitations of identity caching; restored submission 2's kernel_utils then rewrote the specialization key, integrating the slice offset. After fixing signature and float dispatch errors, dev_speedup reached 35.445×, about 15.0% higher than submission 3 and 6.2% higher than submission 2.",
+      "summary": "The agent restores submission 2's kernel_utils.py and builds a cheaper specialization key on that code. It retains slice offsets, fixes a function-signature mismatch and handles floating-point arguments separately from integer alignment checks. Local rotating-object timing falls from 22.04 to 19.74 µs; stable-object timing falls from 21.58 to 19.30 µs. Submission 4 passes correctness and reaches 35.445× development speedup. Its code derives from submission 2, although it occurs after submission 3.",
       "events": [
         "main:E458",
         "main:E468",
@@ -189,15 +189,15 @@
         "previousState": "s3"
       },
       "ladder": {
-        "topic": "Streamlined specialization key",
-        "takeaway": "Streamlined specialization key: rebuild from submission 2 reaches 35.44×",
-        "reason": "Boundary tests passed; parameter-count cost and alignment variants showed no benefit, so work stopped"
+        "topic": "Simpler key",
+        "takeaway": "Simpler key built from submission 2 reaches 35.44× development speedup",
+        "reason": "Signature and float-dispatch fixes restore correctness. Both measured object patterns improve locally."
       }
     },
     {
       "id": "s5",
       "title": "Final · Select V4",
-      "summary": "19 boundary tests passed. The follow-up approach removing alignment specialization was slightly slower; after restoring all submission 4 files, finalized. Hash check matched. Independent scores: Oracle ABBA 2.114×, official baseline 34.588×, correctness passed.",
+      "summary": "The agent restores and finalizes submission 4 after a later alignment variant measures slightly slower locally. The three final file hashes match the saved submission 4 copy. The retained development score is 35.445×; finalization is not a new measurement. Separate evaluation confirms correctness and reports 34.588× against the official baseline and 2.114× against the frozen Oracle under paired ABBA evaluation. These scores use different baselines.",
       "events": [
         "main:E535",
         "main:E536",
@@ -236,8 +236,8 @@
       },
       "ladder": {
         "topic": "Selected submission 4",
-        "takeaway": "Selected submission 4 retains 35.44× development speedup; independent evaluation confirms correctness",
-        "reason": "The final report attributes remaining headroom to host-side Python; two variants were rejected based solely on local timing"
+        "takeaway": "Selected submission 4 passes independent correctness and records 2.11× against Oracle",
+        "reason": "Development score remains 35.44×. Independent official-baseline speedup is 34.59×; these baselines differ."
       }
     }
   ],
@@ -245,16 +245,16 @@
     {
       "id": "s0-setup",
       "title": "Environment and original code",
-      "summary": "Pi Agent uses deepseek-flash with high thinking to optimize batched multi-LoRA shrink/expand. The run has a 90-minute, 16-submission ceiling and edits only three vLLM files. Recorded environment: A100-SXM4-40GB, Python 3.10.12, PyTorch 2.7.1+cu126, Triton 3.3.1. It saves the original files for comparison before changing kernels.",
+      "summary": "Pi Agent uses deepseek-flash with high thinking on an A100 40GB. The recorded software is Python 3.10.12, PyTorch 2.7.1+cu126 and Triton 3.3.1. The task allows 90 minutes and at most 16 submissions. The agent reads the shrink/expand interfaces and saves the three editable files with hashes before changing them.",
       "state": "s0",
       "status": "attempted",
       "events": [
         "main:E2"
       ],
       "ladder": {
-        "topic": "three editable files",
-        "takeaway": "Only three editable files, and the GPU is an A100",
-        "reason": "Saved a baseline copy and hash first, for later comparison",
+        "topic": "Task constraints",
+        "takeaway": "Task constraints: three editable files, A100 40GB, 90 minutes",
+        "reason": "The agent records the software environment and saves the original files before editing.",
         "abstract": [
           {
             "event": "main:E2",
@@ -270,16 +270,16 @@
     {
       "id": "s0-baseline",
       "title": "Own reference and baseline",
-      "summary": "Wrote scratch tests, fixed an import issue, and collected measurements of the original baseline.",
+      "summary": "The agent writes an fp64 reference and ten local correctness and timing cases. An import error initially prevents the scratch copy from running. After fixing module loading, the baseline passes all ten cases and takes roughly 2.7 to 17 ms per operator with diagnostics enabled. These measurements establish the local comparison point; they are separate from the development evaluator.",
       "state": "s0",
       "status": "attempted",
       "events": [
         "main:E42"
       ],
       "ladder": {
-        "topic": "Own reference",
-        "takeaway": "Own reference and 10 sample sets; baseline runs 3 to 17 ms per call",
-        "reason": "The original path loops per adapter; this is the number to beat",
+        "topic": "Local baseline",
+        "takeaway": "Local baseline passes ten cases and takes 2.7 to 17 ms per operator",
+        "reason": "Diagnostics are enabled in this timing. An import fix enables the scratch fp64 comparison.",
         "abstract": [
           {
             "event": "main:E85",
@@ -291,16 +291,16 @@
     {
       "id": "s0-kernel",
       "title": "Grouped Triton kernel",
-      "summary": "Replaced the Python adapter loop with grouped shrink/expand, validated on its own samples.",
+      "summary": "The agent writes grouped Triton kernels and connects both shrink and expand entry points to them. All ten local cases pass against the fp64 reference. Many timings cluster near 200 µs despite different workloads. The agent suspects a host or instrumentation cost and investigates that cost before treating these timings as kernel performance.",
       "state": "s0",
       "status": "attempted",
       "events": [
         "main:E64"
       ],
       "ladder": {
-        "topic": "grouped Triton kernel",
-        "takeaway": "The grouped Triton kernel worked on the first try, passing all 10 sample sets",
-        "reason": "Local error about 3e-4, comparable to the baseline",
+        "topic": "Grouped kernels",
+        "takeaway": "Grouped kernels pass ten local cases; timing still needs diagnosis",
+        "reason": "Different shapes cluster near 200 µs while diagnostic instrumentation is active.",
         "abstract": [
           {
             "event": "main:E87",
@@ -317,7 +317,7 @@
     {
       "id": "s0-diagnostic",
       "title": "Distinguishing GPU vs. host cost",
-      "summary": "Broke down call costs, investigating diagnostic instrumentation and Python/JIT launch cost.",
+      "summary": "With diagnostics disabled, the agent compares ordinary calls, CUDA Graph replay and host profiles. One shrink call takes about 64 µs, while a later breakdown attributes about 45 µs to Triton launch. Device timings depend on shape and are measured separately. An early launch bypass fails with a grid error. The agent submits the working grouped kernel before continuing host-path changes.",
       "state": "s0",
       "status": "attempted",
       "events": [
@@ -325,8 +325,8 @@
       ],
       "ladder": {
         "topic": "Host launch",
-        "takeaway": "Host launch creates a roughly 45 µs floor despite much faster device work",
-        "reason": "Diagnostic instrumentation had inflated timing; turning it off revealed the true picture",
+        "takeaway": "Host launch remains costly after grouped kernels reduce device work",
+        "reason": "The agent disables instrumentation, separates device timing and profiles Triton specialization.",
         "abstract": [
           {
             "event": "main:E91",
@@ -343,7 +343,7 @@
     {
       "id": "s0-submit",
       "title": "Submission and official feedback",
-      "summary": "Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.",
+      "summary": "The agent submits the grouped Triton implementation after local correctness checks. The asynchronous evaluator returns correctness PASS and dev_speedup 18.671×. This is submission 1 of the allowed 16; the next work investigates the remaining host cost.",
       "state": "s0",
       "status": "attempted",
       "events": [
@@ -351,8 +351,8 @@
       ],
       "ladder": {
         "topic": "Submission 1",
-        "takeaway": "Submission 1 passed correctness, dev_speedup 18.67×",
-        "reason": "This is the first scored candidate, 15 remaining",
+        "takeaway": "Submission 1 passes correctness at 18.67× development speedup",
+        "reason": "This is the first evaluator receipt. Fifteen submission attempts remain.",
         "abstract": [
           {
             "event": "main:E127",
@@ -368,16 +368,16 @@
     {
       "id": "s1-tuning",
       "title": "Tile parameter experiments on the same kernel",
-      "summary": "A large-scale search was stopped due to time cost; the background task did not keep running, so it switched to a smaller foreground scan. Not multiple independent algorithms.",
+      "summary": "The agent searches tile sizes and launch parameters for the same grouped kernels. It stops a broad sweep, then discovers that a background sweep ended with its shell and left partial results. It runs a smaller foreground sweep to obtain comparable results. Different shapes favor different tiles; the retained implementation uses measured settings for shrink and expand.",
       "state": "s1",
       "status": "attempted",
       "events": [
         "main:E130"
       ],
       "ladder": {
-        "topic": "tile scan",
-        "takeaway": "Large-scale tile scan was too slow and stopped; switched to a smaller foreground tile scan",
-        "reason": "Background task exited with the shell, leaving only partial results",
+        "topic": "Tile search",
+        "takeaway": "Tile search moves to a smaller foreground sweep after incomplete runs",
+        "reason": "A broad sweep is stopped; a background sweep ends with its shell. The completed scan compares four shapes.",
         "abstract": [
           {
             "event": "main:E179",
@@ -390,7 +390,7 @@
     {
       "id": "s1-direct",
       "title": "Directly launching the compiled kernel",
-      "summary": "Fixed an arity error using the real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "A first direct-launch experiment supplies 26 arguments where the launcher requires 32, so it fails. The agent inspects the actual launcher signature and repeats the test with the full argument set. Direct launch takes 17.32 µs versus 43.76 µs for the normal path, with bitwise-identical output in that test. It integrates this path and keeps guards around argument packing.",
       "state": "s1",
       "status": "attempted",
       "events": [
@@ -398,8 +398,8 @@
       ],
       "ladder": {
         "topic": "Direct launch",
-        "takeaway": "Direct launch: direct CompiledKernel launch is faster than normal launch, output matches bit-for-bit",
-        "reason": "44 to 17 µs, but first hit a parameter-count error",
+        "takeaway": "Direct launch takes 17.32 µs versus 43.76 µs with identical test output",
+        "reason": "The first attempt had missing arguments. Reading the real signature enables a valid comparison.",
         "abstract": [
           {
             "event": "main:E210",
@@ -412,16 +412,16 @@
     {
       "id": "s1-stream",
       "title": "Streamlining the host path",
-      "summary": "Verified direct launch, then located key/stream cost, and switched to raw stream.",
+      "summary": "After direct launch passes the local cases, the agent profiles the remaining wrapper, key construction and stream lookup. A scratch test with fabricated strides fails and is corrected. The raw stream accessor takes 0.23 µs versus 6.33 µs for current_stream(). The agent changes stream lookup and trims stride arguments; the full operation then measures 21.65 µs locally.",
       "state": "s1",
       "status": "attempted",
       "events": [
         "main:E223"
       ],
       "ladder": {
-        "topic": "raw stream",
-        "takeaway": "Stream acquisition was the most expensive part of host cost; switched to raw stream",
-        "reason": "About 21.65 µs per call, a large reduction from 63.8 µs",
+        "topic": "Raw stream",
+        "takeaway": "Raw stream lookup takes 0.23 µs versus current_stream at 6.33 µs",
+        "reason": "Changing the accessor and stride handling lowers the full local call to 21.65 µs.",
         "abstract": [
           {
             "event": "main:E253",
@@ -434,7 +434,7 @@
     {
       "id": "s1-submit",
       "title": "Submission and official feedback",
-      "summary": "Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.",
+      "summary": "Submission 2 combines direct launch, raw stream lookup and tile choices. The evaluator reports correctness PASS and 33.369× development speedup, up from submission 1's 18.671×. The agent saves this candidate before further experiments.",
       "state": "s1",
       "status": "attempted",
       "events": [
@@ -442,8 +442,8 @@
       ],
       "ladder": {
         "topic": "Submission 2",
-        "takeaway": "Submission 2 passed correctness, dev_speedup 33.37×",
-        "reason": "A clear improvement over submission 1's 18.67×",
+        "takeaway": "Submission 2 passes correctness at 33.37× development speedup",
+        "reason": "The agent saves the improved direct-launch code for comparison and restoration.",
         "abstract": [
           {
             "event": "main:E273",
@@ -455,7 +455,7 @@
     {
       "id": "s2-identity",
       "title": "Identity-based launch parameter caching",
-      "summary": "Tried caching keyed by object identity; fixed double-counting on cache miss. The local benefit with repeated objects does not guarantee benefit across other call patterns.",
+      "summary": "The agent caches launch arguments by tensor identity. Its first implementation launches twice on a cache miss and breaks add_inputs; an initial fix also skips required work. Restructuring the control flow restores correctness. Early cache-hit instrumentation shows hits without a clear full-call gain. A later, simplified version with slice offsets is 3 to 5 µs faster in local A/B tests that reuse tensors, so the agent submits it for development scoring.",
       "state": "s2",
       "status": "attempted",
       "events": [
@@ -463,8 +463,8 @@
       ],
       "ladder": {
         "topic": "Identity caching",
-        "takeaway": "Identity caching fixed the double-counting, but was not faster after cache hits",
-        "reason": "Local time stayed at 21 µs; benefit only appears when objects are reused",
+        "takeaway": "Identity caching gains depend on the implementation and object reuse",
+        "reason": "Double launches first break accumulation. After repair and simplification, reused-object A/B tests favor the candidate.",
         "abstract": [
           {
             "event": "main:E428",
@@ -477,7 +477,7 @@
     {
       "id": "s2-graph",
       "title": "CUDA Graph and reducing views",
-      "summary": "CUDA Graph replay alone was fast, but end-to-end benefit after integration was insufficient. Included accompanying changes to reduce slice views; the Graph path was ultimately removed.",
+      "summary": "A standalone CUDA Graph replay takes 5 µs versus 21 µs for the direct-call test. After integration, fresh slice views cause repeated captures, so the agent passes slice offsets instead and limits capture. The agent then estimates only about 2 µs net benefit and removes the graph path. The standalone replay result does not establish an equal gain for the full operator.",
       "state": "s2",
       "status": "attempted",
       "events": [
@@ -485,8 +485,8 @@
       ],
       "ladder": {
         "topic": "CUDA Graph",
-        "takeaway": "CUDA Graph saves only about 2 µs after integration, so it is removed",
-        "reason": "Key overhead ate into the replay benefit; not worth the risk",
+        "takeaway": "CUDA Graph replay is fast alone; integration leaves little net benefit",
+        "reason": "The agent estimates about 2 µs saved after key overhead and removes the graph path.",
         "abstract": [
           {
             "event": "main:E405",
@@ -499,7 +499,7 @@
     {
       "id": "s2-submit",
       "title": "Submission and official feedback",
-      "summary": "Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.",
+      "summary": "The evaluator accepts submission 3's numerical behavior but reports 30.834× development speedup. Submission 2 remains best at 33.369×. The result conflicts with the local reused-tensor A/B result, which motivates a comparison of input-object patterns.",
       "state": "s2",
       "status": "attempted",
       "events": [
@@ -507,8 +507,8 @@
       ],
       "ladder": {
         "topic": "Submission 3",
-        "takeaway": "Submission 3 passed correctness, score regressed to 30.83×",
-        "reason": "Lower than submission 2's 33.37×, which remains the best",
+        "takeaway": "Submission 3 stays correct but regresses to 30.83× development speedup",
+        "reason": "Submission 2 remains best at 33.37× despite the favorable local reused-object test.",
         "abstract": [
           {
             "event": "main:E432",
@@ -520,16 +520,16 @@
     {
       "id": "s3-compare",
       "title": "Compared call patterns to explain the regression",
-      "summary": "Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse, and was ultimately abandoned.",
+      "summary": "The original identity cache takes 17.01 µs with stable objects versus 21.89 µs for submission 2, but takes 65.46 µs with fresh objects versus 61.08 µs for submission 2. The fresh-object totals include allocation. An adaptive miss policy still takes 24.68 µs on rotating objects versus 22.41 µs for submission 2. The agent abandons the identity approach. The evaluator's actual object-reuse pattern remains unobserved.",
       "state": "s3",
       "status": "attempted",
       "events": [
         "main:E435"
       ],
       "ladder": {
-        "topic": "Identity caching",
-        "takeaway": "Identity caching wins with reused objects but loses with fresh and rotating objects",
-        "reason": "These local comparisons suggest cache misses may explain the lower development score; the hidden evaluator input pattern remains unknown.",
+        "topic": "Object reuse",
+        "takeaway": "Object reuse changes whether identity caching helps",
+        "reason": "Fresh-object totals include allocation. Rotating objects also disfavor the candidate; the evaluator input pattern is unknown.",
         "abstract": [
           {
             "event": "main:E434",
@@ -546,7 +546,7 @@
     {
       "id": "s3-rebase",
       "title": "Redid the specialization key starting from v2",
-      "summary": "Restored v2's kernel_utils and modified it; fixed a missed replacement, signature and float parameter dispatch, while keeping the slice offset.",
+      "summary": "The agent copies kernel_utils.py from submission 2 and rewrites the specialization key, while retaining slice offsets. The first retest exposes an outdated function signature; a later test exposes a bitwise operation on a float. After both fixes, correctness passes and rotating/stable object tests favor the new implementation. A stale microbenchmark fails separately, so the entire command is not labeled as a clean success.",
       "state": "s3",
       "status": "attempted",
       "events": [
@@ -554,8 +554,8 @@
       ],
       "ladder": {
         "topic": "Submission 2 code",
-        "takeaway": "Submission 2 code: reverted to submission 2's code, redoing it with a cheaper specialization key",
-        "reason": "Fixed two bugs in signature and float dispatch, while keeping the slice offset",
+        "takeaway": "Submission 2 code supplies the base for a cheaper specialization key",
+        "reason": "The agent retains slice offsets and fixes signature and float-dispatch errors before submission.",
         "abstract": [
           {
             "event": "main:E457",
@@ -568,7 +568,7 @@
     {
       "id": "s3-submit",
       "title": "Submission and official feedback",
-      "summary": "Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.",
+      "summary": "Submission 4 passes correctness and reaches 35.445× development speedup. This exceeds both the previous submission's 30.834× and submission 2's 33.369×. The agent then broadens local boundary tests before deciding whether to continue optimizing.",
       "state": "s3",
       "status": "attempted",
       "events": [
@@ -576,8 +576,8 @@
       ],
       "ladder": {
         "topic": "Submission 4",
-        "takeaway": "Submission 4 passed correctness, dev_speedup 35.44",
-        "reason": "Higher than submission 2's 33.37, the new best",
+        "takeaway": "Submission 4 passes correctness and reaches 35.44× development speedup",
+        "reason": "It exceeds both submission 3 and its code ancestor, submission 2.",
         "abstract": [
           {
             "event": "main:E504",
@@ -589,20 +589,20 @@
     {
       "id": "s4-robust",
       "title": "Boundary condition validation",
-      "summary": "19 scratch tests; the first error was due to the reference script's output shape, fixed afterward and passed.",
+      "summary": "The agent tests nineteen boundary cases, including bf16, fp32 fallback, small/large ranks, noncontiguous views, offsets and add_inputs. An offset test first fails because the reference script creates the wrong output shape. After fixing that script, all nineteen cases pass. This expands local correctness coverage; it is not a new development or independent performance score.",
       "state": "s4",
       "status": "attempted",
       "events": [
         "main:E509"
       ],
       "ladder": {
-        "topic": "19 boundary tests",
-        "takeaway": "All 19 boundary tests passed",
-        "reason": "First failure was only due to a wrong output shape in the reference script",
+        "topic": "Boundary tests",
+        "takeaway": "Boundary tests all pass after the reference shape is fixed",
+        "reason": "Nineteen local cases cover dtypes, ranks, offsets, views and routing. This is correctness coverage.",
         "abstract": [
           {
-            "event": "main:E508",
-            "quote": "Round 4: **dev_speedup 35.44** (new best), correctness PASS."
+            "event": "main:E516",
+            "quote": "ALL OK"
           }
         ]
       }
@@ -610,16 +610,16 @@
     {
       "id": "s4-argcost",
       "title": "Further overhead localization",
-      "summary": "Measured the parameter-passing cost of the direct launcher, concluding limited benefit from this direction.",
+      "summary": "A direct-launch microbenchmark compares six arguments with twenty-one. Timing rises from 6.04 to 6.47 µs, about 0.029 µs per extra argument. The agent explicitly stops trimming arguments after seeing this small local contribution.",
       "state": "s4",
       "status": "attempted",
       "events": [
         "main:E519"
       ],
       "ladder": {
-        "topic": "Number of parameters",
-        "takeaway": "Number of parameters: parameter count has almost no effect on direct launcher cost",
-        "reason": "About 0.029 µs per parameter; further reducing parameters is not meaningful",
+        "topic": "Argument count",
+        "takeaway": "Argument count adds about 0.029 µs per extra direct-launch argument",
+        "reason": "The agent stops trimming arguments after the six-versus-twenty-one comparison.",
         "abstract": [
           {
             "event": "main:E523",
@@ -632,16 +632,16 @@
     {
       "id": "s4-alignment",
       "title": "Alternative approach removing alignment specialization",
-      "summary": "Tested on a copy of v4; slightly slower locally, not submitted, restored all v4 files.",
+      "summary": "The agent saves submission 4 and tries skipping alignment specialization. Correctness passes, but rotating-object timing is 20.60 µs versus 20.32 µs for the saved candidate; stable-object timing also worsens slightly. It restores the saved files and does not submit this variant. The restoration receipt includes passing test output while the command is still running; the final hash audit is recorded later.",
       "state": "s4",
       "status": "attempted",
       "events": [
         "main:E526"
       ],
       "ladder": {
-        "topic": "alignment specialization",
-        "takeaway": "Removing alignment specialization was slightly slower; restored submission 4 files",
-        "reason": "Correctness still passed, but local timing showed no benefit, so not submitted",
+        "topic": "Alignment variant",
+        "takeaway": "Alignment variant is slightly slower locally, so submission 4 is restored",
+        "reason": "Correctness passes. No development score is submitted for this variant.",
         "abstract": [
           {
             "event": "main:E534",
@@ -654,7 +654,7 @@
     {
       "id": "s4-finalize",
       "title": "Restoring the best version and finalizing the submission",
-      "summary": "The first request was rejected by schema; retried, and finalize explicitly selected submission 4.",
+      "summary": "The first finalize request contains an unsupported tool argument and is rejected before execution. The corrected request succeeds and explicitly selects submission 4 at 4 of 16 allowed submissions. This records the chosen artifact; separate evaluation supplies the independent scores.",
       "state": "s4",
       "status": "attempted",
       "events": [
@@ -662,8 +662,8 @@
       ],
       "ladder": {
         "topic": "Finalize",
-        "takeaway": "Finalize selected submission 4 as the final result",
-        "reason": "First request was rejected by schema; retried successfully after fixing the parameters",
+        "takeaway": "Finalize selects submission 4 after a rejected first request",
+        "reason": "The first tool call never executes. Corrected arguments produce an explicit selection receipt.",
         "abstract": [
           {
             "event": "main:E538",
@@ -676,16 +676,16 @@
     {
       "id": "s5-audit",
       "title": "Final code verification and summary",
-      "summary": "Checked that file hashes match the submission 4 copy, and kept the agent's original summary.",
+      "summary": "The agent checks the final functions and hashes of all three editable files. They match the saved submission 4 copy, while HEAD remains the original baseline commit with those files modified. The final narrative explains local results and rejected attempts. Its claims about remaining headroom and evaluator input patterns are the agent's interpretation, not additional independent measurements.",
       "state": "s5",
       "status": "attempted",
       "events": [
         "main:E544"
       ],
       "ladder": {
-        "topic": "file hashes",
-        "takeaway": "Final file hashes match the submission 4 copy",
-        "reason": "The agent's summary attributed remaining headroom to Python overhead",
+        "topic": "File hashes",
+        "takeaway": "File hashes identify the final tree as the saved submission 4",
+        "reason": "HEAD remains the baseline commit with three modified files. The final narrative is kept as an agent report.",
         "abstract": [
           {
             "event": "main:E549",
@@ -1207,7 +1207,7 @@
     {
       "id": "a64",
       "title": "Implement per-LoRA-grouped Triton shrink / expand",
-      "summary": "Implement per-LoRA-grouped Triton shrink / expand. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.",
+      "summary": "The agent writes grouped Triton shrink and expand kernels while baseline timing is still running. The kernels use routing arrays to process LoRA groups. This action writes the implementation; the numerical comparison follows in later actions.",
       "events": [
         "main:E62",
         "main:E63",
@@ -1304,7 +1304,7 @@
     {
       "id": "a84",
       "title": "Collect baseline measurement results; 10 test cases complete",
-      "summary": "Collect baseline measurement results; 10 test cases complete. Write scratch tests, fix import issues, collect original baseline measurements.",
+      "summary": "The baseline test finishes and reports ten passing cases against the fp64 reference. Per-operator timings range from roughly 2.7 to 17 ms with diagnostics enabled in this local harness. This result establishes the original implementation's local behavior and cost.",
       "events": [
         "main:E83",
         "main:E84",
@@ -1335,7 +1335,7 @@
     {
       "id": "a88",
       "title": "Validate first candidate; diagnose instrumentation affecting local timing",
-      "summary": "Validate first candidate; diagnose instrumentation affecting local timing. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.",
+      "summary": "All ten local cases pass for the grouped kernels. Several timings remain near 200 µs across different shapes while automatic diagnostics are enabled. The matching numerical results support correctness on these cases; the timing pattern still needs diagnosis.",
       "events": [
         "main:E86",
         "main:E87",
@@ -1367,7 +1367,7 @@
     {
       "id": "a92",
       "title": "Write minimal call-overhead test",
-      "summary": "Write minimal call-overhead test. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.",
+      "summary": "The agent reports that all ten cases pass but timings cluster near 200 µs. It writes a smaller call-overhead test and plans to disable diagnostics. The suspected host floor is a hypothesis at this point, not yet a measured decomposition.",
       "events": [
         "main:E90",
         "main:E91",
@@ -1400,7 +1400,7 @@
     {
       "id": "a95",
       "title": "Disable automatic diagnostics and re-measure host call overhead",
-      "summary": "Disable automatic diagnostics and re-measure host call overhead. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.",
+      "summary": "With diagnostics disabled, an empty one-block Triton launch takes about 18 µs and the tested shrink call takes about 64 µs. Larger shapes show different device and wall times. These measurements narrow the investigation to call overhead, but do not yet isolate GPU execution cleanly.",
       "events": [
         "main:E95",
         "main:E96"
@@ -1462,7 +1462,7 @@
     {
       "id": "a102",
       "title": "Compare device execution time and host call time",
-      "summary": "Compare device execution time and host call time. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.",
+      "summary": "CUDA Graph replay separates device work from ordinary host calls. Device times range from 12.15 to 220.13 µs across the shown operations, while small ordinary calls remain near 63 to 68 µs. The accompanying profile identifies Triton specialization and launch work for further inspection.",
       "events": [
         "main:E102",
         "main:E103"
@@ -1609,7 +1609,7 @@
     {
       "id": "a119",
       "title": "Test launch overhead; fast-path grid call fails",
-      "summary": "Test launch overhead; fast-path grid call fails. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost. This check/call did not complete its intended goal; the specific error is preserved in the tool output.",
+      "summary": "The microbenchmark shows ordinary Triton launch cost increasing with argument count. An attempted fast-path grid call raises tuple index out of range. That bypass does not produce a valid performance result.",
       "events": [
         "main:E119",
         "main:E120"
@@ -1643,7 +1643,7 @@
     {
       "id": "a123",
       "title": "Submission 1: grouped Triton kernel; wait for async scoring",
-      "summary": "Submission 1: grouped Triton kernel; wait for async scoring. Execute submit and retain the scoring receipt; correctness and dev performance are recorded separately. The scoring result is collected by a later infra_execution_status, and this node also references the completion receipt.",
+      "summary": "The agent submits the grouped-kernel candidate after reporting ten passing local cases. Scoring runs asynchronously. The receipt included in this action records submission 1, correctness PASS and 18.67× development speedup.",
       "events": [
         "main:E121",
         "main:E122",
@@ -1676,7 +1676,7 @@
     {
       "id": "a126",
       "title": "Submission 1 receipt: correctness passed, dev score 18.671×",
-      "summary": "Submission 1 receipt: correctness passed, dev score 18.671×. Execute submit and retain the scoring receipt; correctness and dev performance are recorded separately.",
+      "summary": "The submission receipt reports correctness PASS and 18.67× development speedup. It marks submission 1 as best so far and leaves fifteen attempts. These are development-evaluator results, separate from the preceding local timings.",
       "events": [
         "main:E125",
         "main:E126",
@@ -1771,7 +1771,7 @@
     {
       "id": "a136",
       "title": "Stop the overly time-consuming large-scale search",
-      "summary": "Stop the overly time-consuming large-scale search. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.",
+      "summary": "The agent stops the broad tile search after it runs for about 34 seconds without a useful completed comparison. Stopping this scan does not reject the grouped-kernel design; a smaller parameter search follows.",
       "events": [
         "main:E135",
         "main:E136",
@@ -1939,7 +1939,7 @@
     {
       "id": "a158",
       "title": "Write host-layer call overhead breakdown",
-      "summary": "Write host-layer call overhead breakdown. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "After a direct-launch call fails because its argument count is wrong, the agent says the bypass is fragile. It writes a host-overhead breakdown to measure the existing path before revisiting the launcher.",
       "events": [
         "main:E156",
         "main:E157",
@@ -1972,7 +1972,7 @@
     {
       "id": "a161",
       "title": "Identify cost of Python wrapper, key, and stream acquisition",
-      "summary": "Identify cost of Python wrapper, key, and stream acquisition. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "The breakdown measures 63.84 µs for the tested shrink call and 44.69 µs for Triton launch with the full argument set. Removing the launch gives 11.29 µs in the scratch test. These are diagnostic local timings, not the development score.",
       "events": [
         "main:E161",
         "main:E162"
@@ -2026,7 +2026,7 @@
     {
       "id": "a167",
       "title": "Use profile to examine host path",
-      "summary": "Use profile to examine host path. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "The host profile lists specialize_impl and Triton run among the dominant functions. The separate unprofiled launch measurement is 43.45 µs. Profiled function totals locate overhead; they should not be added to that latency as independent costs.",
       "events": [
         "main:E167",
         "main:E168"
@@ -2075,7 +2075,7 @@
     {
       "id": "a173",
       "title": "Check output already produced by targeted sweep",
-      "summary": "Check output already produced by targeted sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.",
+      "summary": "The partial sweep reports a 27.5 µs shrink configuration with tile tuple (32, 256, 4, 3). Some (256, 256) choices exceed shared memory. Only the shown partial search is supported here; expand results are not yet available.",
       "events": [
         "main:E172",
         "main:E173",
@@ -2106,7 +2106,7 @@
     {
       "id": "a176",
       "title": "Confirm the background sweep process has exited",
-      "summary": "Confirm the background sweep process has exited. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.",
+      "summary": "The process check finds no running background tuner and its log contains only a small partial result. The agent subsequently attributes the exit to the shell session and switches to a foreground sweep.",
       "events": [
         "main:E175",
         "main:E176",
@@ -2137,7 +2137,7 @@
     {
       "id": "a180",
       "title": "Switch to a smaller-range foreground tile sweep",
-      "summary": "Switch to a smaller-range foreground tile sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.",
+      "summary": "The agent states that the background tuner died with its shell. It narrows the tile choices and writes a foreground sweep so the remaining measurements can complete within the session.",
       "events": [
         "main:E178",
         "main:E179",
@@ -2239,7 +2239,7 @@
     {
       "id": "a193",
       "title": "Direct launch succeeds; output matches bit-for-bit, local call is faster",
-      "summary": "Direct launch succeeds; output matches bit-for-bit, local call is faster. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "With the full launcher signature, direct launch takes 17.32 µs versus 43.76 µs for normal launch. The tested output is bitwise equal with maxdiff 0.0. This validates that launch experiment, not every future input or kernel configuration.",
       "events": [
         "main:E193",
         "main:E194"
@@ -2354,7 +2354,7 @@
     {
       "id": "a207",
       "title": "Collect foreground tile scan results",
-      "summary": "Collect foreground tile scan results. Large-scale search was stopped due to time cost; background task was not kept running, switched to smaller foreground scan. Not multiple independent algorithms.",
+      "summary": "The foreground sweep returns shrink and expand timings for four shapes. The preferred tiles vary by shape; bounding the grid helps some expand cases but not all. The next implementation uses these results alongside the independently tested direct launch.",
       "events": [
         "main:E206",
         "main:E207",
@@ -2385,7 +2385,7 @@
     {
       "id": "a211",
       "title": "Add direct CompiledKernel launch and tile configuration",
-      "summary": "Add direct CompiledKernel launch and tile configuration. Fixed arity error based on real launcher signature, forming a direct CompiledKernel launch path.",
+      "summary": "The agent reports measured tile choices and the direct-launch comparison, then integrates both. It chooses BLOCK_M/BLOCK_K of 32/128 for shrink and 64/128 for expand. Numerical and call-cost checks follow this edit.",
       "events": [
         "main:E209",
         "main:E210",
@@ -2478,7 +2478,7 @@
     {
       "id": "a227",
       "title": "Re-measure host-side overhead at each layer",
-      "summary": "Re-measure host-side overhead at each layer. Validated direct launch, then located key/stream costs, switched to raw stream.",
+      "summary": "The updated shrink call measures 33.34 µs, but the old no-launch diagnostic still measures 33.78 µs. The old monkey patch no longer isolates the new launcher. These figures motivate a breakdown written for the changed implementation.",
       "events": [
         "main:E225",
         "main:E226",
@@ -2580,7 +2580,7 @@
     {
       "id": "a240",
       "title": "Breakdown script failed: fake stride caused misaligned address",
-      "summary": "Breakdown script failed: fake stride caused misaligned address. Validated direct launch, then located key/stream costs, switched to raw stream. This check/call did not complete its intended goal; specific error remains in tool output.",
+      "summary": "The scratch breakdown reports a CUDA misaligned-address error after using fabricated strides. This test failure does not identify a production-kernel regression. The agent later corrects the scratch inputs and retains stride-divisibility checks in the key.",
       "events": [
         "main:E240",
         "main:E241"
@@ -2631,7 +2631,7 @@
     {
       "id": "a247",
       "title": "Re-locate key, stream, wrapper costs",
-      "summary": "Re-locate key, stream, wrapper costs. Validated direct launch, then located key/stream costs, switched to raw stream.",
+      "summary": "Using real tensor strides, the breakdown reports 34.11 µs for the full call, 6.06 µs for the wrapper-only test and 5.53 µs for key construction. Stream lookup is also several microseconds. These separate diagnostic measurements identify candidates for the next change.",
       "events": [
         "main:E247",
         "main:E248"
@@ -2665,7 +2665,7 @@
     {
       "id": "a250",
       "title": "Compare cost of current_stream vs raw stream acquisition",
-      "summary": "Compare cost of current_stream vs raw stream acquisition. Validated direct launch, then located key/stream costs, switched to raw stream.",
+      "summary": "The accessor microbenchmark measures current_stream() at 6.33 µs and the raw stream accessor at 0.23 µs. This compares stream-query APIs on the recorded setup. It does not imply the complete operator becomes 27 times faster.",
       "events": [
         "main:E249",
         "main:E250",
@@ -2700,7 +2700,7 @@
     {
       "id": "a254",
       "title": "Switch to raw stream and simplify stride handling",
-      "summary": "Switch to raw stream and simplify stride handling. Validated direct launch, then located key/stream costs, switched to raw stream.",
+      "summary": "The agent cites the cheaper raw stream accessor and changes stream lookup together with stride-argument handling. This edit applies the diagnostic finding to the launcher. Subsequent tests check the new signature and full call.",
       "events": [
         "main:E252",
         "main:E253",
@@ -2781,7 +2781,7 @@
     {
       "id": "a268",
       "title": "Re-measure local call cost: about 21.65 µs",
-      "summary": "Re-measure local call cost: about 21.65 µs. Validated direct launch, then located key/stream costs, switched to raw stream.",
+      "summary": "The full operation with direct launch and a cache hit measures 21.65 µs locally. The diagnostic script also measures the older stream-query API separately; those older query timings are not part of the new call path.",
       "events": [
         "main:E267",
         "main:E268",
@@ -2812,7 +2812,7 @@
     {
       "id": "a272",
       "title": "Submission 2: correctness passed, dev_speedup raised to 33.369×",
-      "summary": "Submission 2: correctness passed, dev_speedup raised to 33.369×. Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.",
+      "summary": "Submission 2 receives correctness PASS and 33.37× development speedup. The previous receipt was 18.67×. The agent then saves this candidate before trying another cache strategy.",
       "events": [
         "main:E270",
         "main:E271",
@@ -2989,7 +2989,7 @@
     {
       "id": "a303",
       "title": "First round of identity caching validation failed: add_inputs double-accumulated",
-      "summary": "First round of identity caching validation failed: add_inputs double-accumulated. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns. This check/call did not complete its intended goal; specific error remains in tool output.",
+      "summary": "The identity-cache implementation passes nine displayed cases but fails add_inputs with expand relative error 0.6441. The shell operation completes, yet numerical verification fails. The agent isolates first-call and repeated-call behavior next.",
       "events": [
         "main:E302",
         "main:E303",
@@ -3051,7 +3051,7 @@
     {
       "id": "a310",
       "title": "Locate first cache miss: first call wrong, subsequent calls normal",
-      "summary": "Locate first cache miss: first call wrong, subsequent calls normal. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The reproduction shows direct launch failing on the first add_inputs call but passing on the repeated call. The ordinary path passes both. This localizes the issue to the direct path's cache-miss behavior.",
       "events": [
         "main:E310",
         "main:E311"
@@ -3081,7 +3081,7 @@
     {
       "id": "a314",
       "title": "Try fixing duplicate launch on cache miss",
-      "summary": "Try fixing duplicate launch on cache miss. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The agent identifies a double launch on a cache miss and edits the control flow. This is an attempted fix. The next test shows that the revised return also breaks a different cached-specialization path.",
       "events": [
         "main:E312",
         "main:E313",
@@ -3116,7 +3116,7 @@
     {
       "id": "a319",
       "title": "First fix introduced another bug, still failing",
-      "summary": "First fix introduced another bug, still failing. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns. This check/call did not complete its intended goal; specific error remains in tool output.",
+      "summary": "The first fix makes the initial add_inputs call pass, but the repeated call fails. Several other cases return relative error 1.0. Correctness is still broken, so this result cannot be treated as a successful cache optimization.",
       "events": [
         "main:E319",
         "main:E320"
@@ -3145,7 +3145,7 @@
     {
       "id": "a323",
       "title": "Revisit launch branches to locate control-flow issue",
-      "summary": "Revisit launch branches to locate control-flow issue. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The agent states that its return statement breaks the path with a cached specialization and new tensors. It reopens the launch implementation before restructuring the branches to execute exactly one launch.",
       "events": [
         "main:E321",
         "main:E322",
@@ -3205,7 +3205,7 @@
     {
       "id": "a331",
       "title": "Recheck accumulation path and 10 sample sets after refactor",
-      "summary": "Recheck accumulation path and 10 sample sets after refactor. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "After restructuring the launch branches, direct and ordinary add_inputs paths pass on both first and repeated calls. All ten displayed local cases pass. This repairs the observed correctness regression; performance still needs separate measurement.",
       "events": [
         "main:E331",
         "main:E332"
@@ -3296,7 +3296,7 @@
     {
       "id": "a341",
       "title": "Measure cache benefit for repeated objects",
-      "summary": "Measure cache benefit for repeated objects. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The full call measures 21.61 µs, and the script reports a specialization-cache hit but an alias-cache miss at its check. Building the alias key takes 2.33 µs. These figures do not establish a full-call benefit from identity caching.",
       "events": [
         "main:E341",
         "main:E342"
@@ -3326,7 +3326,7 @@
     {
       "id": "a345",
       "title": "Confirm hit count in scratch copy",
-      "summary": "Confirm hit count in scratch copy. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.",
+      "summary": "Instrumentation of a scratch copy records 199 alias hits in 200 calls. This establishes that the repeated-call test reaches the cache. A hit count alone does not show a latency improvement.",
       "events": [
         "main:E343",
         "main:E344",
@@ -3358,7 +3358,7 @@
     {
       "id": "a349",
       "title": "Standalone CUDA Graph replay experiment: about 5 µs",
-      "summary": "Standalone CUDA Graph replay experiment: about 5 µs. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.",
+      "summary": "A standalone test measures CUDA Graph replay at 5.00 µs versus 21.01 µs for the direct call, with the same result. Graph construction and its eventual cache lookup are not included in the replay-only number.",
       "events": [
         "main:E347",
         "main:E348",
@@ -3394,7 +3394,7 @@
     {
       "id": "a353",
       "title": "Check launch path needed for Graph integration",
-      "summary": "Check launch path needed for Graph integration. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.",
+      "summary": "After the replay-only comparison, the agent proposes an identity-keyed graph cache with a two-sighting capture policy and fallback. It reads the launch path needed for integration. The proposed full-operator gain has not yet been measured.",
       "events": [
         "main:E351",
         "main:E352",
@@ -3502,7 +3502,7 @@
     {
       "id": "a372",
       "title": "Graph integration passed local correctness, but end-to-end gain is poor",
-      "summary": "Graph integration passed local correctness, but end-to-end gain is poor. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.",
+      "summary": "The integrated graph version passes the displayed numerical checks, but the three-slice case is much slower than the small single-slice cases. The agent subsequently identifies fresh view objects as a cause of graph-key churn and repeated capture.",
       "events": [
         "main:E372",
         "main:E373"
@@ -3532,7 +3532,7 @@
     {
       "id": "a376",
       "title": "Try passing slice offsets directly to reduce tensor views",
-      "summary": "Try passing slice offsets directly to reduce tensor views. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.",
+      "summary": "The agent states that multi-slice calls create fresh views and trigger repeated graph capture. It changes the kernels to accept slice offsets and adds a capture limit. This edit addresses that observed integration problem; later timing determines whether graphs remain useful.",
       "events": [
         "main:E374",
         "main:E375",
@@ -3698,7 +3698,7 @@
     {
       "id": "a406",
       "title": "Read a copy of submission 2 to compare launch implementations",
-      "summary": "Read a copy of submission 2 to compare launch implementations. Graph replay alone is fast, but end-to-end gains after integration are insufficient. Includes companion changes to reduce slice views; the Graph path was eventually removed.",
+      "summary": "The agent estimates that integrated graphs save only about 2 µs because key overhead consumes most of the replay gain. It decides the benefit is not worth the risk and reads the saved submission 2 implementation before rebuilding.",
       "events": [
         "main:E404",
         "main:E405",
@@ -3730,7 +3730,7 @@
     {
       "id": "a410",
       "title": "Removed the CUDA Graph path, kept identity caching",
-      "summary": "Removed the CUDA Graph path, kept identity caching. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The agent removes graph capture/replay and installs a simpler same-object launch fast path. Slice-offset work remains. This selects a different candidate implementation; a controlled A/B test follows.",
       "events": [
         "main:E408",
         "main:E409",
@@ -3844,7 +3844,7 @@
     {
       "id": "a425",
       "title": "A/B shows the current candidate is faster when objects are reused",
-      "summary": "A/B shows the current candidate is faster when objects are reused. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The local A/B test reuses tensors and compares the current candidate with the saved submission 2 code. The candidate is faster on the shown shapes; the agent describes about 3 to 5 µs per operation. This result applies to reused objects and does not establish behavior with fresh objects.",
       "events": [
         "main:E424",
         "main:E425",
@@ -3860,9 +3860,9 @@
       "classification_basis": "analyst",
       "t_min": 31.64,
       "ladder": {
-        "topic": "per shape",
-        "takeaway": "A/B shows the current candidate is 3 to 5 µs faster per shape",
-        "reason": "But the A/B repeatedly reuses the same batch of objects, never tested with fresh ones",
+        "topic": "Reused tensors",
+        "takeaway": "Reused tensors favor the candidate in local A/B timing",
+        "reason": "Fresh and rotating objects are not covered by this comparison.",
         "abstract": [
           {
             "event": "main:E426",
@@ -3875,7 +3875,7 @@
     {
       "id": "a429",
       "title": "Scanned submission code for banned words and checked syntax",
-      "summary": "Scanned submission code for banned words and checked syntax. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.",
+      "summary": "The agent cites the favorable reused-object A/B test, scans the editable files for banned tokens and checks syntax before submission. These checks prepare submission 3; they do not supply its development score.",
       "events": [
         "main:E427",
         "main:E428",
@@ -3907,7 +3907,7 @@
     {
       "id": "a431",
       "title": "Submission 3: correctness passed, but dev score dropped back to 30.834x",
-      "summary": "Submission 3: correctness passed, but dev score dropped back to 30.834x. Ran submit and kept the scoring receipt; correctness and dev performance recorded separately.",
+      "summary": "Submission 3 passes correctness but scores 30.83×, below submission 2's 33.37×. The evaluator still lists submission 2 as best. The discrepancy with the reused-object A/B test is retained instead of replacing one result with the other.",
       "events": [
         "main:E431",
         "main:E432"
@@ -3969,7 +3969,7 @@
     {
       "id": "a438",
       "title": "Found that identity caching gains depend on object reuse",
-      "summary": "Found that identity caching gains depend on object reuse. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.",
+      "summary": "With stable objects, the identity candidate takes 17.01 µs versus 21.89 µs for submission 2. With fresh objects, total time is 65.46 versus 61.08 µs; those totals include allocation. The result shows sensitivity to object reuse, but does not reveal how the evaluator constructs inputs.",
       "events": [
         "main:E438",
         "main:E439"
@@ -3984,9 +3984,9 @@
       "classification_basis": "analyst",
       "t_min": 34.38,
       "ladder": {
-        "topic": "Fresh objects",
-        "takeaway": "Fresh objects reverse the cache benefit: 65.46 µs versus submission 2 at 61.08 µs",
-        "reason": "With stable objects the cache wins at 17.01 versus 21.89 µs; fresh-object results include allocation cost and do not reveal hidden workloads.",
+        "topic": "Object reuse",
+        "takeaway": "Object reuse changes the identity candidate from faster to slower",
+        "reason": "Stable: 17.01 versus 21.89 µs. Fresh totals: 65.46 versus 61.08 µs, including allocation.",
         "abstract": [
           {
             "event": "main:E439",
@@ -4057,7 +4057,7 @@
     {
       "id": "a451",
       "title": "Still slower than submission 2 with rotating objects; identity approach abandoned",
-      "summary": "Still slower than submission 2 with rotating objects; identity approach abandoned. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.",
+      "summary": "After the adaptive miss change, the candidate takes 24.68 µs with rotating objects versus 22.41 µs for submission 2. Stable-object timing is also slower in this comparison. The agent next rebuilds from the saved submission 2 design.",
       "events": [
         "main:E451",
         "main:E452"
@@ -4121,7 +4121,7 @@
     {
       "id": "a458",
       "title": "Reverted to submission 2's kernel_utils, then modified the specialization key",
-      "summary": "Reverted to submission 2's kernel_utils, then modified the specialization key. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset.",
+      "summary": "The agent explicitly rejects the identity-cache direction and restores submission 2's kernel_utils.py. It begins a new specialization key with separate tensor and scalar argument tuples. This creates a new candidate from the earlier code, not an identical restoration of the whole final tree.",
       "events": [
         "main:E456",
         "main:E457",
@@ -4413,7 +4413,7 @@
     {
       "id": "a501",
       "title": "Collected results: correctness passed, old micro script failure logged separately",
-      "summary": "Collected results: correctness passed, old micro script failure logged separately. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset. A failing command as a whole should not be equated with the candidate failing correctness; the old micro7 script is incompatible with the new signature, and earlier correctness and rotating comparisons already produced output.",
+      "summary": "The result contains ten passing numerical cases and passing first/repeated add_inputs checks. Rotating-object timing is 19.74 versus 22.04 µs for submission 2; stable-object timing is 19.30 versus 21.58 µs. A separate old microbenchmark fails, so the enclosing operation reports failure despite these usable results.",
       "events": [
         "main:E500",
         "main:E501",
@@ -4448,7 +4448,7 @@
     {
       "id": "a505",
       "title": "Submission 4: correctness passed, dev score rose to 35.445x",
-      "summary": "Submission 4: correctness passed, dev score rose to 35.445x. Ran submit and kept the scoring receipt; correctness and dev performance recorded separately.",
+      "summary": "Submission 4 returns correctness PASS and dev_speedup 35.44×. It becomes the best of four submissions. The local object-pattern comparisons and this development score are separate evidence.",
       "events": [
         "main:E503",
         "main:E504",
@@ -4544,7 +4544,7 @@
     {
       "id": "a515",
       "title": "Fixed the reference script and retested; all 19 cases passed",
-      "summary": "Fixed the reference script and retested; all 19 cases passed. 19 scratch tests; the first error was in the reference script's output shape, fixed afterward and passed.",
+      "summary": "The agent fixes the reference script's output-shape handling and reruns the boundary suite. All nineteen listed cases pass, including offsets, add_inputs, noncontiguous views and alternate dtypes. The repaired script expands local correctness coverage.",
       "events": [
         "main:E514",
         "main:E515",
@@ -4609,7 +4609,7 @@
     {
       "id": "a522",
       "title": "Each extra argument adds about 0.029 microseconds; limited room for gains",
-      "summary": "Each extra argument adds about 0.029 microseconds; limited room for gains. Measured the argument-passing cost of the direct launcher to judge whether this direction has limited gains.",
+      "summary": "Direct launch takes 6.04 µs with six arguments and 6.47 µs with twenty-one: about 0.029 µs per extra argument. This limits the expected benefit of further argument trimming on this setup. The explicit decision to stop trimming appears in the following action.",
       "events": [
         "main:E522",
         "main:E523"
@@ -4689,7 +4689,7 @@
     {
       "id": "a531",
       "title": "Correctness passed, but local timing was slightly slower than submission 4",
-      "summary": "Correctness passed, but local timing was slightly slower than submission 4. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.",
+      "summary": "The alignment variant passes the displayed correctness checks. Rotating-object timing is 20.60 µs versus 20.32 µs for the saved submission 4 copy; stable-object timing is 20.59 versus 20.20 µs. The small local regression is not a new submitted score.",
       "events": [
         "main:E531",
         "main:E532"
@@ -4723,7 +4723,7 @@
     {
       "id": "a535",
       "title": "Restored all of submission 4's files and re-validated",
-      "summary": "Restored all of submission 4's files and re-validated. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.",
+      "summary": "The agent says the alignment change measured slower and copies back the saved submission 4 files. The receipt shows matching hashes and passing test output, but the overall command is still running at that receipt. Final file equality is checked again later.",
       "events": [
         "main:E533",
         "main:E534",
@@ -4743,8 +4743,8 @@
       "t_min": 43.71,
       "ladder": {
         "topic": "Restore submission 4",
-        "takeaway": "Restore submission 4: restored all of submission 4's files and re-verified; hashes match",
-        "reason": "Abandoned this variant based on local timing alone, no score was submitted for it",
+        "takeaway": "Restore submission 4 after the alignment variant measures slower",
+        "reason": "The receipt contains passing output while still running. A later hash check confirms the final files.",
         "abstract": [
           {
             "event": "main:E534",
@@ -4757,7 +4757,7 @@
     {
       "id": "a539",
       "title": "The first finalize request was rejected by the tool schema and not executed",
-      "summary": "The first finalize request was rejected by the tool schema and not executed. Retried after the first request was rejected by the schema; finalize explicitly selected submission 4. This check/call did not complete its intended goal; the specific error is kept in the tool output.",
+      "summary": "The finalize request includes an unsupported yieldMs argument. Tool validation rejects the request before the shell command runs. No final selection occurs in this action.",
       "events": [
         "main:E537",
         "main:E538",
@@ -4788,7 +4788,7 @@
     {
       "id": "a541",
       "title": "After fixing the arguments, finalize succeeded, ultimately selecting submission 4",
-      "summary": "After fixing the arguments, finalize succeeded, ultimately selecting submission 4. Retried after the first request was rejected by the schema; finalize explicitly selected submission 4.",
+      "summary": "The corrected finalize request succeeds. Its receipt selects submission 4 at k=4/16 and prepares that tree for grading. It does not run a new development performance measurement.",
       "events": [
         "main:E541",
         "main:E542"
@@ -4837,7 +4837,7 @@
     {
       "id": "a547",
       "title": "Compared final file hashes, confirmed they match the submission 4 copy",
-      "summary": "Compared final file hashes, confirmed they match the submission 4 copy. Verified file hashes match the submission 4 copy, and preserved the agent's original summary.",
+      "summary": "All three final file hashes match the saved submission 4 copy. HEAD is still the original baseline commit, with three modified files. The retained artifact is identified by its file contents rather than by a newly created commit.",
       "events": [
         "main:E546",
         "main:E547",
@@ -4867,7 +4867,7 @@
     {
       "id": "final-report",
       "title": "Main agent's final report: results, failed attempts, and reasons for stopping",
-      "summary": "This is the main agent's end-of-session summary. Its performance explanations and local figures are preserved verbatim; independent scoring is recorded separately by the system.",
+      "summary": "The agent reports that it finalized submission 4 and summarizes grouped kernels, direct launch, raw stream lookup and rejected cache variants. Its narrative omits submission 3 from one displayed score sequence and speculates about evaluator object reuse. The export retains the full four-submission receipts and separate independent evaluation, so those claims can be checked against their evidence.",
       "events": [
         "main:E549"
       ],
@@ -4881,9 +4881,9 @@
       "classification_basis": "analyst",
       "t_min": 44.63,
       "ladder": {
-        "topic": "remaining headroom",
-        "takeaway": "Final report: remaining headroom is in host-side Python, below scoring noise",
-        "reason": "Both the identity caching and alignment variants were rejected based on local timing alone, without testing more input patterns",
+        "topic": "Final report",
+        "takeaway": "Final report explains retained changes and remaining limits in the agent's words",
+        "reason": "Check the complete receipts: one reported score sequence omits submission 3, and evaluator object reuse remains inferred.",
         "abstract": [
           {
             "event": "main:E549",
@@ -17500,7 +17500,7 @@
     }
   },
   "journey": {
-    "text": "Pi Agent uses deepseek-flash with high thinking to accelerate vLLM’s batched multi-LoRA shrink/expand while preserving 2% numerical tolerance. Configuration: A100 40GB, PyTorch 2.7.1, Triton 3.3.1, three editable files, a 90-minute budget and at most 16 submissions; no separate reviewer recorded. In 44.63 minutes it makes four submissions: grouped Triton kernels, direct launch, then an identity-cache regression. It returns to submission 2 and simplifies specialization keys. Submission 4 reaches 35.44× development speedup; separate evaluation reports 34.59× against the official baseline and 2.11× against a frozen Oracle. Local timing and those scores have different comparison baselines.",
+    "text": "Pi Agent uses deepseek-flash with high thinking to accelerate batched multi-LoRA shrink/expand in three vLLM files. It must preserve 2% numerical tolerance. Configuration: A100 40GB, PyTorch 2.7.1, Triton 3.3.1, a 90-minute budget and at most 16 submissions. Grouped kernels and direct launch improve development scores. Identity caching then regresses despite faster local tests with reused tensors. The agent rebuilds from submission 2 with a simpler specialization key and selects submission 4 after 44.63 minutes. Correctness passes. Development speedup is 35.44×; independent scores are 34.59× against the official baseline and 2.11× against a frozen Oracle. No separate reviewer is recorded.",
     "cites": [
       "s0",
       "s0-setup",
@@ -17517,81 +17517,20 @@
   "language": "en",
   "i18n": {
     "zh": {
-      "Starting point is the Python loop baseline, 3 to 17 ms per call": "起点是 Python 循环基线，每次调用 3 到 17 ms",
-      "Wrote the grouped Triton kernel here, and discovered that host launch (~45 µs) is the actual lower bound": "在此写出分组 Triton kernel，并发现 host 端启动（约 45 µs）才是真正的下限",
-      "Python loop baseline": "Python 循环基线",
-      "Grouped Triton kernel: submission 1 passes correctness at 18.67× development speedup": "分组 Triton kernel：第 1 次提交通过正确性，开发集加速比 18.67×",
-      "Bottleneck shifted to host launch, so tried tile scanning, direct launch, and raw stream": "瓶颈转到 host 端启动，于是尝试了 tile 扫描、直接启动和 raw stream",
       "Grouped Triton kernel": "分组 Triton kernel",
-      "Direct launch with raw stream: submission 2 reaches 33.37× development speedup": "直接启动配合 raw stream：第 2 次提交的开发集加速比达到 33.37×",
-      "Also tried CUDA Graph and identity caching: Graph was excluded, identity benefit unconfirmed": "还试了 CUDA Graph 和 identity 缓存：Graph 被排除，identity 的收益未得到确认",
       "Direct launch": "直接启动",
-      "Identity caching: submission 3 remains correct but regresses to 30.83×": "identity 缓存：第 3 次提交仍正确，但回落到 30.83×",
-      "Compared fresh vs. rotating objects, then abandoned and reverted to submission 2's code": "对比新建对象与轮换对象后放弃，退回第 2 次提交的代码",
       "Identity caching": "identity 缓存",
-      "Streamlined specialization key: rebuild from submission 2 reaches 35.44×": "精简特化键：基于第 2 次提交重做，达到 35.44×",
-      "Boundary tests passed; parameter-count cost and alignment variants showed no benefit, so work stopped": "边界测试通过；参数个数开销和对齐变体都没有收益，于是停止",
-      "Streamlined specialization key": "精简特化键",
-      "Selected submission 4 retains 35.44× development speedup; independent evaluation confirms correctness": "选定第 4 次提交，开发集加速比保持 35.44×，独立评测确认正确性",
-      "The final report attributes remaining headroom to host-side Python; two variants were rejected based solely on local timing": "最终报告把剩余提升空间归因于 host 端 Python；两个变体仅凭本地计时就被否决",
       "Selected submission 4": "选定第 4 次",
-      "Only three editable files, and the GPU is an A100": "只有三个可改文件，GPU 是 A100",
-      "Saved a baseline copy and hash first, for later comparison": "先保存基线副本和哈希，供之后对比",
-      "three editable files": "三个可改文件",
-      "Own reference and 10 sample sets; baseline runs 3 to 17 ms per call": "自写参考实现和 10 组样例；基线每次调用 3 到 17 ms",
-      "The original path loops per adapter; this is the number to beat": "原始路径按 adapter 逐个循环；这就是要超越的数字",
-      "Own reference": "自写参考",
-      "The grouped Triton kernel worked on the first try, passing all 10 sample sets": "分组 Triton kernel 一次跑通，10 组样例全部通过",
-      "Local error about 3e-4, comparable to the baseline": "本地误差约 3e-4，与基线相当",
-      "grouped Triton kernel": "分组 Triton kernel",
-      "Host launch creates a roughly 45 µs floor despite much faster device work": "尽管 device 端计算快得多，host 端启动仍形成约 45 µs 的下限",
-      "Diagnostic instrumentation had inflated timing; turning it off revealed the true picture": "诊断插桩曾抬高计时，关掉后才看清真实情况",
       "Host launch": "host 端启动",
-      "Submission 1 passed correctness, dev_speedup 18.67×": "第 1 次提交通过正确性，dev_speedup 18.67×",
-      "This is the first scored candidate, 15 remaining": "这是第一个获得评分的候选，还剩 15 次",
       "Submission 1": "第 1 次提交",
-      "Large-scale tile scan was too slow and stopped; switched to a smaller foreground tile scan": "大规模 tile 扫描太慢被停掉，改为较小的前台 tile 扫描",
-      "Background task exited with the shell, leaving only partial results": "后台任务随 shell 退出，只留下部分结果",
-      "tile scan": "tile 扫描",
-      "Direct launch: direct CompiledKernel launch is faster than normal launch, output matches bit-for-bit": "直接启动 CompiledKernel 比常规启动更快，输出逐位一致",
-      "44 to 17 µs, but first hit a parameter-count error": "从 44 µs 降到 17 µs，但先遇到了参数个数错误",
-      "Stream acquisition was the most expensive part of host cost; switched to raw stream": "获取 stream 是 host 开销中最贵的一环，于是改用 raw stream",
-      "About 21.65 µs per call, a large reduction from 63.8 µs": "每次调用约 21.65 µs，比 63.8 µs 大幅下降",
       "raw stream": "raw stream",
-      "Submission 2 passed correctness, dev_speedup 33.37×": "第 2 次提交通过正确性，dev_speedup 33.37×",
-      "A clear improvement over submission 1's 18.67×": "明显优于第 1 次提交的 18.67×",
       "Submission 2": "第 2 次提交",
-      "Identity caching fixed the double-counting, but was not faster after cache hits": "identity 缓存修好了重复计数，但缓存命中后并没有更快",
-      "Local time stayed at 21 µs; benefit only appears when objects are reused": "本地时间仍是 21 µs；只有对象被复用时才有收益",
-      "CUDA Graph saves only about 2 µs after integration, so it is removed": "CUDA Graph 接入后只省约 2 µs，因此移除",
-      "Key overhead ate into the replay benefit; not worth the risk": "key 的开销吃掉了 replay 的收益；不值得冒这个风险",
       "CUDA Graph": "CUDA Graph",
-      "Submission 3 passed correctness, score regressed to 30.83×": "第 3 次提交通过正确性，分数回落到 30.83×",
-      "Lower than submission 2's 33.37×, which remains the best": "低于第 2 次提交的 33.37×，后者仍是最佳",
       "Submission 3": "第 3 次提交",
-      "Identity caching wins with reused objects but loses with fresh and rotating objects": "identity 缓存在复用对象时占优，对新建和轮换对象则落后",
-      "These local comparisons suggest cache misses may explain the lower development score; the hidden evaluator input pattern remains unknown.": "这些本地对比提示，缓存未命中可能是开发集分数偏低的原因；隐藏评测器的输入模式仍不清楚。",
-      "Submission 2 code: reverted to submission 2's code, redoing it with a cheaper specialization key": "回到第 2 次提交的代码，改用开销更低的特化键重做",
-      "Fixed two bugs in signature and float dispatch, while keeping the slice offset": "修复了签名和 float 分派中的两个 bug，同时保留 slice 偏移",
       "Submission 2 code": "回到第 2 次",
-      "Submission 4 passed correctness, dev_speedup 35.44": "第 4 次提交通过正确性，dev_speedup 35.44",
-      "Higher than submission 2's 33.37, the new best": "高于第 2 次提交的 33.37，成为新的最佳",
       "Submission 4": "第 4 次提交",
-      "All 19 boundary tests passed": "19 项边界测试全部通过",
-      "First failure was only due to a wrong output shape in the reference script": "第一次失败只是因为参考脚本的输出 shape 写错了",
       "19 boundary tests": "19 项边界测试",
-      "Number of parameters: parameter count has almost no effect on direct launcher cost": "参数个数对直接启动器的开销几乎没有影响",
-      "About 0.029 µs per parameter; further reducing parameters is not meaningful": "每个参数约 0.029 µs；继续减少参数意义不大",
-      "Number of parameters": "参数个数",
-      "Removing alignment specialization was slightly slower; restored submission 4 files": "去掉对齐特化后略慢，于是恢复第 4 次提交的文件",
-      "Correctness still passed, but local timing showed no benefit, so not submitted": "正确性仍然通过，但本地计时没有收益，因此没有提交",
-      "alignment specialization": "对齐特化",
-      "Finalize selected submission 4 as the final result": "定稿时选择第 4 次提交作为最终结果",
-      "First request was rejected by schema; retried successfully after fixing the parameters": "第一次请求被 schema 拒绝；修正参数后重试成功",
       "Finalize": "定稿",
-      "Final file hashes match the submission 4 copy": "最终文件哈希与第 4 次提交的副本一致",
-      "The agent's summary attributed remaining headroom to Python overhead": "agent 的总结把剩余提升空间归因于 Python 开销",
-      "file hashes": "文件哈希",
       "Baseline inspection comes first, before choosing an optimization direction": "先做基线检查，再选择优化方向",
       "What was read determines what gets written later": "读到了什么，决定了之后写什么",
       "Baseline inspection": "基线检查",
@@ -17723,56 +17662,32 @@
       "The six behavior categories and English annotations are analyst-labeled; full reasoning, utterances, tool inputs, outputs, and diagnostic attachments remain at the original text layer. Multiple results from the same call are grouped under that call; asynchronous execution and later result retrieval are kept separate.": "六个行为类别和英文标注由分析者标注；完整的推理、发言、工具输入、输出和诊断附件保留在原始文本层。同一次调用的多个结果归在该调用之下；异步执行与之后的结果取回分开保留。",
       "A command returning success does not automatically mean verification passed; Tracebacks, BAD results, schema rejections, interrupted background scans, and post-failure fixes are each annotated separately. The Token field is the cumulative session input count, not a single node's consumption.": "命令返回成功并不自动意味着验证通过；Traceback、BAD 结果、schema 拒绝、被中断的后台扫描以及失败后的修复都分别标注。Token 字段是会话累计的输入数，而不是单个节点的消耗。",
       "This public example preserves the previously exported session and scoring attachments. Historical tool names and paths remain verbatim in the raw record; the displayed agent name is Pi Agent.": "这个公开示例保留了之前导出的会话和评分附件。历史工具名称和路径在原始记录中原样保留；显示的 agent 名称为 Pi Agent。",
-      "Pi Agent uses deepseek-flash with high thinking to accelerate vLLM’s batched multi-LoRA shrink/expand while preserving 2% numerical tolerance. Configuration: A100 40GB, PyTorch 2.7.1, Triton 3.3.1, three editable files, a 90-minute budget and at most 16 submissions; no separate reviewer recorded. In 44.63 minutes it makes four submissions: grouped Triton kernels, direct launch, then an identity-cache regression. It returns to submission 2 and simplifies specialization keys. Submission 4 reaches 35.44× development speedup; separate evaluation reports 34.59× against the official baseline and 2.11× against a frozen Oracle. Local timing and those scores have different comparison baselines.": "Pi Agent 使用 deepseek-flash（思考等级 high）加速 vLLM 的批量多 LoRA shrink/expand，同时保持 2% 的数值容差。配置：A100 40GB、PyTorch 2.7.1、Triton 3.3.1，三个可编辑文件，90 分钟预算，最多 16 次提交；没有记录单独的评审。它在 44.63 分钟内完成四次提交：分组 Triton kernel、直接启动，然后是一次 identity 缓存导致的回退。随后它回到第 2 次提交，简化了特化键。第 4 次提交的开发集加速比达到 35.44×；独立评测报告相对官方基线为 34.59×，相对冻结的 Oracle 为 2.11×。本地计时与这些分数的对比基线不同。",
-      "Pi Agent must accelerate batched multi-LoRA shrink/expand with fp16 inputs, fp32 accumulation and a 2% relative tolerance. Only kernel_utils.py, lora_shrink_op.py and lora_expand_op.py are editable. The run allows 90 minutes and at most 16 submissions. It first saves the Python baseline, writes its own reference and 10 local cases, then implements grouped Triton kernels.": "Pi Agent 需要在 fp16 输入、fp32 累加和 2% 相对容差的条件下加速批量多 LoRA shrink/expand。只有 kernel_utils.py、lora_shrink_op.py 和 lora_expand_op.py 可以编辑。本次运行允许 90 分钟、最多 16 次提交。它先保存 Python 基线，编写自己的参考实现和 10 个本地用例，然后实现分组 Triton kernel。",
       "V1 · Grouped kernel": "V1 · 分组 kernel",
-      "Replaced shrink/expand with a grouped Triton kernel; first submission passed correctness with dev_speedup 18.671×. Then shifted focus to tile configuration and Python launch cost; local timing was temporarily skewed by automatic diagnostic instrumentation.": "用分组 Triton kernel 替换 shrink/expand；第 1 次提交通过正确性，dev_speedup 18.671×。随后重点转向 tile 配置和 Python 启动开销；本地计时一度被自动诊断插桩扭曲。",
       "Continued modifying along the current candidate and submitted; the subsequent candidate in the same timeline.": "沿当前候选继续修改并提交；即同一时间线上的后续候选。",
       "dev_speedup in the same round's submission receipt; color only indicates measured value change, not statistical significance.": "同一轮提交回执中的 dev_speedup；颜色只表示测量值的变化，不代表统计显著性。",
       "V2 · Direct launch": "V2 · 直接启动",
-      "Directly launched CompiledKernel using the real launcher signature and used raw stream, combined with tile configuration. dev_speedup 33.369×, about 78.7% higher than submission 1. Saved this version as a source for later rollback and comparison.": "用真实的 launcher 签名直接启动 CompiledKernel，并使用 raw stream，再结合 tile 配置。dev_speedup 33.369×，比第 1 次提交高约 78.7%。这个版本被保存下来，作为之后回退和对比的来源。",
       "V3 · Identity cache": "V3 · identity 缓存",
-      "Tried identity launch caching, CUDA Graph, and reducing slice views. Graph integration benefit was insufficient and was removed; identity was faster in local tests reusing objects, but the submission score was only 30.834×, about 7.6% lower than submission 2. Correctness still passed.": "尝试了 identity 启动缓存、CUDA Graph 以及减少 slice view。Graph 接入后收益不足，已移除；identity 在复用对象的本地测试中更快，但提交分数只有 30.834×，比第 2 次提交低约 7.6%。正确性仍然通过。",
       "V4 · New specialization key": "V4 · 新特化键",
-      "The fresh/rotating object experiments exposed limitations of identity caching; restored submission 2's kernel_utils then rewrote the specialization key, integrating the slice offset. After fixing signature and float dispatch errors, dev_speedup reached 35.445×, about 15.0% higher than submission 3 and 6.2% higher than submission 2.": "新建对象与轮换对象的实验暴露了 identity 缓存的局限；恢复第 2 次提交的 kernel_utils 后重写特化键，并整合 slice 偏移。修复签名和 float 分派错误后，dev_speedup 达到 35.445×，比第 3 次提交高约 15.0%，比第 2 次提交高 6.2%。",
       "The command restored v2_33.37/kernel_utils.py and immediately continued editing; the final hashes of both wrappers match v2. This is a new version built on v2, not an unmodified restoration.": "该命令恢复了 v2_33.37/kernel_utils.py 并立即继续编辑；两个 wrapper 的最终哈希都与 v2 一致。这是在 v2 基础上构建的新版本，而不是原样恢复。",
       "Final · Select V4": "最终 · 选定 V4",
-      "19 boundary tests passed. The follow-up approach removing alignment specialization was slightly slower; after restoring all submission 4 files, finalized. Hash check matched. Independent scores: Oracle ABBA 2.114×, official baseline 34.588×, correctness passed.": "19 项边界测试通过。随后去掉对齐特化的方案略慢；恢复第 4 次提交的全部文件后定稿。哈希校验一致。独立评分：Oracle ABBA 2.114×，官方基线 34.588×，正确性通过。",
       "Discarded the unsubmitted alignment specialization experiment, restored v4 files, and finalized the selection of submission 4; no 5th submission was produced.": "放弃了未提交的对齐特化实验，恢复 v4 文件，最终选定第 4 次提交；没有产生第 5 次提交。",
       "The final selection references submission 4's dev_speedup; independent scores are listed separately in the measurement record.": "最终选定引用的是第 4 次提交的 dev_speedup；独立评分在测量记录中单独列出。",
       "Environment and original code": "环境与原始代码",
-      "Pi Agent uses deepseek-flash with high thinking to optimize batched multi-LoRA shrink/expand. The run has a 90-minute, 16-submission ceiling and edits only three vLLM files. Recorded environment: A100-SXM4-40GB, Python 3.10.12, PyTorch 2.7.1+cu126, Triton 3.3.1. It saves the original files for comparison before changing kernels.": "Pi Agent 使用 deepseek-flash（思考等级 high）优化批量多 LoRA shrink/expand。本次运行上限为 90 分钟、16 次提交，只编辑三个 vLLM 文件。记录的环境：A100-SXM4-40GB、Python 3.10.12、PyTorch 2.7.1+cu126、Triton 3.3.1。修改 kernel 之前，它先保存原始文件以供对比。",
       "Own reference and baseline": "自写参考实现与基线",
-      "Wrote scratch tests, fixed an import issue, and collected measurements of the original baseline.": "编写 scratch 测试，修复导入问题，收集原始基线的测量数据。",
-      "Replaced the Python adapter loop with grouped shrink/expand, validated on its own samples.": "用分组 shrink/expand 替换 Python adapter 循环，在自己的样例上验证。",
       "Distinguishing GPU vs. host cost": "区分 GPU 与 host 开销",
-      "Broke down call costs, investigating diagnostic instrumentation and Python/JIT launch cost.": "拆解调用开销，排查诊断插桩以及 Python/JIT 启动开销。",
       "Submission and official feedback": "提交与官方反馈",
-      "Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.": "执行 submit 并保留评分回执；正确性和 dev_speedup 分开记录。",
       "Tile parameter experiments on the same kernel": "同一 kernel 上的 tile 参数实验",
-      "A large-scale search was stopped due to time cost; the background task did not keep running, so it switched to a smaller foreground scan. Not multiple independent algorithms.": "大规模搜索因耗时过长被停止；后台任务没有持续运行，于是改为较小的前台扫描。这不是多个独立算法。",
       "Directly launching the compiled kernel": "直接启动已编译的 kernel",
-      "Fixed an arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Streamlining the host path": "精简 host 路径",
-      "Verified direct launch, then located key/stream cost, and switched to raw stream.": "验证直接启动后，定位 key/stream 开销，并改用 raw stream。",
       "Identity-based launch parameter caching": "基于 identity 的启动参数缓存",
-      "Tried caching keyed by object identity; fixed double-counting on cache miss. The local benefit with repeated objects does not guarantee benefit across other call patterns.": "尝试以对象 identity 为键的缓存；修复了缓存未命中时的重复计数。对象重复时的本地收益，不能保证在其他调用模式下同样成立。",
       "CUDA Graph and reducing views": "CUDA Graph 与减少 view",
-      "CUDA Graph replay alone was fast, but end-to-end benefit after integration was insufficient. Included accompanying changes to reduce slice views; the Graph path was ultimately removed.": "单独看 CUDA Graph replay 很快，但接入后的端到端收益不足。其中包含减少 slice view 的配套修改；Graph 路径最终被移除。",
       "Compared call patterns to explain the regression": "对比调用模式以解释回退",
-      "Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse, and was ultimately abandoned.": "对比了新建、稳定和轮换三种对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Redid the specialization key starting from v2": "从 v2 出发重做特化键",
-      "Restored v2's kernel_utils and modified it; fixed a missed replacement, signature and float parameter dispatch, while keeping the slice offset.": "恢复 v2 的 kernel_utils 并加以修改；修复了一处漏替换、签名和 float 参数分派，同时保留 slice 偏移。",
       "Boundary condition validation": "边界条件验证",
-      "19 scratch tests; the first error was due to the reference script's output shape, fixed afterward and passed.": "19 个 scratch 测试；第一次报错源于参考脚本的输出 shape，修复后通过。",
       "Further overhead localization": "进一步定位开销",
-      "Measured the parameter-passing cost of the direct launcher, concluding limited benefit from this direction.": "测量了直接启动器的参数传递开销，结论是这个方向收益有限。",
       "Alternative approach removing alignment specialization": "去掉对齐特化的替代方案",
-      "Tested on a copy of v4; slightly slower locally, not submitted, restored all v4 files.": "在 v4 的副本上测试；本地略慢，未提交，已恢复全部 v4 文件。",
       "Restoring the best version and finalizing the submission": "恢复最佳版本并完成定稿",
-      "The first request was rejected by schema; retried, and finalize explicitly selected submission 4.": "第一次请求被 schema 拒绝；重试后，finalize 明确选定了第 4 次提交。",
       "Final code verification and summary": "最终代码核验与总结",
-      "Checked that file hashes match the submission 4 copy, and kept the agent's original summary.": "核对文件哈希与第 4 次提交的副本一致，并保留了 agent 的原始总结。",
       "Read the baseline first, then decide on optimization direction": "先读基线，再决定优化方向",
       "The main agent's original opening plan: understand the current implementation first.": "主 agent 原始的开场计划：先理解当前实现。",
       "The original text explicitly states a read plan not yet executed.": "原文明确写出了一个尚未执行的阅读计划。",
@@ -17816,7 +17731,6 @@
       "Launch baseline measurement; wait asynchronously for result": "启动基线测量，异步等待结果",
       "Launch baseline measurement; wait asynchronously for result. Write scratch tests, fix import issues, collect original baseline measurements.": "启动基线测量，异步等待结果。编写 scratch 测试，修复导入问题，收集原始基线的测量数据。",
       "Implement per-LoRA-grouped Triton shrink / expand": "实现按 LoRA 分组的 Triton shrink / expand",
-      "Implement per-LoRA-grouped Triton shrink / expand. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.": "实现按 LoRA 分组的 Triton shrink / expand。用分组 shrink / expand 替换 Python adapter 循环，在自己的测试用例上验证。",
       "Clean up kernel_utils imports": "清理 kernel_utils 的导入",
       "Clean up kernel_utils imports. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.": "清理 kernel_utils 的导入。用分组 shrink / expand 替换 Python adapter 循环，在自己的测试用例上验证。",
       "Wire shrink entry point to new kernel": "把 shrink 入口接到新 kernel",
@@ -17824,17 +17738,12 @@
       "Wire expand entry point to new kernel": "把 expand 入口接到新 kernel",
       "Wire expand entry point to new kernel. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.": "把 expand 入口接到新 kernel。用分组 shrink / expand 替换 Python adapter 循环，在自己的测试用例上验证。",
       "Collect baseline measurement results; 10 test cases complete": "收集基线测量结果，10 个测试用例完成",
-      "Collect baseline measurement results; 10 test cases complete. Write scratch tests, fix import issues, collect original baseline measurements.": "收集基线测量结果，10 个测试用例完成。编写 scratch 测试，修复导入问题，收集原始基线的测量数据。",
       "Validate first candidate; diagnose instrumentation affecting local timing": "验证第一个候选，诊断插桩对本地计时的影响",
-      "Validate first candidate; diagnose instrumentation affecting local timing. Replace Python adapter loop with grouped shrink / expand, verify on own test cases.": "验证第一个候选，诊断插桩对本地计时的影响。用分组 shrink / expand 替换 Python adapter 循环，在自己的测试用例上验证。",
       "Write minimal call-overhead test": "编写最小调用开销测试",
-      "Write minimal call-overhead test. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "编写最小调用开销测试。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Disable automatic diagnostics and re-measure host call overhead": "关闭自动诊断，重新测量 host 调用开销",
-      "Disable automatic diagnostics and re-measure host call overhead. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "关闭自动诊断，重新测量 host 调用开销。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Write device / host overhead breakdown test": "编写 device / host 开销拆分测试",
       "Write device / host overhead breakdown test. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "编写 device / host 开销拆分测试。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Compare device execution time and host call time": "对比 device 执行时间与 host 调用时间",
-      "Compare device execution time and host call time. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "对比 device 执行时间与 host 调用时间。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Read Triton JIT launch implementation": "阅读 Triton JIT 的启动实现",
       "Read Triton JIT launch implementation. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "阅读 Triton JIT 的启动实现。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Try reading via absolute path; tool refuses": "尝试用绝对路径读取，被工具拒绝",
@@ -17846,17 +17755,13 @@
       "Write cost test for different launch methods": "编写不同启动方式的开销测试",
       "Write cost test for different launch methods. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost.": "编写不同启动方式的开销测试。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。",
       "Test launch overhead; fast-path grid call fails": "测试启动开销，快速路径的 grid 调用失败",
-      "Test launch overhead; fast-path grid call fails. Break down call cost, investigate diagnostic instrumentation and Python / JIT startup cost. This check/call did not complete its intended goal; the specific error is preserved in the tool output.": "测试启动开销，快速路径的 grid 调用失败。拆解调用开销，排查诊断插桩以及 Python / JIT 启动开销。这次检查/调用未达成预期目标；具体错误保留在工具输出中。",
       "Submission 1: grouped Triton kernel; wait for async scoring": "第 1 次提交：分组 Triton kernel，等待异步评分",
-      "Submission 1: grouped Triton kernel; wait for async scoring. Execute submit and retain the scoring receipt; correctness and dev performance are recorded separately. The scoring result is collected by a later infra_execution_status, and this node also references the completion receipt.": "第 1 次提交：分组 Triton kernel，等待异步评分。执行 submit 并保留评分回执；正确性和开发集性能分开记录。评分结果由之后的 infra_execution_status 取回，本节点同时引用完成回执。",
       "Submission 1 receipt: correctness passed, dev score 18.671×": "第 1 次提交回执：正确性通过，开发集分数 18.671×",
-      "Submission 1 receipt: correctness passed, dev score 18.671×. Execute submit and retain the scoring receipt; correctness and dev performance are recorded separately.": "第 1 次提交回执：正确性通过，开发集分数 18.671×。执行 submit 并保留评分回执；正确性和开发集性能分开记录。",
       "Write tile parameter sweep": "编写 tile 参数扫描",
       "Write tile parameter sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "编写 tile 参数扫描。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Launch large-scale tile search": "启动大规模 tile 搜索",
       "Launch large-scale tile search. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "启动大规模 tile 搜索。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Stop the overly time-consuming large-scale search": "停止耗时过长的大规模搜索",
-      "Stop the overly time-consuming large-scale search. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "停止耗时过长的大规模搜索。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Narrow parameter range, write targeted sweep": "缩小参数范围，编写定向扫描",
       "Narrow parameter range, write targeted sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "缩小参数范围，编写定向扫描。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Try running targeted sweep in background": "尝试在后台运行定向扫描",
@@ -17870,21 +17775,15 @@
       "Direct launch fails: mismatched number of arguments": "直接启动失败：参数个数不匹配",
       "Direct launch fails: mismatched number of arguments. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path. This check/call did not complete its intended goal; the specific error is preserved in the tool output.": "直接启动失败：参数个数不匹配。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。这次检查/调用未达成预期目标；具体错误保留在工具输出中。",
       "Write host-layer call overhead breakdown": "编写 host 各层调用开销拆分",
-      "Write host-layer call overhead breakdown. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "编写 host 各层调用开销拆分。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Identify cost of Python wrapper, key, and stream acquisition": "确定 Python wrapper、key 和 stream 获取的开销",
-      "Identify cost of Python wrapper, key, and stream acquisition. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "确定 Python wrapper、key 和 stream 获取的开销。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Write profile sampling script": "编写 profile 采样脚本",
       "Write profile sampling script. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "编写 profile 采样脚本。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Use profile to examine host path": "用 profile 检查 host 路径",
-      "Use profile to examine host path. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "用 profile 检查 host 路径。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Continue reading JIT argument handling and specialization logic": "继续阅读 JIT 参数处理与特化逻辑",
       "Continue reading JIT argument handling and specialization logic. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "继续阅读 JIT 参数处理与特化逻辑。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Check output already produced by targeted sweep": "检查定向扫描已产生的输出",
-      "Check output already produced by targeted sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "检查定向扫描已产生的输出。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Confirm the background sweep process has exited": "确认后台扫描进程已退出",
-      "Confirm the background sweep process has exited. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "确认后台扫描进程已退出。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Switch to a smaller-range foreground tile sweep": "改为范围更小的前台 tile 扫描",
-      "Switch to a smaller-range foreground tile sweep. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "改为范围更小的前台 tile 扫描。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Launch foreground sweep; wait asynchronously": "启动前台扫描，异步等待",
       "Launch foreground sweep; wait asynchronously. Large-scale search stopped due to excessive time, background task did not keep running, switched to a smaller foreground sweep. Not multiple independent algorithms.": "启动前台扫描，异步等待。大规模搜索因耗时过长被停止，后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Read the real signature of CUDA launcher": "阅读 CUDA launcher 的真实签名",
@@ -17892,7 +17791,6 @@
       "Fill in the full argument set needed for direct launch": "补齐直接启动所需的完整参数",
       "Fill in the full argument set needed for direct launch. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "补齐直接启动所需的完整参数。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Direct launch succeeds; output matches bit-for-bit, local call is faster": "直接启动成功：输出逐位一致，本地调用更快",
-      "Direct launch succeeds; output matches bit-for-bit, local call is faster. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "直接启动成功：输出逐位一致，本地调用更快。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Examine how tensor specialization arguments are formed": "查看 tensor 特化参数是如何生成的",
       "Examine how tensor specialization arguments are formed. Fix arity error using the real launcher signature, forming a direct CompiledKernel launch path.": "查看 tensor 特化参数是如何生成的。用真实的 launcher 签名修复参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Verify JIT argument packing": "核对 JIT 参数打包",
@@ -17902,15 +17800,12 @@
       "Tried reading scan log; log path does not exist": "尝试读取扫描日志，日志路径不存在",
       "Tried reading scan log; log path does not exist. Large-scale search was stopped due to time cost; background task was not kept running, switched to smaller foreground scan. Not multiple independent algorithms. This check/call did not complete its intended goal; specific error remains in tool output.": "尝试读取扫描日志，日志路径不存在。大规模搜索因耗时被停止；后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。这次检查/调用未达成预期目标；具体错误保留在工具输出中。",
       "Collect foreground tile scan results": "收集前台 tile 扫描结果",
-      "Collect foreground tile scan results. Large-scale search was stopped due to time cost; background task was not kept running, switched to smaller foreground scan. Not multiple independent algorithms.": "收集前台 tile 扫描结果。大规模搜索因耗时被停止；后台任务没有持续运行，改为较小的前台扫描。这不是多个独立算法。",
       "Add direct CompiledKernel launch and tile configuration": "加入 CompiledKernel 直接启动和 tile 配置",
-      "Add direct CompiledKernel launch and tile configuration. Fixed arity error based on real launcher signature, forming a direct CompiledKernel launch path.": "加入 CompiledKernel 直接启动和 tile 配置。根据真实的 launcher 签名修复了参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Adjust cache signature and guard conditions": "调整缓存签名和 guard 条件",
       "Adjust cache signature and guard conditions. Fixed arity error based on real launcher signature, forming a direct CompiledKernel launch path.": "调整缓存签名和 guard 条件。根据真实的 launcher 签名修复了参数个数错误，形成直接启动 CompiledKernel 的路径。",
       "Validate direct launch candidate; 10 sample sets passed": "验证直接启动候选，10 组样例通过",
       "Validate direct launch candidate; 10 sample sets passed. Validated direct launch, then located key/stream costs, switched to raw stream.": "验证直接启动候选，10 组样例通过。验证直接启动后，定位了 key/stream 开销，改用 raw stream。",
       "Re-measure host-side overhead at each layer": "重新测量各层 host 端开销",
-      "Re-measure host-side overhead at each layer. Validated direct launch, then located key/stream costs, switched to raw stream.": "重新测量各层 host 端开销。验证直接启动后，定位了 key/stream 开销，改用 raw stream。",
       "Write key, stream, and wrapper breakdown tests": "编写 key、stream 和 wrapper 拆分测试",
       "Write key, stream, and wrapper breakdown tests. Validated direct launch, then located key/stream costs, switched to raw stream.": "编写 key、stream 和 wrapper 拆分测试。验证直接启动后，定位了 key/stream 开销，改用 raw stream。",
       "Breakdown script failed: mistakenly treated a list as a tensor": "拆分脚本失败：误把 list 当作 tensor",
@@ -17918,7 +17813,6 @@
       "Fix argument list in breakdown script": "修复拆分脚本中的参数列表",
       "Fix argument list in breakdown script. Validated direct launch, then located key/stream costs, switched to raw stream.": "修复拆分脚本中的参数列表。验证直接启动后，定位了 key/stream 开销，改用 raw stream。",
       "Breakdown script failed: fake stride caused misaligned address": "拆分脚本失败：伪造的 stride 导致地址未对齐",
-      "Breakdown script failed: fake stride caused misaligned address. Validated direct launch, then located key/stream costs, switched to raw stream. This check/call did not complete its intended goal; specific error remains in tool output.": "拆分脚本失败：伪造的 stride 导致地址未对齐。验证直接启动后，定位了 key/stream 开销，改用 raw stream。这次检查/调用未达成预期目标；具体错误保留在工具输出中。",
       "Foreground sweep: foreground scan gives best tile per shape, e.g. expand uses (64, 128, 4, 1)": "前台扫描：为每个 shape 找出最佳 tile，如 expand 用 (64, 128, 4, 1)",
       "BLOCK_K 128 is best for most shapes": "多数 shape 以 BLOCK_K 128 最佳",
       "Foreground sweep": "前台扫描",
@@ -18031,9 +17925,6 @@
       "Worried about regression on S=3 shapes, wrote an A/B comparison against submission 2": "担心 S=3 的 shape 性能回退，写了与第 2 次提交的 A/B 对比",
       "Goal is to rule out a real regression": "目的是排除真实的性能回退",
       "A/B comparison": "A/B 对比",
-      "A/B shows the current candidate is 3 to 5 µs faster per shape": "A/B 显示当前候选每个 shape 快 3 到 5 µs",
-      "But the A/B repeatedly reuses the same batch of objects, never tested with fresh ones": "但 A/B 一直复用同一批对象，从未用新对象测过",
-      "per shape": "每个 shape",
       "Submit version 3 after syntax checks, relying on faster reused-object tests": "语法检查后提交第 3 版，依据是复用对象测试更快",
       "Relied only on the reused-objects A/B results as evidence": "证据只有复用对象的 A/B 结果",
       "Submit version 3": "提交第 3 版",
@@ -18042,9 +17933,6 @@
       "fresh objects: submission 3 was faster locally yet scored worse, so wrote a fresh-objects comparison script": "新对象：第 3 次提交本地更快却得分更低，于是写新对象对比脚本",
       "Suspected the evaluator passes new tensors each time": "怀疑评测器每次都传入新的 tensor",
       "fresh objects": "新对象",
-      "Fresh objects reverse the cache benefit: 65.46 µs versus submission 2 at 61.08 µs": "新对象让缓存收益反转：65.46 µs，第 2 次提交为 61.08 µs",
-      "With stable objects the cache wins at 17.01 versus 21.89 µs; fresh-object results include allocation cost and do not reveal hidden workloads.": "对象稳定时缓存胜出，17.01 对 21.89 µs；新对象结果包含分配开销，也不能反映隐藏负载。",
-      "Fresh objects": "新对象",
       "Made the identity fast path turn itself off after consecutive misses": "让 identity 快速路径在连续未命中后自动关闭",
       "Wanted to keep the stable-case gains without hurting the fresh case": "想保住稳定场景的收益，又不拖累新对象场景",
       "identity fast path": "identity 快速路径",
@@ -18094,8 +17982,6 @@
       "Alignment specialization removal passes correctness but slightly worsens local timing": "去掉对齐特化后正确性通过，但本地计时略变差",
       "Rotating objects: 20.60 µs without alignment specialization versus 20.32 µs for the saved submission 4 copy.": "轮换对象：去掉对齐特化为 20.60 µs，保存的第 4 次提交副本为 20.32 µs。",
       "Alignment specialization": "对齐特化",
-      "Restore submission 4: restored all of submission 4's files and re-verified; hashes match": "恢复第 4 次提交：还原全部文件并重新验证，哈希一致",
-      "Abandoned this variant based on local timing alone, no score was submitted for it": "仅凭本地计时放弃此变体，没有为它提交评分",
       "Restore submission 4": "恢复第 4 次提交",
       "schema rejection: the first finalize call was rejected by the tool schema and not executed": "schema 拒绝：首次 finalize 调用被工具 schema 拒绝，未执行",
       "Included an extra, unexpected argument": "多带了一个预期之外的参数",
@@ -18105,25 +17991,17 @@
       "All three final files' hashes match the submission 4 copy": "三个最终文件的哈希都与第 4 次提交副本一致",
       "kernel_utils hash 39789882 matches": "kernel_utils 哈希 39789882 一致",
       "submission 4 copy": "第 4 次提交副本",
-      "Final report: remaining headroom is in host-side Python, below scoring noise": "最终报告：剩余优化空间在 host 端 Python，低于评分噪声",
-      "Both the identity caching and alignment variants were rejected based on local timing alone, without testing more input patterns": "identity 缓存和对齐两个变体都只凭本地计时否决，没有测试更多输入模式",
-      "remaining headroom": "剩余优化空间",
       "Rewrite breakdown script using real tensor strides": "用真实的 tensor stride 重写拆解脚本",
       "Rewrite breakdown script using real tensor strides. Validated direct launch, then located key/stream costs, switched to raw stream.": "用真实的 tensor stride 重写拆解脚本。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Re-locate key, stream, wrapper costs": "重新定位 key、stream、wrapper 的开销",
-      "Re-locate key, stream, wrapper costs. Validated direct launch, then located key/stream costs, switched to raw stream.": "重新定位 key、stream、wrapper 的开销。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Compare cost of current_stream vs raw stream acquisition": "比较 current_stream 与 raw stream 的获取开销",
-      "Compare cost of current_stream vs raw stream acquisition. Validated direct launch, then located key/stream costs, switched to raw stream.": "比较 current_stream 与 raw stream 的获取开销。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Switch to raw stream and simplify stride handling": "改用 raw stream 并简化 stride 处理",
-      "Switch to raw stream and simplify stride handling. Validated direct launch, then located key/stream costs, switched to raw stream.": "改用 raw stream 并简化 stride 处理。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Synchronously update kernel signature": "同步更新 kernel 签名",
       "Synchronously update kernel signature. Validated direct launch, then located key/stream costs, switched to raw stream.": "同步更新 kernel 签名。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Validate new signature and stream path; 10 sample sets passed": "验证新签名和 stream 路径；10 组样本通过",
       "Validate new signature and stream path; 10 sample sets passed. Validated direct launch, then located key/stream costs, switched to raw stream.": "验证新签名和 stream 路径；10 组样本通过。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Re-measure local call cost: about 21.65 µs": "重新测量本地调用开销：约 21.65 µs",
-      "Re-measure local call cost: about 21.65 µs. Validated direct launch, then located key/stream costs, switched to raw stream.": "重新测量本地调用开销：约 21.65 µs。验证了直接启动，随后定位 key/stream 开销，改用 raw stream。",
       "Submission 2: correctness passed, dev_speedup raised to 33.369×": "第 2 次提交：正确性通过，dev_speedup 提升到 33.369×",
-      "Submission 2: correctness passed, dev_speedup raised to 33.369×. Executed submit and kept the score receipt; correctness and dev_speedup recorded separately.": "第 2 次提交：正确性通过，dev_speedup 提升到 33.369×。执行 submit 并保留评分回执；正确性与 dev_speedup 分开记录。",
       "Save code copy and file hash of submission 2": "保存第 2 次提交的代码副本和文件哈希",
       "Save code copy and file hash of submission 2. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "保存第 2 次提交的代码副本和文件哈希。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Adjust cache metadata handling": "调整缓存元数据的处理",
@@ -18137,33 +18015,23 @@
       "Try caching launch arguments by object identity": "尝试按对象身份缓存启动参数",
       "Try caching launch arguments by object identity. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "尝试按对象身份缓存启动参数。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "First round of identity caching validation failed: add_inputs double-accumulated": "identity 缓存首轮验证失败：add_inputs 被重复累加",
-      "First round of identity caching validation failed: add_inputs double-accumulated. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns. This check/call did not complete its intended goal; specific error remains in tool output.": "identity 缓存首轮验证失败：add_inputs 被重复累加。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。这次检查/调用没有达成预期目标，具体错误保留在工具输出中。",
       "Write a minimal reproduction for add_inputs": "为 add_inputs 写最小复现",
       "Write a minimal reproduction for add_inputs. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "为 add_inputs 写最小复现。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Locate first cache miss: first call wrong, subsequent calls normal": "定位首次缓存未命中：首次调用出错，后续调用正常",
-      "Locate first cache miss: first call wrong, subsequent calls normal. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "定位首次缓存未命中：首次调用出错，后续调用正常。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Try fixing duplicate launch on cache miss": "尝试修复缓存未命中时的重复启动",
-      "Try fixing duplicate launch on cache miss. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "尝试修复缓存未命中时的重复启动。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "First fix introduced another bug, still failing": "第一次修复引入了另一个 bug，仍然失败",
-      "First fix introduced another bug, still failing. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns. This check/call did not complete its intended goal; specific error remains in tool output.": "第一次修复引入了另一个 bug，仍然失败。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。这次检查/调用没有达成预期目标，具体错误保留在工具输出中。",
       "Revisit launch branches to locate control-flow issue": "重新梳理启动分支，定位控制流问题",
-      "Revisit launch branches to locate control-flow issue. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "重新梳理启动分支，定位控制流问题。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Refactor cache miss to ensure launch executes exactly once": "重构缓存未命中逻辑，确保恰好启动一次",
       "Refactor cache miss to ensure launch executes exactly once. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "重构缓存未命中逻辑，确保恰好启动一次。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Recheck accumulation path and 10 sample sets after refactor": "重构后复查累加路径和 10 组样本",
-      "Recheck accumulation path and 10 sample sets after refactor. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "重构后复查累加路径和 10 组样本。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Re-measure identity caching call cost": "重新测量 identity 缓存的调用开销",
       "Re-measure identity caching call cost. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "重新测量 identity 缓存的调用开销。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Write cache-hit test": "编写缓存命中测试",
       "Write cache-hit test. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "编写缓存命中测试。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Measure cache benefit for repeated objects": "测量复用对象时的缓存收益",
-      "Measure cache benefit for repeated objects. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "测量复用对象时的缓存收益。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Confirm hit count in scratch copy": "在 scratch 副本中确认命中次数",
-      "Confirm hit count in scratch copy. Tried identity caching; fixed duplicate accumulation on cache miss. Local gains on repeated objects don't guarantee gains for other call patterns.": "在 scratch 副本中确认命中次数。尝试了 identity 缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Standalone CUDA Graph replay experiment: about 5 µs": "单独的 CUDA Graph replay 实验：约 5 µs",
-      "Standalone CUDA Graph replay experiment: about 5 µs. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "单独的 CUDA Graph replay 实验：约 5 µs。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Check launch path needed for Graph integration": "检查接入 Graph 所需的启动路径",
-      "Check launch path needed for Graph integration. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "检查接入 Graph 所需的启动路径。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Check lifecycle of launch arguments": "检查启动参数的生命周期",
       "Check lifecycle of launch arguments. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "检查启动参数的生命周期。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Try integrating CUDA Graph caching into the candidate": "尝试把 CUDA Graph 缓存接入候选",
@@ -18171,9 +18039,7 @@
       "Fix Graph cache global variable": "修复 Graph 缓存的全局变量",
       "Fix Graph cache global variable. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "修复 Graph 缓存的全局变量。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Graph integration passed local correctness, but end-to-end gain is poor": "Graph 接入通过本地正确性检查，但端到端收益差",
-      "Graph integration passed local correctness, but end-to-end gain is poor. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "Graph 接入通过本地正确性检查，但端到端收益差。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Try passing slice offsets directly to reduce tensor views": "尝试直接传 slice 偏移，以减少 tensor view",
-      "Try passing slice offsets directly to reduce tensor views. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "尝试直接传 slice 偏移，以减少 tensor view。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Check erroneous line caused by replacement": "检查替换造成的出错行",
       "Check erroneous line caused by replacement. Graph replay alone is fast, but end-to-end gain after integration is insufficient. Includes accompanying changes to reduce slice views; the Graph path was ultimately removed.": "检查替换造成的出错行。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Fix line-break issue caused by replacement script": "修复替换脚本造成的换行问题",
@@ -18185,9 +18051,7 @@
       "Validate Graph combined with slice offset": "验证 Graph 与 slice 偏移的组合",
       "Validate Graph combined with slice offset. Graph replay alone is fast, but end-to-end gains after integration are insufficient. Includes companion changes to reduce slice views; the Graph path was eventually removed.": "验证 Graph 与 slice 偏移的组合。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Read a copy of submission 2 to compare launch implementations": "读取第 2 次提交的副本，对比启动实现",
-      "Read a copy of submission 2 to compare launch implementations. Graph replay alone is fast, but end-to-end gains after integration are insufficient. Includes companion changes to reduce slice views; the Graph path was eventually removed.": "读取第 2 次提交的副本，对比启动实现。单独的 Graph replay 很快，但接入后的端到端收益不足。包含减少 slice view 的配套改动；Graph 路径最终被移除。",
       "Removed the CUDA Graph path, kept identity caching": "移除 CUDA Graph 路径，保留 identity 缓存",
-      "Removed the CUDA Graph path, kept identity caching. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.": "移除 CUDA Graph 路径，保留 identity 缓存。尝试了按对象身份作键的缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Validated the candidate without Graph; local call takes about 17 microseconds": "验证不含 Graph 的候选；本地调用约 17 微秒",
       "Validated the candidate without Graph; local call takes about 17 microseconds. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.": "验证不含 Graph 的候选；本地调用约 17 微秒。尝试了按对象身份作键的缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Wrote a local A/B script comparing submission 2 against the current candidate": "写了本地 A/B 脚本，对比第 2 次提交与当前候选",
@@ -18195,25 +18059,19 @@
       "Launched an A/B test reusing the same batch of objects": "运行复用同一批对象的 A/B 测试",
       "Launched an A/B test reusing the same batch of objects. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.": "运行复用同一批对象的 A/B 测试。尝试了按对象身份作键的缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "A/B shows the current candidate is faster when objects are reused": "A/B 显示复用对象时当前候选更快",
-      "A/B shows the current candidate is faster when objects are reused. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.": "A/B 显示复用对象时当前候选更快。尝试了按对象身份作键的缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Scanned submission code for banned words and checked syntax": "扫描提交代码中的禁用词并检查语法",
-      "Scanned submission code for banned words and checked syntax. Tried caching keyed by object identity; fixed duplicate accumulation on cache misses. Local gains from repeated objects don't guarantee gains for other call patterns.": "扫描提交代码中的禁用词并检查语法。尝试了按对象身份作键的缓存；修复了缓存未命中时的重复累加。复用对象时的本地收益，不保证其他调用模式也有收益。",
       "Submission 3: correctness passed, but dev score dropped back to 30.834x": "第 3 次提交：正确性通过，但开发集得分回落到 30.834x",
-      "Submission 3: correctness passed, but dev score dropped back to 30.834x. Ran submit and kept the scoring receipt; correctness and dev performance recorded separately.": "第 3 次提交：正确性通过，但开发集得分回落到 30.834x。执行 submit 并保留评分回执；正确性与开发集性能分开记录。",
       "Wrote a fresh / reused object comparison script": "写了新对象 / 复用对象对比脚本",
       "Wrote a fresh / reused object comparison script. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "写了新对象 / 复用对象对比脚本。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Found that identity caching gains depend on object reuse": "发现 identity 缓存的收益依赖对象复用",
-      "Found that identity caching gains depend on object reuse. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "发现 identity 缓存的收益依赖对象复用。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Tried disabling the identity fast path under miss patterns": "尝试在未命中模式下关闭 identity 快速路径",
       "Tried disabling the identity fast path under miss patterns. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "尝试在未命中模式下关闭 identity 快速路径。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Wrote a call experiment using rotating objects": "写了一个使用轮换对象的调用实验",
       "Wrote a call experiment using rotating objects. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "写了一个使用轮换对象的调用实验。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Still slower than submission 2 with rotating objects; identity approach abandoned": "轮换对象下仍比第 2 次提交慢；放弃 identity 方案",
-      "Still slower than submission 2 with rotating objects; identity approach abandoned. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "轮换对象下仍比第 2 次提交慢；放弃 identity 方案。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Checked differences against a copy of submission 2": "对照第 2 次提交的副本检查差异",
       "Checked differences against a copy of submission 2. Compared fresh, stable, and rotating objects. The identity fast path depends on object reuse and was ultimately abandoned.": "对照第 2 次提交的副本检查差异。对比了新对象、稳定对象和轮换对象。identity 快速路径依赖对象复用，最终被放弃。",
       "Reverted to submission 2's kernel_utils, then modified the specialization key": "退回第 2 次提交的 kernel_utils，再修改特化键",
-      "Reverted to submission 2's kernel_utils, then modified the specialization key. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset.": "退回第 2 次提交的 kernel_utils，再修改特化键。在恢复 v2 的 kernel_utils 后修改；修复了漏替换、签名和 float 参数分派，并保留 slice 偏移。",
       "Checked launch arguments after the rollback": "回滚后检查启动参数",
       "Checked launch arguments after the rollback. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset.": "回滚后检查启动参数。在恢复 v2 的 kernel_utils 后修改；修复了漏替换、签名和 float 参数分派，并保留 slice 偏移。",
       "Continued checking the shrink / expand launcher": "继续检查 shrink / expand launcher",
@@ -18237,37 +18095,27 @@
       "Re-checked candidate correctness and local timing": "重新检查候选的正确性和本地计时",
       "Re-checked candidate correctness and local timing. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset.": "重新检查候选的正确性和本地计时。在恢复 v2 的 kernel_utils 后修改；修复了漏替换、签名和 float 参数分派，并保留 slice 偏移。",
       "Collected results: correctness passed, old micro script failure logged separately": "汇总结果：正确性通过，旧 micro 脚本的失败另行记录",
-      "Collected results: correctness passed, old micro script failure logged separately. Modified after restoring v2's kernel_utils; fixed missed replacements, signature, and float argument dispatch, while keeping slice offset. A failing command as a whole should not be equated with the candidate failing correctness; the old micro7 script is incompatible with the new signature, and earlier correctness and rotating comparisons already produced output.": "汇总结果：正确性通过，旧 micro 脚本的失败另行记录。在恢复 v2 的 kernel_utils 后修改；修复了漏替换、签名和 float 参数分派，并保留 slice 偏移。整条命令失败不等于候选正确性失败；旧的 micro7 脚本与新签名不兼容，而前面的正确性检查和轮换对象对比已经产出结果。",
       "Submission 4: correctness passed, dev score rose to 35.445x": "第 4 次提交：正确性通过，开发集得分升到 35.445x",
-      "Submission 4: correctness passed, dev score rose to 35.445x. Ran submit and kept the scoring receipt; correctness and dev performance recorded separately.": "第 4 次提交：正确性通过，开发集得分升到 35.445x。执行 submit 并保留评分回执；正确性与开发集性能分开记录。",
       "Wrote 19 boundary condition tests": "编写 19 个边界条件测试",
       "Wrote 19 boundary condition tests. 19 scratch tests; the first error was in the reference script's output shape, fixed afterward and passed.": "编写 19 个边界条件测试。19 个 scratch 测试；第一次报错出在参考脚本的输出 shape，修复后通过。",
       "Boundary tests interrupted: scratch reference output had wrong offset shape": "边界测试中断：scratch 参考输出的 offset shape 错误",
       "Boundary tests interrupted: scratch reference output had wrong offset shape. 19 scratch tests; the first error was in the reference script's output shape, fixed afterward and passed. This check/call did not complete its intended goal; the specific error is kept in the tool output.": "边界测试中断：scratch 参考输出的 offset shape 错误。19 个 scratch 测试；第一次报错出在参考脚本的输出 shape，修复后通过。这次检查/调用没有达成预期目标，具体错误保留在工具输出中。",
       "Fixed the reference script and retested; all 19 cases passed": "修好参考脚本后重测；19 个用例全部通过",
-      "Fixed the reference script and retested; all 19 cases passed. 19 scratch tests; the first error was in the reference script's output shape, fixed afterward and passed.": "修好参考脚本后重测；19 个用例全部通过。19 个 scratch 测试；第一次报错出在参考脚本的输出 shape，修复后通过。",
       "Wrote a test for the cost of launcher argument count": "编写测试，测量 launcher 参数个数带来的开销",
       "Wrote a test for the cost of launcher argument count. Measured the argument-passing cost of the direct launcher to judge whether this direction has limited gains.": "编写测试，测量 launcher 参数个数带来的开销。测量直接 launcher 的传参开销，判断这个方向的收益是否有限。",
       "Each extra argument adds about 0.029 microseconds; limited room for gains": "每多一个参数约增加 0.029 微秒；收益空间有限",
-      "Each extra argument adds about 0.029 microseconds; limited room for gains. Measured the argument-passing cost of the direct launcher to judge whether this direction has limited gains.": "每多一个参数约增加 0.029 微秒；收益空间有限。测量直接 launcher 的传参开销，判断这个方向的收益是否有限。",
       "Saved submission 4, then tried removing the alignment specialization": "保存第 4 次提交，然后尝试去掉对齐特化",
       "Saved submission 4, then tried removing the alignment specialization. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.": "保存第 4 次提交，然后尝试去掉对齐特化。在 v4 副本上测试；本地略慢，未提交，已还原全部 v4 文件。",
       "Launched a test removing the alignment specialization": "运行去掉对齐特化的测试",
       "Launched a test removing the alignment specialization. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.": "运行去掉对齐特化的测试。在 v4 副本上测试；本地略慢，未提交，已还原全部 v4 文件。",
       "Correctness passed, but local timing was slightly slower than submission 4": "正确性通过，但本地计时比第 4 次提交略慢",
-      "Correctness passed, but local timing was slightly slower than submission 4. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.": "正确性通过，但本地计时比第 4 次提交略慢。在 v4 副本上测试；本地略慢，未提交，已还原全部 v4 文件。",
       "Restored all of submission 4's files and re-validated": "还原第 4 次提交的全部文件并重新验证",
-      "Restored all of submission 4's files and re-validated. Tested on top of a v4 copy; slightly slower locally, not submitted, restored all v4 files.": "还原第 4 次提交的全部文件并重新验证。在 v4 副本上测试；本地略慢，未提交，已还原全部 v4 文件。",
       "The first finalize request was rejected by the tool schema and not executed": "首次 finalize 请求被工具 schema 拒绝，未执行",
-      "The first finalize request was rejected by the tool schema and not executed. Retried after the first request was rejected by the schema; finalize explicitly selected submission 4. This check/call did not complete its intended goal; the specific error is kept in the tool output.": "首次 finalize 请求被工具 schema 拒绝，未执行。首次请求被 schema 拒绝后重试；finalize 明确选定第 4 次提交。这次检查/调用没有达成预期目标，具体错误保留在工具输出中。",
       "After fixing the arguments, finalize succeeded, ultimately selecting submission 4": "修正参数后 finalize 成功，最终选定第 4 次提交",
-      "After fixing the arguments, finalize succeeded, ultimately selecting submission 4. Retried after the first request was rejected by the schema; finalize explicitly selected submission 4.": "修正参数后 finalize 成功，最终选定第 4 次提交。首次请求被 schema 拒绝后重试；finalize 明确选定第 4 次提交。",
       "Checked the final function and working tree": "检查最终函数和工作树",
       "Checked the final function and working tree. Verified file hashes match the submission 4 copy, and preserved the agent's original summary.": "检查最终函数和工作树。确认文件哈希与第 4 次提交副本一致，并保留了 agent 的原始总结。",
       "Compared final file hashes, confirmed they match the submission 4 copy": "比对最终文件哈希，确认与第 4 次提交副本一致",
-      "Compared final file hashes, confirmed they match the submission 4 copy. Verified file hashes match the submission 4 copy, and preserved the agent's original summary.": "比对最终文件哈希，确认与第 4 次提交副本一致。确认文件哈希与第 4 次提交副本一致，并保留了 agent 的原始总结。",
       "Main agent's final report: results, failed attempts, and reasons for stopping": "主 agent 的最终报告：结果、失败的尝试和停止原因",
-      "This is the main agent's end-of-session summary. Its performance explanations and local figures are preserved verbatim; independent scoring is recorded separately by the system.": "这是主 agent 在会话结束时的总结。其中的性能解释和本地数据按原文保留；独立评分由系统另行记录。",
       "A post-hoc review and summary of completed work and test results, not a new measurement.": "对已完成工作和测试结果的事后回顾与总结，不是新的测量。",
       "Submission 1 receipt": "第 1 次提交回执",
       "Machine-written submit/finalize ledger and session execution receipts.": "机器写入的 submit/finalize 账本和会话执行回执。",
@@ -18316,7 +18164,164 @@
       "Scratch code copy, used as a later comparison and restore source; not a wiki record.": "scratch 代码副本，用作之后对比和还原的来源；不是 wiki 记录。",
       "After restoring v2, modifications continued; after restoring v4, it was re-validated. Command and receipt evidence retained.": "恢复 v2 后继续修改；恢复 v4 后重新验证。命令和回执证据均已保留。",
       "Local expand relative error 0.6441; this is a failure of an unsubmitted draft, not submission 3's correctness failure.": "本地 expand 相对误差 0.6441；这是未提交草稿的失败，不是第 3 次提交的正确性失败。",
-      "The original offset error was in the scratch reference script. After the fix, 19 groups passed, including non-contiguous tensors, multi-slice, bf16, fp32, and no-LoRA cases.": "原先的 offset 错误出在 scratch 参考脚本。修复后 19 组全部通过，包括非连续 tensor、多 slice、bf16、fp32 和无 LoRA 的情况。"
+      "The original offset error was in the scratch reference script. After the fix, 19 groups passed, including non-contiguous tensors, multi-slice, bf16, fp32, and no-LoRA cases.": "原先的 offset 错误出在 scratch 参考脚本。修复后 19 组全部通过，包括非连续 tensor、多 slice、bf16、fp32 和无 LoRA 的情况。",
+      "Pi Agent starts from Python code that loops over LoRA adapters and performs separate matrix operations. It must accelerate batched shrink/expand while preserving fp16 inputs, fp32 accumulation and 2% relative tolerance. Only three vLLM files are editable. Before submitting a change, the agent saves the baseline, builds an fp64 reference and checks ten local cases. These scratch activities remain under the baseline state because states track submitted code and final selection.": "Pi Agent 从逐个 LoRA 执行矩阵运算的 Python 基线出发。任务是加速批量 shrink/expand，并保留 fp16 输入、fp32 累加和 2% 相对误差约束。仅允许修改三个 vLLM 文件。提交前，agent 备份基线、建立 fp64 参考计算并检查十组本地用例。这里的状态追踪已提交代码和最终选择，因此这些草稿活动仍挂在基线下。",
+      "Submission 1 replaces the Python adapter loop with grouped Triton shrink and expand kernels. The development evaluator reports correctness PASS and 18.671× speedup against its baseline. Local tests also pass, but timing changes when diagnostic instrumentation is disabled. The agent therefore separates GPU execution from host launch cost before choosing its next optimization.": "提交 1 用按 LoRA 分组的 Triton 内核替换 Python 循环。开发评测返回正确性 PASS，相对其基线加速 18.671×。本地用例也通过，但关闭诊断采集后计时明显变化。Agent 随后分别测量 GPU 执行与主机启动开销，再选择下一项优化。",
+      "Submission 2 adds direct calls to CompiledKernel, cheaper CUDA stream lookup and measured tile settings. The development score rises from 18.671× to 33.369×, with correctness PASS. A local breakdown measures about 21.65 µs per operation after the host changes. The agent saves this code for comparison and possible restoration before trying object-identity caching.": "提交 2 加入 CompiledKernel 直接启动、更便宜的 CUDA stream 查询和实测选出的分块参数。开发分数从 18.671× 升到 33.369×，正确性 PASS。主机路径修改后，本地拆分计时约为每次操作 21.65 µs。Agent 备份这版代码，之后尝试按对象身份缓存启动参数。",
+      "Submission 3 retains an object-identity cache and slice-offset changes. CUDA Graph caching was tried and removed before this submission. Local A/B tests with reused tensors favor the candidate, but the development score falls from 33.369× to 30.834×; correctness still passes. Subsequent fresh and rotating object tests expose a cache limitation. They suggest a possible explanation for the regression, but do not reveal the evaluator's actual input pattern.": "提交 3 保留对象身份缓存和切片偏移改动。CUDA Graph 缓存已在提交前试过并移除。复用张量的本地 A/B 测试更快，但开发分数从 33.369× 降到 30.834×；正确性仍通过。后续新建和轮换对象测试暴露了缓存的限制。这可能解释评分回退，但不能证明评测器实际采用了哪种输入方式。",
+      "The agent restores submission 2's kernel_utils.py and builds a cheaper specialization key on that code. It retains slice offsets, fixes a function-signature mismatch and handles floating-point arguments separately from integer alignment checks. Local rotating-object timing falls from 22.04 to 19.74 µs; stable-object timing falls from 21.58 to 19.30 µs. Submission 4 passes correctness and reaches 35.445× development speedup. Its code derives from submission 2, although it occurs after submission 3.": "Agent 恢复提交 2 的 kernel_utils.py，并在其基础上简化特化键。它保留切片偏移，修复函数签名不匹配，并将浮点参数与整数对齐检查分开处理。本地轮换对象计时从 22.04 降到 19.74 µs，稳定对象从 21.58 降到 19.30 µs。提交 4 正确性通过，开发加速比为 35.445×。代码来源是提交 2，时间上则发生在提交 3 之后。",
+      "The agent restores and finalizes submission 4 after a later alignment variant measures slightly slower locally. The three final file hashes match the saved submission 4 copy. The retained development score is 35.445×; finalization is not a new measurement. Separate evaluation confirms correctness and reports 34.588× against the official baseline and 2.114× against the frozen Oracle under paired ABBA evaluation. These scores use different baselines.": "后续去掉对齐特化的变体在本地略慢，agent 因此恢复并最终选择提交 4。三个最终文件的哈希与提交 4 备份一致。保留的开发分数是 35.445×，finalize 本身不是新测量。独立评测确认正确性，相对官方基线为 34.588×，相对冻结 Oracle 的配对 ABBA 结果为 2.114×。这些加速比的比较基线不同。",
+      "Pi Agent uses deepseek-flash with high thinking on an A100 40GB. The recorded software is Python 3.10.12, PyTorch 2.7.1+cu126 and Triton 3.3.1. The task allows 90 minutes and at most 16 submissions. The agent reads the shrink/expand interfaces and saves the three editable files with hashes before changing them.": "Pi Agent 使用 deepseek-flash 和 high thinking，在 A100 40GB 上运行。软件为 Python 3.10.12、PyTorch 2.7.1+cu126、Triton 3.3.1。预算为 90 分钟、最多 16 次提交。Agent 先读接口，再备份三个可编辑文件并记录哈希。",
+      "The agent writes grouped Triton kernels and connects both shrink and expand entry points to them. All ten local cases pass against the fp64 reference. Many timings cluster near 200 µs despite different workloads. The agent suspects a host or instrumentation cost and investigates that cost before treating these timings as kernel performance.": "Agent 编写按 LoRA 分组的 Triton 内核，并接入 shrink 和 expand。十组用例均通过 fp64 参考检查，但不同负载的计时都集中在约 200 µs。Agent 怀疑主机或诊断采集开销，先调查这些开销，再判断内核性能。",
+      "With diagnostics disabled, the agent compares ordinary calls, CUDA Graph replay and host profiles. One shrink call takes about 64 µs, while a later breakdown attributes about 45 µs to Triton launch. Device timings depend on shape and are measured separately. An early launch bypass fails with a grid error. The agent submits the working grouped kernel before continuing host-path changes.": "关闭诊断采集后，agent 比较普通调用、CUDA Graph 回放和主机 profile。一次 shrink 调用约 64 µs，后续拆分测量中 Triton 启动约占 45 µs。设备计时随形状变化，单独记录。早期绕过启动路径的尝试发生 grid 错误；agent 先提交可用的分组内核，再继续优化主机路径。",
+      "The agent submits the grouped Triton implementation after local correctness checks. The asynchronous evaluator returns correctness PASS and dev_speedup 18.671×. This is submission 1 of the allowed 16; the next work investigates the remaining host cost.": "Agent 在本地正确性检查后提交分组 Triton 实现。异步评测返回正确性 PASS 和 dev_speedup 18.671×。这是最多 16 次中的第 1 次提交；后续开始研究剩余的主机开销。",
+      "The agent searches tile sizes and launch parameters for the same grouped kernels. It stops a broad sweep, then discovers that a background sweep ended with its shell and left partial results. It runs a smaller foreground sweep to obtain comparable results. Different shapes favor different tiles; the retained implementation uses measured settings for shrink and expand.": "Agent 为同一组内核搜索 tile 大小和启动参数。它先停止大范围扫描，随后发现后台扫描随 shell 退出，只留下部分结果。因此改为小范围前台扫描。不同形状偏好的分块不同，最终实现采用实测选出的 shrink 和 expand 参数。",
+      "A first direct-launch experiment supplies 26 arguments where the launcher requires 32, so it fails. The agent inspects the actual launcher signature and repeats the test with the full argument set. Direct launch takes 17.32 µs versus 43.76 µs for the normal path, with bitwise-identical output in that test. It integrates this path and keeps guards around argument packing.": "首次直接启动只传入 26 个参数，启动器要求 32 个，因此失败。Agent 检查真实签名并补齐参数后重测：直接启动 17.32 µs，普通路径 43.76 µs，该用例输出逐位相同。随后将直接启动接入实现，并保留参数打包检查。",
+      "After direct launch passes the local cases, the agent profiles the remaining wrapper, key construction and stream lookup. A scratch test with fabricated strides fails and is corrected. The raw stream accessor takes 0.23 µs versus 6.33 µs for current_stream(). The agent changes stream lookup and trims stride arguments; the full operation then measures 21.65 µs locally.": "直接启动通过本地用例后，agent 拆分 wrapper、特化键和 stream 查询开销。一个伪造 stride 的草稿测试失败后被修正。raw stream 查询为 0.23 µs，而 current_stream() 为 6.33 µs。Agent 更换查询方式并减少 stride 参数，随后完整操作的本地计时为 21.65 µs。",
+      "Submission 2 combines direct launch, raw stream lookup and tile choices. The evaluator reports correctness PASS and 33.369× development speedup, up from submission 1's 18.671×. The agent saves this candidate before further experiments.": "提交 2 结合直接启动、raw stream 查询和分块配置。评测返回正确性 PASS，开发加速比从提交 1 的 18.671× 升到 33.369×。Agent 保存这版代码后继续尝试。",
+      "The agent caches launch arguments by tensor identity. Its first implementation launches twice on a cache miss and breaks add_inputs; an initial fix also skips required work. Restructuring the control flow restores correctness. Early cache-hit instrumentation shows hits without a clear full-call gain. A later, simplified version with slice offsets is 3 to 5 µs faster in local A/B tests that reuse tensors, so the agent submits it for development scoring.": "Agent 按张量身份缓存启动参数。首次实现缓存未命中时启动两次，破坏 add_inputs；第一次修复又跳过了必要工作。重构控制流后正确性恢复。早期计数显示缓存命中，但完整调用没有明显提速。后续结合切片偏移的简化版本在复用张量的本地 A/B 测试中快 3 至 5 µs，因此被提交评分。",
+      "A standalone CUDA Graph replay takes 5 µs versus 21 µs for the direct-call test. After integration, fresh slice views cause repeated captures, so the agent passes slice offsets instead and limits capture. The agent then estimates only about 2 µs net benefit and removes the graph path. The standalone replay result does not establish an equal gain for the full operator.": "独立 CUDA Graph 回放为 5 µs，直接调用测试为 21 µs。接入算子后，新建切片 view 导致重复 capture；agent 改传切片偏移并限制 capture 次数。随后它估计净收益仅约 2 µs，并移除 Graph 路径。独立回放的优势不能直接当成完整算子的收益。",
+      "The evaluator accepts submission 3's numerical behavior but reports 30.834× development speedup. Submission 2 remains best at 33.369×. The result conflicts with the local reused-tensor A/B result, which motivates a comparison of input-object patterns.": "评测认可提交 3 的数值正确性，但开发加速比只有 30.834×。提交 2 的 33.369× 仍是最佳。这个结果与复用张量的本地 A/B 结果不同，促使 agent 比较不同对象使用方式。",
+      "The original identity cache takes 17.01 µs with stable objects versus 21.89 µs for submission 2, but takes 65.46 µs with fresh objects versus 61.08 µs for submission 2. The fresh-object totals include allocation. An adaptive miss policy still takes 24.68 µs on rotating objects versus 22.41 µs for submission 2. The agent abandons the identity approach. The evaluator's actual object-reuse pattern remains unobserved.": "原身份缓存在稳定对象上为 17.01 µs，提交 2 为 21.89 µs；新建对象时则为 65.46 对 61.08 µs。新建对象的总时间包含分配。加入自适应未命中策略后，轮换对象仍为 24.68 对 22.41 µs。Agent 放弃身份缓存。评测器实际是否复用对象仍未知。",
+      "The agent copies kernel_utils.py from submission 2 and rewrites the specialization key, while retaining slice offsets. The first retest exposes an outdated function signature; a later test exposes a bitwise operation on a float. After both fixes, correctness passes and rotating/stable object tests favor the new implementation. A stale microbenchmark fails separately, so the entire command is not labeled as a clean success.": "Agent 从提交 2 恢复 kernel_utils.py，改写特化键并保留切片偏移。首次重测发现函数签名未更新，后一次发现对浮点数执行位运算。修复后正确性通过，轮换和稳定对象测试均更快。旧版 microbenchmark 另有失败，因此不能将整个命令算作无异常通过。",
+      "Submission 4 passes correctness and reaches 35.445× development speedup. This exceeds both the previous submission's 30.834× and submission 2's 33.369×. The agent then broadens local boundary tests before deciding whether to continue optimizing.": "提交 4 正确性通过，开发加速比达到 35.445×，超过前一次的 30.834× 和提交 2 的 33.369×。Agent 随后扩充本地边界测试，再决定是否继续优化。",
+      "The agent tests nineteen boundary cases, including bf16, fp32 fallback, small/large ranks, noncontiguous views, offsets and add_inputs. An offset test first fails because the reference script creates the wrong output shape. After fixing that script, all nineteen cases pass. This expands local correctness coverage; it is not a new development or independent performance score.": "Agent 检查十九组边界用例，包括 bf16、fp32 回退、不同 rank、非连续 view、offset 和 add_inputs。offset 用例先因参考脚本输出形状错误而失败；修复脚本后十九组全部通过。这增加了本地正确性覆盖，不是新的开发或独立性能评分。",
+      "A direct-launch microbenchmark compares six arguments with twenty-one. Timing rises from 6.04 to 6.47 µs, about 0.029 µs per extra argument. The agent explicitly stops trimming arguments after seeing this small local contribution.": "直接启动 microbenchmark 比较 6 个和 21 个参数，计时从 6.04 增至 6.47 µs，平均每个新增参数约 0.029 µs。看到这部分本地开销很小后，agent 明确停止继续削减参数。",
+      "The agent saves submission 4 and tries skipping alignment specialization. Correctness passes, but rotating-object timing is 20.60 µs versus 20.32 µs for the saved candidate; stable-object timing also worsens slightly. It restores the saved files and does not submit this variant. The restoration receipt includes passing test output while the command is still running; the final hash audit is recorded later.": "Agent 保存提交 4，再尝试跳过对齐特化。正确性通过，但轮换对象计时为 20.60 µs，备份版本为 20.32 µs；稳定对象也略慢。它恢复备份，没有提交这个变体。恢复回执在命令仍运行时已含通过的测试输出，最终哈希检查在后面记录。",
+      "The first finalize request contains an unsupported tool argument and is rejected before execution. The corrected request succeeds and explicitly selects submission 4 at 4 of 16 allowed submissions. This records the chosen artifact; separate evaluation supplies the independent scores.": "首次 finalize 请求带有不支持的工具参数，执行前即被拒绝。修正后的请求成功，明确选择提交 4，总共用掉 16 次额度中的 4 次。这一步确定最终产物；独立分数来自后续评测。",
+      "The agent checks the final functions and hashes of all three editable files. They match the saved submission 4 copy, while HEAD remains the original baseline commit with those files modified. The final narrative explains local results and rejected attempts. Its claims about remaining headroom and evaluator input patterns are the agent's interpretation, not additional independent measurements.": "Agent 检查最终函数和三个可编辑文件的哈希，均与提交 4 备份一致。HEAD 仍是原始基线提交，三个文件带有修改。最终报告汇总本地结果和放弃的尝试。其中关于剩余优化空间和评测输入方式的判断属于 agent 的解释，不是新的独立测量。",
+      "Pi Agent uses deepseek-flash with high thinking to accelerate batched multi-LoRA shrink/expand in three vLLM files. It must preserve 2% numerical tolerance. Configuration: A100 40GB, PyTorch 2.7.1, Triton 3.3.1, a 90-minute budget and at most 16 submissions. Grouped kernels and direct launch improve development scores. Identity caching then regresses despite faster local tests with reused tensors. The agent rebuilds from submission 2 with a simpler specialization key and selects submission 4 after 44.63 minutes. Correctness passes. Development speedup is 35.44×; independent scores are 34.59× against the official baseline and 2.11× against a frozen Oracle. No separate reviewer is recorded.": "Pi Agent 使用 deepseek-flash 和 high thinking，在三个 vLLM 文件内加速批量多 LoRA shrink/expand，保持 2% 数值误差约束。配置为 A100 40GB、PyTorch 2.7.1、Triton 3.3.1，预算 90 分钟、最多 16 次提交。分组内核和直接启动提高开发分数；随后身份缓存虽在复用张量的本地测试中更快，评分却回退。Agent 从提交 2 重建并简化特化键，运行 44.63 分钟后选择提交 4。正确性通过，开发加速比 35.44×；独立评测相对官方基线 34.59×，相对冻结 Oracle 为 2.11×。没有单独的 reviewer 记录。",
+      "Python baseline": "Python 基线",
+      "Python baseline needs milliseconds per call before grouped kernels": "Python 基线在分组内核替换前，每次调用需要毫秒级时间",
+      "Scratch checks establish a local reference. States track submitted code, so pre-submission experiments remain here.": "临时测试建立了本地参考。状态追踪已提交的代码，因此提交前的实验仍归在这里。",
+      "Grouped kernels": "分组内核",
+      "Grouped kernels pass correctness at 18.67× development speedup": "分组内核通过正确性检查，开发评分加速 18.67×",
+      "Submission 1 removes the adapter loop. Host launch becomes the next measured target.": "提交 1 移除逐适配器循环，下一步测量主机发射开销。",
+      "Direct launch and raw stream raise development speedup to 33.37×": "直接发射和底层流接口将开发评分加速提高到 33.37×",
+      "Submission 2 passes correctness. The agent saves this code before trying identity caching.": "提交 2 通过正确性检查。Agent 先保存这版代码，再尝试对象身份缓存。",
+      "Identity cache": "对象身份缓存",
+      "Identity cache passes correctness but development speedup falls to 30.83×": "对象身份缓存通过正确性检查，但开发评分加速降为 30.83×",
+      "Reused-object local tests were faster. Later fresh and rotating object tests expose a limitation.": "复用对象的本地测试更快；后续新建对象和轮换对象测试暴露了其局限。",
+      "Simpler key": "简化键",
+      "Simpler key built from submission 2 reaches 35.44× development speedup": "基于提交 2 的简化键使开发评分加速达到 35.44×",
+      "Signature and float-dispatch fixes restore correctness. Both measured object patterns improve locally.": "修复签名和浮点参数分派后恢复正确性。两种测量过的对象模式均在本地变快。",
+      "Selected submission 4 passes independent correctness and records 2.11× against Oracle": "选定的提交 4 通过独立正确性检查，相对 Oracle 加速 2.11×",
+      "Development score remains 35.44×. Independent official-baseline speedup is 34.59×; these baselines differ.": "开发评分仍为 35.44×。独立评测相对官方基线为 34.59×；各项使用不同基线。",
+      "Task constraints": "任务约束",
+      "Task constraints: three editable files, A100 40GB, 90 minutes": "任务约束：三个可编辑文件、A100 40GB、九十分钟",
+      "The agent records the software environment and saves the original files before editing.": "Agent 在编辑前记录软件环境，并保存原始文件。",
+      "Local baseline": "本地基线",
+      "Local baseline passes ten cases and takes 2.7 to 17 ms per operator": "本地基线通过十个用例，每个算子耗时 2.7 至 17 ms",
+      "Grouped kernels pass ten local cases; timing still needs diagnosis": "分组内核通过十个本地用例，但计时仍需诊断",
+      "Different shapes cluster near 200 µs while diagnostic instrumentation is active.": "诊断采集开启时，不同形状的耗时均集中在约 200 µs。",
+      "Host launch remains costly after grouped kernels reduce device work": "分组内核减少设备工作量后，主机发射仍然昂贵",
+      "The agent disables instrumentation, separates device timing and profiles Triton specialization.": "Agent 关闭诊断采集，单独测量设备时间，并分析 Triton 特化开销。",
+      "Submission 1 passes correctness at 18.67× development speedup": "提交 1 通过正确性检查，开发评分加速 18.67×",
+      "This is the first evaluator receipt. Fifteen submission attempts remain.": "这是首个评测回执，还剩十五次提交机会。",
+      "Tile search": "分块搜索",
+      "Tile search moves to a smaller foreground sweep after incomplete runs": "分块搜索在未完成的运行后改用较小的前台扫描",
+      "A broad sweep is stopped; a background sweep ends with its shell. The completed scan compares four shapes.": "大范围扫描被停止；后台扫描随 shell 结束。完成的扫描比较了四种形状。",
+      "Direct launch takes 17.32 µs versus 43.76 µs with identical test output": "直接发射为 17.32 µs，普通发射为 43.76 µs，测试输出相同",
+      "The first attempt had missing arguments. Reading the real signature enables a valid comparison.": "首次尝试缺少参数。读取实际签名后，比较才有效。",
+      "Raw stream lookup takes 0.23 µs versus current_stream at 6.33 µs": "底层流查询为 0.23 µs，current_stream 为 6.33 µs",
+      "Changing the accessor and stride handling lowers the full local call to 21.65 µs.": "更换查询接口并调整步长处理后，完整本地调用降为 21.65 µs。",
+      "Submission 2 passes correctness at 33.37× development speedup": "提交 2 通过正确性检查，开发评分加速 33.37×",
+      "The agent saves the improved direct-launch code for comparison and restoration.": "Agent 保存改进后的直接发射代码，供后续比较和恢复。",
+      "Identity caching gains depend on the implementation and object reuse": "对象身份缓存的收益取决于实现和对象复用",
+      "Double launches first break accumulation. After repair and simplification, reused-object A/B tests favor the candidate.": "重复发射最初破坏了累加；修复和简化后，复用对象的 A/B 测试支持新候选。",
+      "CUDA Graph replay is fast alone; integration leaves little net benefit": "CUDA Graph 单独重放很快，集成后的净收益有限",
+      "The agent estimates about 2 µs saved after key overhead and removes the graph path.": "Agent 估计扣除键开销后只节省约 2 µs，因此移除图路径。",
+      "Submission 3 stays correct but regresses to 30.83× development speedup": "提交 3 保持正确，但开发评分加速退到 30.83×",
+      "Submission 2 remains best at 33.37× despite the favorable local reused-object test.": "尽管本地复用对象测试有利，提交 2 仍以 33.37× 保持最优。",
+      "Object reuse": "对象复用",
+      "Object reuse changes whether identity caching helps": "对象复用方式决定身份缓存是否有益",
+      "Fresh-object totals include allocation. Rotating objects also disfavor the candidate; the evaluator input pattern is unknown.": "新建对象的总耗时包含分配。轮换对象也不利于候选；评测器输入模式未知。",
+      "Submission 2 code supplies the base for a cheaper specialization key": "以提交 2 的代码为基础构建更便宜的特化键",
+      "The agent retains slice offsets and fixes signature and float-dispatch errors before submission.": "Agent 保留切片偏移，并在提交前修复签名和浮点参数分派错误。",
+      "Submission 4 passes correctness and reaches 35.44× development speedup": "提交 4 通过正确性检查，开发评分加速达到 35.44×",
+      "It exceeds both submission 3 and its code ancestor, submission 2.": "它同时超过了提交 3 和其代码来源提交 2。",
+      "Boundary tests": "边界测试",
+      "Boundary tests all pass after the reference shape is fixed": "修复参考实现的形状后，边界测试全部通过",
+      "Nineteen local cases cover dtypes, ranks, offsets, views and routing. This is correctness coverage.": "十九个本地用例覆盖数据类型、秩、偏移、视图和路由；这是正确性覆盖。",
+      "Argument count": "参数数量",
+      "Argument count adds about 0.029 µs per extra direct-launch argument": "直接发射每增加一个参数，开销约增加 0.029 µs",
+      "The agent stops trimming arguments after the six-versus-twenty-one comparison.": "比较六个与二十一个参数后，Agent 停止继续裁减参数。",
+      "Alignment variant": "对齐变体",
+      "Alignment variant is slightly slower locally, so submission 4 is restored": "对齐变体在本地略慢，因此恢复提交 4",
+      "Correctness passes. No development score is submitted for this variant.": "正确性通过；该变体没有提交开发评分。",
+      "Finalize selects submission 4 after a rejected first request": "首次请求被拒绝后，Finalize 选定提交 4",
+      "The first tool call never executes. Corrected arguments produce an explicit selection receipt.": "第一次工具调用未执行。修正参数后，回执明确记录最终选择。",
+      "File hashes": "文件哈希",
+      "File hashes identify the final tree as the saved submission 4": "文件哈希确认最终工作树等于保存的提交 4",
+      "HEAD remains the baseline commit with three modified files. The final narrative is kept as an agent report.": "HEAD 仍是基线提交，三个文件有修改。最终文字总结作为 Agent 报告保留。",
+      "The agent writes grouped Triton shrink and expand kernels while baseline timing is still running. The kernels use routing arrays to process LoRA groups. This action writes the implementation; the numerical comparison follows in later actions.": "基线计时仍在运行时，Agent 编写分组 Triton shrink 和 expand 内核。内核通过路由数组处理 LoRA 组。这个动作写入实现；数值比较在后续动作中进行。",
+      "All ten local cases pass for the grouped kernels. Several timings remain near 200 µs across different shapes while automatic diagnostics are enabled. The matching numerical results support correctness on these cases; the timing pattern still needs diagnosis.": "分组内核通过全部十个本地用例。自动诊断开启时，不同形状的若干计时仍在约 200 µs 附近。数值相符支持这些用例上的正确性；计时模式仍需诊断。",
+      "The agent reports that all ten cases pass but timings cluster near 200 µs. It writes a smaller call-overhead test and plans to disable diagnostics. The suspected host floor is a hypothesis at this point, not yet a measured decomposition.": "Agent 报告十个用例全部通过，但耗时集中在约 200 µs。它编写更小的调用开销测试，并计划关闭诊断。此时怀疑存在主机开销下限，仍只是待验证假设，还没有分解测量。",
+      "With diagnostics disabled, an empty one-block Triton launch takes about 18 µs and the tested shrink call takes about 64 µs. Larger shapes show different device and wall times. These measurements narrow the investigation to call overhead, but do not yet isolate GPU execution cleanly.": "关闭诊断后，空的单块 Triton 发射耗时约 18 µs，所测 shrink 调用约 64 µs。更大的形状呈现不同的设备时间和墙钟时间。这些测量将调查缩小到调用开销，但尚未清晰隔离 GPU 执行。",
+      "CUDA Graph replay separates device work from ordinary host calls. Device times range from 12.15 to 220.13 µs across the shown operations, while small ordinary calls remain near 63 to 68 µs. The accompanying profile identifies Triton specialization and launch work for further inspection.": "CUDA Graph 重放将设备工作与普通主机调用分开。所示算子的设备耗时在 12.15 至 220.13 µs 之间，而小型普通调用仍约为 63 至 68 µs。配套 profile 将 Triton 特化与发射列为进一步检查的对象。",
+      "The microbenchmark shows ordinary Triton launch cost increasing with argument count. An attempted fast-path grid call raises tuple index out of range. That bypass does not produce a valid performance result.": "微基准显示，普通 Triton 发射开销随参数数量增加。一次尝试绕过常规路径的 grid 调用触发 tuple index out of range。这个旁路尝试没有产生有效性能结果。",
+      "The agent submits the grouped-kernel candidate after reporting ten passing local cases. Scoring runs asynchronously. The receipt included in this action records submission 1, correctness PASS and 18.67× development speedup.": "Agent 报告十个本地用例通过后，提交分组内核候选。评分异步运行。该动作所含回执记录提交 1、正确性 PASS 和 18.67× 开发评分加速。",
+      "The submission receipt reports correctness PASS and 18.67× development speedup. It marks submission 1 as best so far and leaves fifteen attempts. These are development-evaluator results, separate from the preceding local timings.": "提交回执报告正确性 PASS 和 18.67× 开发评分加速，将提交 1 标为当前最优，并显示还剩十五次机会。这些是开发评测器结果，与先前的本地计时分开。",
+      "The agent stops the broad tile search after it runs for about 34 seconds without a useful completed comparison. Stopping this scan does not reject the grouped-kernel design; a smaller parameter search follows.": "大范围分块搜索运行约三十四秒后仍未形成有用的完整比较，Agent 将其停止。停止这轮扫描并不代表放弃分组内核设计；随后进行了较小范围的参数搜索。",
+      "After a direct-launch call fails because its argument count is wrong, the agent says the bypass is fragile. It writes a host-overhead breakdown to measure the existing path before revisiting the launcher.": "直接发射调用因参数数量错误而失败后，Agent 表示这条旁路较脆弱。它编写主机开销分解测试，先测量已有路径，再重新研究发射器。",
+      "The breakdown measures 63.84 µs for the tested shrink call and 44.69 µs for Triton launch with the full argument set. Removing the launch gives 11.29 µs in the scratch test. These are diagnostic local timings, not the development score.": "分解测试测得 shrink 调用为 63.84 µs，带完整参数集的 Triton 发射为 44.69 µs。临时测试移除发射后为 11.29 µs。这些是本地诊断计时，不是开发评分。",
+      "The host profile lists specialize_impl and Triton run among the dominant functions. The separate unprofiled launch measurement is 43.45 µs. Profiled function totals locate overhead; they should not be added to that latency as independent costs.": "主机 profile 将 specialize_impl 和 Triton run 列为主要耗时函数。另一次未开启 profile 的发射测量为 43.45 µs。Profile 的函数累计时间用于定位开销，不应作为独立成本再加到该延迟上。",
+      "The partial sweep reports a 27.5 µs shrink configuration with tile tuple (32, 256, 4, 3). Some (256, 256) choices exceed shared memory. Only the shown partial search is supported here; expand results are not yet available.": "部分扫描报告 shrink 分块参数 (32, 256, 4, 3) 耗时 27.5 µs。若干 (256, 256) 选择超过共享内存上限。这里仅支持已显示的部分搜索结果，还没有 expand 结果。",
+      "The process check finds no running background tuner and its log contains only a small partial result. The agent subsequently attributes the exit to the shell session and switches to a foreground sweep.": "进程检查未发现仍在运行的后台调参程序，其日志也只有少量部分结果。Agent 随后将退出归因于 shell 会话结束，并改用前台扫描。",
+      "The agent states that the background tuner died with its shell. It narrows the tile choices and writes a foreground sweep so the remaining measurements can complete within the session.": "Agent 表示后台调参程序随 shell 退出。它缩小分块选择范围，并编写前台扫描，以便在会话内完成剩余测量。",
+      "With the full launcher signature, direct launch takes 17.32 µs versus 43.76 µs for normal launch. The tested output is bitwise equal with maxdiff 0.0. This validates that launch experiment, not every future input or kernel configuration.": "补齐发射器签名后，直接发射为 17.32 µs，普通发射为 43.76 µs。测试输出逐位相同，maxdiff 为 0.0。这验证了本次发射实验，不代表所有未来输入或内核配置都已验证。",
+      "The foreground sweep returns shrink and expand timings for four shapes. The preferred tiles vary by shape; bounding the grid helps some expand cases but not all. The next implementation uses these results alongside the independently tested direct launch.": "前台扫描返回四种形状的 shrink 和 expand 耗时。最优分块随形状变化；限制 grid 对部分 expand 用例有益，但并非全部。下一版实现同时采用这些结果和另行测试过的直接发射路径。",
+      "The agent reports measured tile choices and the direct-launch comparison, then integrates both. It chooses BLOCK_M/BLOCK_K of 32/128 for shrink and 64/128 for expand. Numerical and call-cost checks follow this edit.": "Agent 汇报测得的分块选择与直接发射比较，然后将两者集成。它为 shrink 选择 BLOCK_M/BLOCK_K 为 32/128，为 expand 选择 64/128。之后继续检查数值与调用成本。",
+      "The updated shrink call measures 33.34 µs, but the old no-launch diagnostic still measures 33.78 µs. The old monkey patch no longer isolates the new launcher. These figures motivate a breakdown written for the changed implementation.": "更新后的 shrink 调用为 33.34 µs，但旧的无发射诊断仍测得 33.78 µs。旧 monkey patch 已无法隔离新发射器。这些数值促使 Agent 为改后的实现重新编写分解测试。",
+      "The scratch breakdown reports a CUDA misaligned-address error after using fabricated strides. This test failure does not identify a production-kernel regression. The agent later corrects the scratch inputs and retains stride-divisibility checks in the key.": "临时分解测试使用虚构步长后，出现 CUDA misaligned-address 错误。这个测试失败不能据此确定生产内核发生回归。Agent 后来修正临时输入，并在键中保留步长整除检查。",
+      "Using real tensor strides, the breakdown reports 34.11 µs for the full call, 6.06 µs for the wrapper-only test and 5.53 µs for key construction. Stream lookup is also several microseconds. These separate diagnostic measurements identify candidates for the next change.": "改用真实张量步长后，分解测试测得完整调用 34.11 µs、仅封装层 6.06 µs、键构建 5.53 µs。流查询也占数微秒。这些分开的诊断测量帮助选出下一步修改目标。",
+      "The accessor microbenchmark measures current_stream() at 6.33 µs and the raw stream accessor at 0.23 µs. This compares stream-query APIs on the recorded setup. It does not imply the complete operator becomes 27 times faster.": "访问接口微基准测得 current_stream() 为 6.33 µs，底层流接口为 0.23 µs。这是在所记录环境中比较流查询 API，不代表完整算子加速二十七倍。",
+      "The agent cites the cheaper raw stream accessor and changes stream lookup together with stride-argument handling. This edit applies the diagnostic finding to the launcher. Subsequent tests check the new signature and full call.": "Agent 根据底层流接口较便宜的测量，更换流查询并调整步长参数处理。这个编辑将诊断结果应用到发射器。后续测试检查新的签名和完整调用。",
+      "The full operation with direct launch and a cache hit measures 21.65 µs locally. The diagnostic script also measures the older stream-query API separately; those older query timings are not part of the new call path.": "直接发射并命中缓存时，完整操作在本地测得 21.65 µs。诊断脚本还单独测量旧的流查询 API，但旧查询耗时不属于新调用路径。",
+      "Submission 2 receives correctness PASS and 33.37× development speedup. The previous receipt was 18.67×. The agent then saves this candidate before trying another cache strategy.": "提交 2 收到正确性 PASS 和 33.37× 开发评分加速；前一次回执为 18.67×。Agent 随后保存该候选，再尝试另一种缓存策略。",
+      "The identity-cache implementation passes nine displayed cases but fails add_inputs with expand relative error 0.6441. The shell operation completes, yet numerical verification fails. The agent isolates first-call and repeated-call behavior next.": "对象身份缓存实现通过显示的九个用例，但 add_inputs 失败，expand 相对误差为 0.6441。Shell 操作完成不等于数值验证通过。Agent 随后分别检查首次调用与重复调用。",
+      "The reproduction shows direct launch failing on the first add_inputs call but passing on the repeated call. The ordinary path passes both. This localizes the issue to the direct path's cache-miss behavior.": "复现显示，直接发射在首次 add_inputs 调用时失败，重复调用时通过；普通路径两次都通过。这将问题定位到直接路径的缓存未命中行为。",
+      "The agent identifies a double launch on a cache miss and edits the control flow. This is an attempted fix. The next test shows that the revised return also breaks a different cached-specialization path.": "Agent 发现缓存未命中时发生两次发射，并修改控制流。这只是一次修复尝试；下一轮测试表明，修改后的 return 又破坏了另一条已有特化缓存的路径。",
+      "The first fix makes the initial add_inputs call pass, but the repeated call fails. Several other cases return relative error 1.0. Correctness is still broken, so this result cannot be treated as a successful cache optimization.": "第一次修复让首次 add_inputs 调用通过，却使重复调用失败，另外几个用例返回相对误差 1.0。正确性仍未恢复，因此该结果不能视为成功的缓存优化。",
+      "The agent states that its return statement breaks the path with a cached specialization and new tensors. It reopens the launch implementation before restructuring the branches to execute exactly one launch.": "Agent 表示，其 return 语句破坏了“已有特化缓存但使用新张量”的路径。它重新打开启动实现，随后重构分支，确保每次只发射一次。",
+      "After restructuring the launch branches, direct and ordinary add_inputs paths pass on both first and repeated calls. All ten displayed local cases pass. This repairs the observed correctness regression; performance still needs separate measurement.": "重构发射分支后，直接与普通 add_inputs 路径在首次和重复调用时均通过，显示的十个本地用例也全部通过。这修复了已观察到的正确性回归；性能仍需另行测量。",
+      "The full call measures 21.61 µs, and the script reports a specialization-cache hit but an alias-cache miss at its check. Building the alias key takes 2.33 µs. These figures do not establish a full-call benefit from identity caching.": "完整调用耗时 21.61 µs。脚本检查时报告特化缓存命中，但 alias 缓存未命中；alias 键构建耗时 2.33 µs。这些数值还不能证明身份缓存降低了完整调用耗时。",
+      "Instrumentation of a scratch copy records 199 alias hits in 200 calls. This establishes that the repeated-call test reaches the cache. A hit count alone does not show a latency improvement.": "对临时副本加的计数器记录到，二百次调用中有一百九十九次 alias 命中。这说明重复调用测试确实进入了缓存。仅有命中次数不能说明延迟降低。",
+      "A standalone test measures CUDA Graph replay at 5.00 µs versus 21.01 µs for the direct call, with the same result. Graph construction and its eventual cache lookup are not included in the replay-only number.": "独立测试测得 CUDA Graph 重放为 5.00 µs，直接调用为 21.01 µs，结果相同。仅重放的数值不包含图构建和最终集成时的缓存查询成本。",
+      "After the replay-only comparison, the agent proposes an identity-keyed graph cache with a two-sighting capture policy and fallback. It reads the launch path needed for integration. The proposed full-operator gain has not yet been measured.": "比较仅重放的性能后，Agent 提出按对象身份缓存图，采用对象出现两次后才捕获的策略，并保留回退路径。它读取发射路径准备集成。此时还未测量完整算子的收益。",
+      "The integrated graph version passes the displayed numerical checks, but the three-slice case is much slower than the small single-slice cases. The agent subsequently identifies fresh view objects as a cause of graph-key churn and repeated capture.": "集成图的版本通过显示的数值检查，但三切片用例明显慢于较小的单切片用例。Agent 随后将新建视图对象识别为图键频繁变化、反复捕获的原因。",
+      "The agent states that multi-slice calls create fresh views and trigger repeated graph capture. It changes the kernels to accept slice offsets and adds a capture limit. This edit addresses that observed integration problem; later timing determines whether graphs remain useful.": "Agent 表示，多切片调用创建新视图并触发重复图捕获。它修改内核以接收切片偏移，并限制捕获次数。这个编辑处理了已观察到的集成问题；后续计时再决定是否保留图。",
+      "The agent estimates that integrated graphs save only about 2 µs because key overhead consumes most of the replay gain. It decides the benefit is not worth the risk and reads the saved submission 2 implementation before rebuilding.": "Agent 估计，键开销抵消了大部分重放收益，集成图只节省约 2 µs。它认为收益不值得冒险，因此在重构前读取已保存的提交 2 实现。",
+      "The agent removes graph capture/replay and installs a simpler same-object launch fast path. Slice-offset work remains. This selects a different candidate implementation; a controlled A/B test follows.": "Agent 移除图捕获与重放，安装更简单的同对象发射快速路径，同时保留切片偏移改动。这选择了另一种候选实现，随后进行受控 A/B 测试。",
+      "The local A/B test reuses tensors and compares the current candidate with the saved submission 2 code. The candidate is faster on the shown shapes; the agent describes about 3 to 5 µs per operation. This result applies to reused objects and does not establish behavior with fresh objects.": "本地 A/B 测试复用张量，将当前候选与保存的提交 2 比较。候选在显示的形状上更快，Agent 将收益描述为每个算子约 3 至 5 µs。该结果适用于复用对象，不能说明新建对象时的表现。",
+      "Reused tensors": "复用张量",
+      "Reused tensors favor the candidate in local A/B timing": "复用张量时，本地 A/B 计时支持新候选",
+      "Fresh and rotating objects are not covered by this comparison.": "这个比较没有覆盖新建对象和轮换对象。",
+      "The agent cites the favorable reused-object A/B test, scans the editable files for banned tokens and checks syntax before submission. These checks prepare submission 3; they do not supply its development score.": "Agent 引用有利的复用对象 A/B 结果，检查可编辑文件中的禁用词和语法，再准备提交。这些检查用于准备提交 3，不提供其开发评分。",
+      "Submission 3 passes correctness but scores 30.83×, below submission 2's 33.37×. The evaluator still lists submission 2 as best. The discrepancy with the reused-object A/B test is retained instead of replacing one result with the other.": "提交 3 通过正确性检查，但评分为 30.83×，低于提交 2 的 33.37×。评测器仍将提交 2 列为最优。导出保留了它与复用对象 A/B 测试的差异，没有用一项结果替换另一项。",
+      "With stable objects, the identity candidate takes 17.01 µs versus 21.89 µs for submission 2. With fresh objects, total time is 65.46 versus 61.08 µs; those totals include allocation. The result shows sensitivity to object reuse, but does not reveal how the evaluator constructs inputs.": "使用稳定对象时，身份缓存候选为 17.01 µs，提交 2 为 21.89 µs；使用新建对象时，总耗时分别为 65.46 和 61.08 µs，包含分配时间。结果说明表现取决于对象复用，但不能揭示评测器如何构造输入。",
+      "Object reuse changes the identity candidate from faster to slower": "对象复用方式让身份缓存候选从更快变成更慢",
+      "Stable: 17.01 versus 21.89 µs. Fresh totals: 65.46 versus 61.08 µs, including allocation.": "稳定对象：17.01 对 21.89 µs。新建对象总耗时：65.46 对 61.08 µs，包含分配。",
+      "After the adaptive miss change, the candidate takes 24.68 µs with rotating objects versus 22.41 µs for submission 2. Stable-object timing is also slower in this comparison. The agent next rebuilds from the saved submission 2 design.": "加入自适应未命中策略后，候选在轮换对象下为 24.68 µs，提交 2 为 22.41 µs。这次比较中，稳定对象耗时也更慢。Agent 随后从保存的提交 2 设计重新构建。",
+      "The agent explicitly rejects the identity-cache direction and restores submission 2's kernel_utils.py. It begins a new specialization key with separate tensor and scalar argument tuples. This creates a new candidate from the earlier code, not an identical restoration of the whole final tree.": "Agent 明确放弃身份缓存方向，恢复提交 2 的 kernel_utils.py，并开始编写新的特化键，将张量和标量参数拆成独立元组。这是在旧代码上建立新候选，并不是完整工作树原样回退。",
+      "The result contains ten passing numerical cases and passing first/repeated add_inputs checks. Rotating-object timing is 19.74 versus 22.04 µs for submission 2; stable-object timing is 19.30 versus 21.58 µs. A separate old microbenchmark fails, so the enclosing operation reports failure despite these usable results.": "结果包含十个通过的数值用例，以及首次和重复 add_inputs 检查通过。轮换对象耗时为 19.74 µs，提交 2 为 22.04 µs；稳定对象为 19.30 对 21.58 µs。另一个旧微基准单独失败，因此外层操作虽有这些可用结果，仍报告失败。",
+      "Submission 4 returns correctness PASS and dev_speedup 35.44×. It becomes the best of four submissions. The local object-pattern comparisons and this development score are separate evidence.": "提交 4 返回正确性 PASS 和 dev_speedup 35.44×，成为四次提交中的最优。本地对象模式比较与这个开发评分是不同证据。",
+      "The agent fixes the reference script's output-shape handling and reruns the boundary suite. All nineteen listed cases pass, including offsets, add_inputs, noncontiguous views and alternate dtypes. The repaired script expands local correctness coverage.": "Agent 修复参考脚本的输出形状处理并重跑边界测试。列出的十九个用例全部通过，包括偏移、add_inputs、非连续视图和其他数据类型。修复后的脚本扩展了本地正确性覆盖。",
+      "Direct launch takes 6.04 µs with six arguments and 6.47 µs with twenty-one: about 0.029 µs per extra argument. This limits the expected benefit of further argument trimming on this setup. The explicit decision to stop trimming appears in the following action.": "直接发射六个参数耗时 6.04 µs，二十一个参数耗时 6.47 µs，约为每增加一个参数多 0.029 µs。这限制了当前配置下进一步裁减参数的预期收益。下一动作明确记录了停止裁减的决定。",
+      "The alignment variant passes the displayed correctness checks. Rotating-object timing is 20.60 µs versus 20.32 µs for the saved submission 4 copy; stable-object timing is 20.59 versus 20.20 µs. The small local regression is not a new submitted score.": "对齐变体通过显示的正确性检查。轮换对象为 20.60 µs，保存的提交 4 为 20.32 µs；稳定对象为 20.59 对 20.20 µs。这个小幅本地退步不是新提交的评分。",
+      "The agent says the alignment change measured slower and copies back the saved submission 4 files. The receipt shows matching hashes and passing test output, but the overall command is still running at that receipt. Final file equality is checked again later.": "Agent 表示对齐改动测得更慢，并复制回保存的提交 4 文件。回执显示哈希相符和通过的测试输出，但此时整条命令仍在运行。最终文件一致性在后面再次检查。",
+      "Restore submission 4 after the alignment variant measures slower": "对齐变体测得更慢后，恢复提交 4",
+      "The receipt contains passing output while still running. A later hash check confirms the final files.": "回执包含通过的输出，但命令仍在运行；后续哈希检查确认最终文件。",
+      "The finalize request includes an unsupported yieldMs argument. Tool validation rejects the request before the shell command runs. No final selection occurs in this action.": "Finalize 请求包含不支持的 yieldMs 参数。工具验证在 shell 命令运行前拒绝了请求。这个动作没有完成最终选择。",
+      "The corrected finalize request succeeds. Its receipt selects submission 4 at k=4/16 and prepares that tree for grading. It does not run a new development performance measurement.": "修正后的 finalize 请求成功。回执在 k=4/16 时选定提交 4，并准备对该工作树评分。该动作没有重新测量开发性能。",
+      "All three final file hashes match the saved submission 4 copy. HEAD is still the original baseline commit, with three modified files. The retained artifact is identified by its file contents rather than by a newly created commit.": "三个最终文件的哈希均与保存的提交 4 相同。HEAD 仍是原始基线提交，三个文件有修改。保留的产物由文件内容标识，而非新建的 commit。",
+      "The agent reports that it finalized submission 4 and summarizes grouped kernels, direct launch, raw stream lookup and rejected cache variants. Its narrative omits submission 3 from one displayed score sequence and speculates about evaluator object reuse. The export retains the full four-submission receipts and separate independent evaluation, so those claims can be checked against their evidence.": "Agent 报告已最终选择提交 4，并总结分组内核、直接发射、底层流查询及被放弃的缓存变体。它在一处评分序列中遗漏提交 3，并猜测评测器的对象复用方式。导出保留完整四次提交回执和单独的独立评测，因此可以据此核对这些说法。",
+      "Final report": "最终报告",
+      "Final report explains retained changes and remaining limits in the agent's words": "最终报告用 Agent 原话解释保留的改动和剩余局限",
+      "Check the complete receipts: one reported score sequence omits submission 3, and evaluator object reuse remains inferred.": "应核对完整回执：一处评分序列漏了提交 3，评测器对象复用方式仍是推断。",
+      "The agent writes an fp64 reference and ten local correctness and timing cases. An import error initially prevents the scratch copy from running. After fixing module loading, the baseline passes all ten cases and takes roughly 2.7 to 17 ms per operator with diagnostics enabled. These measurements establish the local comparison point; they are separate from the development evaluator.": "Agent 编写 fp64 参考计算和十组本地正确性、计时用例。草稿副本先因导入错误无法运行；修复模块加载后，十组用例全部通过，每个算子约耗时 2.7 至 17 ms。这是本地比较基准，与开发评测分开记录。 这组毫秒级计时启用了诊断采集，不能直接与后续关闭诊断后的微秒级测量比较。",
+      "The baseline test finishes and reports ten passing cases against the fp64 reference. Per-operator timings range from roughly 2.7 to 17 ms with diagnostics enabled in this local harness. This result establishes the original implementation's local behavior and cost.": "基线测试完成，报告十个用例均通过 fp64 参考实现检查。本地测试中，每个算子的耗时约为 2.7 至 17 ms。该结果记录原始实现的本地行为与开销。 这组毫秒级计时启用了诊断采集，不能直接与后续关闭诊断后的微秒级测量比较。",
+      "Diagnostics are enabled in this timing. An import fix enables the scratch fp64 comparison.": "这组计时启用了诊断采集；修复导入后，草稿代码可与 fp64 参考结果比较。"
     }
   }
 }

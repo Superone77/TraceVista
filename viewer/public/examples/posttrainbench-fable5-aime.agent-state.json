@@ -5,8 +5,8 @@
   "scope": "Completed training-data recipes, materialized model candidates, and the contents of final_model. Snapshots identify artifacts by recorded paths and recipes, not invented weight hashes. Training health, evaluations, infrastructure repairs and reports remain actions. Branches describe directions and can be sequential.",
   "notes": [
     "English reading layers are analyst annotations with source-linked evidence. Raw logs retain their original language and complete public record, subject to credential redaction.",
-    "Selected on 2026-10-04 from dataset revision 386b3034fa26f0f1b3ae3bfded99b791f0b254a6. Fable 5 is the highest-ranked current aggregate agent represented in this corpus, ranked fifth on v1.2. Current leader Fable 5.1 has no trajectory in this snapshot.",
-    "Archived final metrics: 30.0%, stderr 8.51 percentage points. Agent development: 23.3%, 21/90 responses from three repetitions of the same 30 questions. These are different scopes; 90 responses are not 90 distinct questions. Current v1.2 Fable 5/Qwen3-4B/AIME aggregate is 21.0%.",
+    "The 2026-10-04 selection snapshot uses dataset revision 386b3034fa26f0f1b3ae3bfded99b791f0b254a6. In that snapshot, Fable 5 ranked fifth overall and was the highest-ranked agent represented in the public corpus. Fable 5.1 ranked first but had no trajectory in the snapshot.",
+    "Archived final metrics report 30.0% accuracy and an 8.51-percentage-point standard error. Agent development totals 21/90 responses, or 23.3%, from three repetitions of the same 30 questions. The dated selection snapshot separately records a 21.0% v1.2 Fable 5/Qwen3-4B/AIME aggregate.",
     "Baseline 10% and pilot 20% each use a ten-question subset. They are not paired comparisons with the full thirty-question evaluations. Accuracy comparisons are descriptive single-run differences, not statistically established improvements.",
     "The original trace records one coding agent with no invoked skill or coding reviewer. Official post-run judgments are attached as external assessments, not an in-session review loop.",
     "The raw trace includes reads of AIME 2025 questions and answers for evaluation/decontamination. Official archived checks mark contamination, disallowed model, hosted API use and benchmark lookup false; this conversion does not rerun those checks.",
@@ -17,7 +17,7 @@
     {
       "id": "s0",
       "title": "Base model · evaluation contract",
-      "summary": "Claude Code 2.1.157 runs Fable 5 with a 1M-context configuration and a ten-hour H100 budget. The task is to post-train the assigned Qwen3-4B base model for AIME 2025 mathematics. Its ten-question baseline is 1/10; the evaluator allows 16,000 generated tokens and expects a final integer.",
+      "summary": "Claude Code 2.1.157 uses Fable 5 with a one-million-token context configuration to post-train Qwen3-4B-Base for AIME 2025 mathematics. The run has one H100 80 GB GPU and a ten-hour budget. The evaluator allows 16,000 generated tokens and scores the final numeric answer. The untrained base model solves 1 of 10 development questions. This subset establishes the starting result; later candidate selection uses all 30 questions.",
       "events": [
         "main:E3",
         "main:E11",
@@ -54,7 +54,7 @@
     {
       "id": "s1",
       "title": "Pilot data · 26,429 formatted examples",
-      "summary": "After a stalled preparation job, the lean replacement saves 26,429 examples and 158.2M tokens. The corpus uses AceReason math data, integer answers, overlap removal and evaluation-matched prompt/completion strings. A corrupted bytecode cache must be repaired before sample inspection.",
+      "summary": "The agent replaced the stalled preparation script with prep_data2.py. The new script saved 26,429 AceReason examples totaling 158.2 million tokens. It filtered integer answers, removed overlapping prompts and formatted each response to end with an ANSWER line. These files supplied the 1,500-example pilot. A later recipe replaced this corpus before the main training run.",
       "events": [
         "main:E287",
         "main:E308",
@@ -89,8 +89,8 @@
     },
     {
       "id": "s2",
-      "title": "Pilot model · answer completion is the bottleneck",
-      "summary": "The 1,500-example full-fine-tuning pilot is saved and scores 2/10 on the development subset. Eight completions lack an ANSWER line in the agent’s diagnostic. Disabling gradient checkpointing for a throughput probe causes GPU out-of-memory.",
+      "title": "Pilot model · missing final answer lines",
+      "summary": "The agent fine-tuned the base model on 1,500 examples and saved the pilot weights. The pilot solved 2 of 10 development questions. Only two responses contained a terminal ANSWER line in the diagnostic; the other eight did not. This check inspected answer text, not generation finish reasons. A separate attempt to disable gradient checkpointing exhausted GPU memory. The next recipe kept checkpointing and selected shorter eligible traces.",
       "events": [
         "main:E328",
         "main:E349",
@@ -105,9 +105,9 @@
         "submission": null
       },
       "ladder": {
-        "topic": "Pilot model",
-        "takeaway": "Pilot model reaches 20%, but eight responses lack final answer lines.",
-        "reason": "The ten question diagnostic directs attention to shorter training traces.",
+        "topic": "Pilot answers",
+        "takeaway": "Pilot answers reach 2/10, with eight missing final answer lines.",
+        "reason": "The text diagnostic checks endings, not finish reasons. The next recipe uses shorter traces.",
         "abstract": [
           {
             "event": "main:E379",
@@ -142,7 +142,7 @@
     {
       "id": "s3",
       "title": "Shortest-trace recipe · 23,804 examples",
-      "summary": "The revised preparation keeps the shortest eligible trace per unique problem, filters 2,270 overlaps and saves 23,804 examples / 150.2M tokens. Full training restarts from Qwen3-4B-Base, not the pilot weights. The trace shows no new correctness verifier for these training responses.",
+      "summary": "The revised script kept the shortest eligible AceReason trace for each distinct problem. It removed 2,270 overlapping prompts and saved 23,804 examples totaling 150.2 million tokens. The filter checked format and integer answers; it did not run a new correctness verifier. The main fine-tune then initialized from Qwen3-4B-Base. The pilot weights were not its parent.",
       "events": [
         "main:E386",
         "main:E394",
@@ -180,7 +180,7 @@
     {
       "id": "s4",
       "title": "Main fine-tune · full epoch and saved checkpoints",
-      "summary": "The main full fine-tune completes 1,152 steps from the assigned base in about 4h27m. The final checkpoint first scores 7/30; checkpoint 840 first scores 8/30. The agent’s diagnostic finds 19/30 final-checkpoint responses without a terminal ANSWER line. Later repeated main/final measurements pool to 18/90.",
+      "summary": "The main fine-tune trained all model weights for one epoch on the 23,804-example corpus. It used completion-only loss, packed sequences, FlashAttention-2 and Liger kernels. The initial learning rate was 1.5e-5 with cosine decay. Training completed 1,152 steps in about 4 hours 27 minutes and saved intermediate checkpoints. The final checkpoint first solved 7/30 questions; checkpoint 840 first solved 8/30. These scores led to checkpoint comparison and weight averaging. Later repeats of the final checkpoint totaled 18/90 responses on the same 30 questions.",
       "events": [
         "main:E180",
         "main:E428",
@@ -233,7 +233,7 @@
     {
       "id": "s5",
       "title": "Three-checkpoint soup · the eventual winner",
-      "summary": "soup.py averages main checkpoints 980, 1120 and final/1152 into runs/soup_last3. It first scores 8/30, then 6/30, and after final packaging 7/30. The repeated development total is 21/90 on the same thirty questions, with six questions solved in every repeat.",
+      "summary": "The agent averaged the weights of main-run checkpoints 980, 1120 and 1152 into runs/soup_last3. This operation is called a checkpoint soup. It combines saved weights without another training run. The soup first solved 8/30 questions and then 6/30 on a repeat. After the final package was restored to these weights, a third evaluation solved 7/30. The total was 21 correct responses from three passes over the same 30 questions; six questions were solved on every pass.",
       "events": [
         "main:E652",
         "main:E657",
@@ -248,8 +248,8 @@
       },
       "ladder": {
         "topic": "Three checkpoint soup",
-        "takeaway": "Three checkpoint soup first scores 8/30 and ultimately wins selection.",
-        "reason": "Averaging late checkpoints creates the candidate later restored into final_model.",
+        "takeaway": "Three checkpoint soup combines saved weights and is eventually selected.",
+        "reason": "Three repeats score 8/30, 6/30 and 7/30 on the same questions.",
         "abstract": [
           {
             "event": "main:E856",
@@ -284,7 +284,7 @@
     {
       "id": "s6",
       "title": "Long-trace continuation · 38M extra tokens, 6/30",
-      "summary": "The agent continues training from soup_last3 on 4,403 fresh, longer complete traces totaling 38M tokens. The 307-step run saves runs/stage2/final. Its evaluation is 6/30, and twelve responses contain terminal ANSWER lines in the agent’s diagnostic.",
+      "summary": "The agent continued training from soup_last3 on 4,403 previously unused problems with longer complete traces, totaling 38 million tokens. The run used a 5e-6 initial learning rate and saved a new model after 307 steps. It solved 6/30 questions. The answer-line diagnostic found twelve completed endings, only one more than for the main final checkpoint. The agent also tested an average of this run’s checkpoints before abandoning the continuation family.",
       "events": [
         "main:E690",
         "main:E700",
@@ -299,8 +299,8 @@
       },
       "ladder": {
         "topic": "Long trace continuation",
-        "takeaway": "Long trace continuation scores 6/30 and does not improve the candidate.",
-        "reason": "Extra training starts from the soup weights rather than the original base.",
+        "takeaway": "Long trace continuation scores 6/30 in one development run.",
+        "reason": "Training adds 38 million tokens from the soup weights. This candidate is not submitted.",
         "abstract": [
           {
             "event": "main:E757",
@@ -335,7 +335,7 @@
     {
       "id": "s7",
       "title": "Stage-two soup · lower measured accuracy",
-      "summary": "Averaging stage-two checkpoints 200, 300 and final produces a second soup. It scores only 4/30. The agent returns to comparisons among the earlier main-run candidates instead of retaining the continuation family.",
+      "summary": "The agent averaged continuation checkpoints 200, 300 and final into a second soup. The saved candidate loaded and solved 4/30 questions. This was below the continuation model’s 6/30 in the recorded single evaluations. The agent did not submit either candidate and resumed comparisons among main-run checkpoints. These tests do not establish that continuation or averaging is generally harmful.",
       "events": [
         "main:E742",
         "main:E747",
@@ -382,7 +382,7 @@
     {
       "id": "s8",
       "title": "Four-checkpoint soup · wider averaging yields 6/30",
-      "summary": "The agent averages main checkpoints 840, 980, 1120 and final. The wider soup scores 6/30, below the first three-checkpoint-soup evaluation. A temperature-0.3 test on checkpoint 840 also returns 6/30. These remain tested alternatives.",
+      "summary": "The agent added checkpoint 840 to the original three-checkpoint average. This wider soup drew all four inputs from the main training run, not the continuation run. It solved 6/30 questions in one evaluation. A separate checkpoint-840 test with temperature 0.3 and top_p 0.9 also solved 6/30. The agent kept both results separate from the default-sampling repeats and selected neither alternative.",
       "events": [
         "main:E782",
         "main:E789",
@@ -397,8 +397,8 @@
       },
       "ladder": {
         "topic": "Wider soup",
-        "takeaway": "Wider soup scores 6/30 and loses to the earlier candidate.",
-        "reason": "Adding checkpoint 840 does not improve this single development run.",
+        "takeaway": "Wider soup scores 6/30 in one development run.",
+        "reason": "Adding checkpoint 840 creates another main run average, which is not selected.",
         "abstract": [
           {
             "event": "main:E812",
@@ -431,7 +431,7 @@
     {
       "id": "s9",
       "title": "Provisional submission · checkpoint 840 drops to 5/30",
-      "summary": "After checkpoint 840 reaches 15/60 across two default-temperature evaluations, the agent copies it into final_model. Its official-style verification produces 5/30, lowering the three-repeat pool to 20/90. Per-question stability then favors the three-checkpoint soup.",
+      "summary": "The agent copied checkpoint 840 into final_model after it had solved 15/60 responses across two default-sampling evaluations. The package used temperature 0.6, top_p 0.95 and top_k 20. Verification through the default evaluate.py path then solved 5/30, bringing the total to 20/90. The agent responded by comparing which questions each candidate solved consistently. This was a provisional package, not the final submitted weight choice.",
       "events": [
         "main:E820",
         "main:E821",
@@ -480,7 +480,7 @@
     {
       "id": "s10",
       "title": "Final submission · restore soup, archive scores 30%",
-      "summary": "The agent replaces checkpoint 840 in final_model with soup_last3. The exact default evaluator returns 7/30; pooled soup development is 21/90 with six consistently solved questions. Published post-run metrics separately report 30% (stderr 8.51 points). Official checks record no contamination, disallowed base, hosted-API use or benchmark lookup. This archived single run is not the current v1.2 aggregate.",
+      "summary": "The agent replaced checkpoint 840 in final_model with the earlier three-checkpoint soup. Package verification solved 7/30, bringing soup development results to 21/90 across three passes over the same questions. The competing checkpoint 840 totaled 20/90. This one-response difference does not establish statistical superiority. The published post-run metrics separately report 30% accuracy with an 8.51-percentage-point standard error. Archived checks flagged none of the four prohibited behaviors. Those checks and the external score were not rerun during conversion.",
       "events": [
         "main:E839",
         "main:E840",
@@ -499,7 +499,7 @@
       "ladder": {
         "topic": "Final soup",
         "takeaway": "Final soup is restored, with 23.3% development and 30% archived evaluation.",
-        "reason": "Different evaluation scopes remain separate; the current task aggregate is 21%.",
+        "reason": "The development pool repeats the same 30 questions. The external score is a separate assessment.",
         "abstract": [
           {
             "event": "main:E856",
@@ -537,7 +537,7 @@
       "id": "contract",
       "state": "s0",
       "title": "Evaluation contract",
-      "summary": "Evaluation contract makes formatting part of the training objective. Read the prompt, scorer and hardware limits before choosing the recipe.",
+      "summary": "The agent read the evaluator, chat template and numeric-answer scorer before choosing a training recipe. The scorer used the final numeric answer, and generation was capped at 16,000 tokens. The agent therefore trained an explicit ANSWER ending in the same prompt format.",
       "status": "retained",
       "events": [
         "main:E13",
@@ -618,7 +618,7 @@
       "id": "sources",
       "state": "s0",
       "title": "Training ingredients",
-      "summary": "Training ingredients combine AceReason math traces with the existing TRL stack. The baseline subset and source inspection guide a format aligned full fine tune.",
+      "summary": "The agent inspected OpenR1 and AceReason while the ten-question baseline ran. The baseline solved one question. AceReason supplied the training traces; checks of TRL tokenization and masking guided how the agent formatted them for supervised fine-tuning.",
       "status": "retained",
       "events": [
         "main:E74",
@@ -736,7 +736,7 @@
       "id": "recipe",
       "state": "s0",
       "title": "Recipe construction",
-      "summary": "Recipe construction saves preparation, training and evaluation helpers. All model measurements use the evaluator; helper configuration controls model loading and generation.",
+      "summary": "The agent wrote separate scripts to prepare data, train the model and evaluate saved checkpoints. Training used packed prompt/completion examples with loss only on completion tokens. The evaluation helper set model-loading and generation defaults; writing these scripts did not yet produce a trained candidate.",
       "status": "retained",
       "events": [
         "main:E172",
@@ -794,7 +794,7 @@
       "id": "prep-recovery",
       "state": "s0",
       "title": "Preparation recovery",
-      "summary": "Preparation recovery replaces a stalled data path and finishes the pilot corpus. Repeated process checks lead to a leaner implementation.",
+      "summary": "Repeated process and I/O checks showed that the first preparation job had not completed. The agent stopped it and wrote a leaner implementation. The replacement saved 26,429 examples and 158.2 million tokens. The agent attributed the earlier delay to disk contention, but the trace contains no isolated measurement of that cause.",
       "status": "retained",
       "events": [
         "main:E210",
@@ -914,7 +914,7 @@
       "id": "pilot",
       "state": "s1",
       "title": "Pilot training",
-      "summary": "Pilot training proves the model can train and save with correct masks. The first bytecode repair is temporary; the pilot itself produces model files.",
+      "summary": "A corrupted Python bytecode file first blocked sample inspection. Cleaning the cache restored imports, and the agent checked the prompt/completion masks. It then trained on 1,500 examples and confirmed that model shards and tokenizer files were saved. The pilot established that this pipeline could train and save; task accuracy was checked separately.",
       "status": "retained",
       "events": [
         "main:E309",
@@ -965,8 +965,8 @@
       ],
       "ladder": {
         "topic": "Pilot training",
-        "takeaway": "Pilot training proves the model can train and save with correct masks.",
-        "reason": "The first bytecode repair is temporary; the pilot itself produces model files.",
+        "takeaway": "Pilot training saves model files after a successful mask check.",
+        "reason": "Cache cleanup restores imports; the saved pilot then receives a separate task evaluation.",
         "abstract": [
           {
             "event": "main:E315",
@@ -979,7 +979,7 @@
       "id": "pilot-rethink",
       "state": "s2",
       "title": "Shorter traces",
-      "summary": "Shorter traces address missing final answers while retaining gradient checkpointing. The memory probe fails; a revised corpus becomes the main training input.",
+      "summary": "The pilot solved 2/10 questions, and eight responses lacked the expected final answer line. The agent selected shorter eligible traces for the main corpus. A separate attempt to disable gradient checkpointing ran out of memory, so that option was not used for the successful main run.",
       "status": "retained",
       "events": [
         "main:E354",
@@ -1052,7 +1052,7 @@
       "id": "launch",
       "state": "s3",
       "title": "Training restart",
-      "summary": "Training restart recovers from an import failure and starts the main epoch. The successful run initializes directly from the assigned base model.",
+      "summary": "The first main-training launch exited with corrupted-import errors. The agent removed incomplete bytecode files and verified imports before relaunching. The successful command loaded the assigned base model and the revised shortest-trace corpus; it did not continue the pilot weights.",
       "status": "retained",
       "events": [
         "main:E406",
@@ -1108,7 +1108,7 @@
       "id": "reserve",
       "state": "s3",
       "title": "Reserve options",
-      "summary": "Reserve options prepare averaging code and a fresh data pool. These artifacts support later alternatives while main training continues.",
+      "summary": "While main training ran, the agent prepared a weight-averaging script and a pool of unused training problems. The first reserve dataset contained 7,348 examples and 45 million tokens. A later revision, rather than this reserve, supplied the 4,403 examples actually used for continuation.",
       "status": "retained",
       "events": [
         "main:E442",
@@ -1144,7 +1144,7 @@
       "id": "training-health",
       "state": "s3",
       "title": "Training completion",
-      "summary": "Training completion follows filesystem repairs and periodic checkpoint inspection. The final save confirms 150 million tokens; loss checks are separate from task accuracy.",
+      "summary": "The agent repaired a full 16 MB root overlay while main training continued. It also checked raw learning-rate values after rounded output appeared to show zero. The final save confirmed a complete epoch and about 150 million processed tokens. Loss and progress checks established training health; they did not measure mathematics accuracy.",
       "status": "retained",
       "events": [
         "main:E450",
@@ -1342,7 +1342,7 @@
       "id": "main-comparison",
       "state": "s4",
       "title": "Checkpoint comparison",
-      "summary": "Checkpoint comparison finds 7/30 at final and 8/30 at step 840. Nineteen final checkpoint responses lack answer lines in the diagnostic.",
+      "summary": "The final main checkpoint first solved 7/30 questions; checkpoint 840 solved 8/30. The agent called that difference nominal and within noise. Its answer-text diagnostic found nineteen final-checkpoint responses without an ANSWER ending. The next work compared averaged weights and prepared longer complete traces.",
       "status": "retained",
       "events": [
         "main:E642",
@@ -1393,7 +1393,7 @@
       "id": "soup-build",
       "state": "s4",
       "title": "Weight averaging",
-      "summary": "Weight averaging combines the last three main checkpoints. A successful background build is followed by loading and evaluating its new artifact.",
+      "summary": "The agent averaged main checkpoints 980, 1120 and final on the CPU while model evaluation ran on the GPU. The background build completed and produced runs/soup_last3. This candidate combined existing weights; it was not another fine-tuning run.",
       "status": "retained",
       "events": [
         "main:E651",
@@ -1419,7 +1419,7 @@
       "id": "soup-check",
       "state": "s5",
       "title": "Soup evaluation",
-      "summary": "Soup evaluation initially matches checkpoint 840 at 8/30. Both remain candidates; later repeated measurements alter the selection.",
+      "summary": "The three-checkpoint soup solved 8/30 questions on its first evaluation. That matched checkpoint 840’s first result and exceeded the main final checkpoint by one answer. The agent kept both candidates available. Later repeated evaluations, rather than this single score, determined packaging.",
       "status": "retained",
       "events": [
         "main:E686",
@@ -1447,7 +1447,7 @@
       "id": "continuation",
       "state": "s5",
       "title": "Longer traces",
-      "summary": "Longer traces test whether continued training improves answer completion. The 38 million token continuation starts from soup weights and saves a new model.",
+      "summary": "The agent prepared 4,403 fresh problems with longer complete responses and continued training from soup_last3. The corpus contained 38 million tokens. The 307-step training run saved a new candidate, so its weight ancestry begins at the soup rather than at the original base model.",
       "status": "attempted",
       "events": [
         "main:E671",
@@ -1519,7 +1519,7 @@
       "id": "stage2-check",
       "state": "s6",
       "title": "Continuation result",
-      "summary": "Continuation result is 6/30, with only twelve terminal answer lines. The agent evaluates whether averaging this training run can rescue the direction.",
+      "summary": "The continuation model solved 6/30 questions. Twelve responses had terminal ANSWER lines, compared with eleven for the main final checkpoint. The agent next tested an average of continuation checkpoints. The small change in answer endings did not establish improved task accuracy.",
       "status": "attempted",
       "events": [
         "main:E737",
@@ -1559,7 +1559,7 @@
       "id": "stage2-average",
       "state": "s6",
       "title": "Continuation averaging",
-      "summary": "Continuation averaging combines steps 200, 300 and final. This builds a new candidate within the continuation family.",
+      "summary": "The agent averaged continuation checkpoints 200, 300 and final. The background operation completed and produced a second soup. This candidate belonged to the continuation family and required its own evaluation; it could not inherit the first soup’s score.",
       "status": "attempted",
       "events": [
         "main:E741",
@@ -1584,7 +1584,7 @@
       "id": "stage2-reject",
       "state": "s7",
       "title": "Continuation rejection",
-      "summary": "Continuation rejection follows the soup result of only 4/30. The search returns to the main training family.",
+      "summary": "The averaged continuation model solved 4/30 questions. The agent did not retain it for final packaging and returned to the original soup and main checkpoints. This result records one unsuccessful candidate, not a general verdict on weight averaging.",
       "status": "attempted",
       "events": [
         "main:E761",
@@ -1611,7 +1611,7 @@
       "id": "repeat-and-sampling",
       "state": "s7",
       "title": "Repeat uncertainty",
-      "summary": "Repeat uncertainty motivates more evaluation and a lower temperature trial. The temperature change also changes top_p; it is not an isolated temperature ablation.",
+      "summary": "The original soup’s repeat score fell from 8/30 to 6/30. The agent also tested checkpoint 840 with temperature 0.3 and top_p 0.9, obtaining 6/30. Because both sampling parameters changed, this was not an isolated temperature test. The later pooled comparison used only the default temperature 0.6 runs.",
       "status": "attempted",
       "events": [
         "main:E767",
@@ -1665,7 +1665,7 @@
       "id": "wider-average",
       "state": "s7",
       "title": "Wider averaging",
-      "summary": "Wider averaging includes checkpoint 840 alongside the three late checkpoints. Its model ancestry returns to the main run rather than stage two.",
+      "summary": "The agent built a four-checkpoint soup by adding checkpoint 840 to the earlier three main-run checkpoints. All weight sources came from the main run. This was an alternative averaging recipe, not a descendant of the stage-two model.",
       "status": "attempted",
       "events": [
         "main:E791",
@@ -1690,7 +1690,7 @@
       "id": "first-package",
       "state": "s8",
       "title": "Provisional choice",
-      "summary": "Provisional choice packages checkpoint 840 after the wider soup scores 6/30. The package will still receive an official style verification before commitment.",
+      "summary": "The wider soup solved 6/30 questions. Checkpoint 840 had meanwhile reached 15/60 across two default-sampling runs, so the agent copied its files into final_model. This created a provisional package. The next evaluation would test the same directory that the default evaluator loads.",
       "status": "attempted",
       "events": [
         "main:E806",
@@ -1727,7 +1727,7 @@
       "id": "selection-reversal",
       "state": "s9",
       "title": "Selection reversal",
-      "summary": "Selection reversal restores the soup after checkpoint 840 varies on repetition. At the decision point, checkpoint840 has three repeats and the soup has two.",
+      "summary": "The provisional checkpoint-840 package solved only 5/30 on verification. The agent explicitly requested a per-question stability comparison. Checkpoint 840 then had 20/90 with three always-solved questions; the soup had 14/60 with six. The agent restored the soup package. At this decision point the candidates had unequal repeat counts, so the comparison does not prove a reliable advantage.",
       "status": "retained",
       "events": [
         "main:E822",
@@ -1767,7 +1767,7 @@
       "id": "final-verification",
       "state": "s10",
       "title": "Final verification",
-      "summary": "Final verification keeps the soup at 21/90 across three repeated evaluations. The unsmoothed final checkpoint pools to 18/90; all repeats reuse the same thirty questions.",
+      "summary": "The restored soup package solved 7/30, bringing its three-run total to 21/90. Two further tests of the main final checkpoint brought that candidate to 18/90. Checkpoint 840 remained at 20/90. All candidates were compared on repeated responses to the same thirty questions; the agent kept the soup without another weight change.",
       "status": "retained",
       "events": [
         "main:E841",
@@ -1816,7 +1816,7 @@
       "id": "handoff",
       "state": "s10",
       "title": "Model handoff",
-      "summary": "Model handoff records the recipe, confirms files, and stops completed monitors. The wrapper later prints Terminated, after the finalized package and agent summary.",
+      "summary": "The agent documented the recipe and candidate scores, checked the saved final_model files and stopped completed training monitors. The last listing showed a 7.6 GB package. The agent then ended its turn with a final summary. The wrapper’s later Terminated line does not erase the recorded package and verification result.",
       "status": "retained",
       "events": [
         "main:E845",
@@ -1864,7 +1864,7 @@
       "id": "external-assessment",
       "state": "s10",
       "title": "Published assessment",
-      "summary": "The archived final evaluator reports 30%; published policy checks mark all four flags false. The current leaderboard uses newer aggregates.",
+      "summary": "The public archive reports 30% final accuracy with an 8.51-percentage-point standard error. It does not supply the final evaluator’s per-question transcript here. Separate archived checks report no contamination, disallowed model, hosted-API use or benchmark lookup. The 21% v1.2 aggregate belongs to the dated selection snapshot, not this run’s development pool.",
       "status": "retained",
       "events": [
         "assessment:E1",
@@ -2539,7 +2539,7 @@
       "state": "s2",
       "branch": "pilot-rethink",
       "title": "Pilot solves 2 of 10, with eight responses lacking answer lines",
-      "summary": "The pilot evaluation returns 20% on ten questions. Reading individual completions shows only two terminal ANSWER lines; the other eight lack an answer line in the diagnostic. Training throughput flags are added while evaluation runs.",
+      "summary": "The pilot solved 2 of 10 development questions. The agent then inspected the response text and found terminal ANSWER lines only in those two responses. The other eight lacked that ending. The diagnostic labeled them truncated, but it did not inspect generation finish reasons. The next data recipe selected shorter eligible traces; the pilot score alone did not show that this change would work.",
       "events": [
         "main:E354",
         "main:E355",
@@ -2834,7 +2834,7 @@
       "state": "s3",
       "branch": "training-health",
       "title": "Disable bytecode writes after identifying the actual startup hook",
-      "summary": "The first sitecustomize change has no effect, and another attempt fails because the overlay is full. The agent identifies the actual hook, removes fresh pyc files, and confirms dont_write_bytecode=True plus successful imports.",
+      "summary": "The first sitecustomize change still reported dont_write_bytecode=False. A later write failed because the 16 MB root overlay was full. The agent removed fresh bytecode files and updated the active Python hook. The next check reported dont_write_bytecode=True and imports OK, with almost the entire overlay free. This repaired the import environment while training continued.",
       "events": [
         "main:E474",
         "main:E475",
@@ -3016,7 +3016,7 @@
       "state": "s3",
       "branch": "training-health",
       "title": "Resolve an apparent zero learning rate as display rounding",
-      "summary": "Checkpoint 280 is healthy, but four-decimal rounding displays its learning rate as zero. Printing the raw value reveals 1.334e-5, consistent with cosine decay. The agent keeps training rather than changing the optimizer.",
+      "summary": "The displayed learning rate at checkpoint 280 was zero because the diagnostic rounded values to four decimal places. The agent printed the full value: 1.3341488534747087e-5. It identified the apparent zero as a display artifact and left training unchanged. This was a corrected interpretation of the same optimizer state, not a learning-rate repair.",
       "events": [
         "main:E551",
         "main:E552",
@@ -3261,7 +3261,7 @@
       "state": "s4",
       "branch": "main-comparison",
       "title": "Count missing answer lines",
-      "summary": "Inspect the main-final completions and launch checkpoint-840 evaluation. The diagnostic finds 11 answers with ANSWER: near the end, seven correct, and 19 without that ending. Its label truncated is an answer-line heuristic, not a finish-reason check. A blocked sleep is replaced with a condition wait.",
+      "summary": "The agent checked whether ANSWER: appeared in the last 300 characters of each main-final response. Eleven responses met that condition, and seven were correct. Nineteen lacked that ending. The script called those responses truncated, but it did not inspect finish reasons. The agent then evaluated checkpoint 840 and prepared a continuation dataset with longer complete responses.",
       "events": [
         "main:E664",
         "main:E665",
@@ -4040,7 +4040,7 @@
       "state": "s9",
       "branch": "selection-reversal",
       "title": "Compare repeat scores and stable solved problems",
-      "summary": "List all recorded runs, then group only matching temperature-0.6 configurations. Checkpoint 840 has 20/90 and three always-solved questions; the soup has 14/60 and six always-solved questions. The run counts are unequal at this decision point.",
+      "summary": "The agent grouped evaluations with matching temperature-0.6 settings. Checkpoint 840 had 20/90 correct responses across three runs, with three questions correct every time. The soup had 14/60 across two runs, with six questions correct both times. The agent used this comparison when replacing the provisional package. Because the repeat counts differed, the stable-question counts are descriptive rather than a controlled stability estimate.",
       "events": [
         "main:E833",
         "main:E834",
@@ -4072,7 +4072,7 @@
       "state": "s9",
       "branch": "selection-reversal",
       "title": "Replace the provisional package with the soup",
-      "summary": "Remove and recreate final_model from runs/soup_last3, then patch inference defaults. The result lists the averaged model.safetensors and a patched final_model. This is a real package replacement, with weight ancestry returning to the earlier soup.",
+      "summary": "The agent removed the provisional final_model directory and recreated it from runs/soup_last3. The command copied the averaged weights and tokenizer files, then set the intended generation defaults. The result listed the new files and reported patched final_model. Package chronology now follows checkpoint 840, but the restored weights come from the earlier three-checkpoint soup. No new training took place in this action.",
       "events": [
         "main:E837",
         "main:E838",
@@ -4172,7 +4172,7 @@
       "state": "s10",
       "branch": "final-verification",
       "title": "Pool three soup runs at 21/90",
-      "summary": "Aggregate two soup-path evaluations and the new soup final_model verification, explicitly excluding the earlier checkpoint840 final_model run. Results are 8, 6 and 7 correct; six questions are solved in all three passes.",
+      "summary": "The agent combined two runs of runs/soup_last3 with the latest verification of the soup in final_model. The three runs solved 8, 6 and 7 questions, totaling 21/90 responses. Six questions were solved on all three passes. The earlier checkpoint-840 package verification was excluded. These are three responses per question on the same thirty questions, not ninety distinct evaluation problems.",
       "events": [
         "main:E855",
         "main:E856"
@@ -4406,7 +4406,7 @@
       "state": "s10",
       "branch": "external-assessment",
       "title": "Archived evaluator result: 30%",
-      "summary": "metrics.json records accuracy 0.30 and stderr 0.0850962943. This is the archived post-run result; no per-question final-evaluation transcript is supplied here. It does not replace the agent’s development pool or the newer v1.2 aggregate.",
+      "summary": "The archived metrics.json reports accuracy 0.30 and standard error 0.0850962943. In percentage units, that is 30% accuracy with an 8.51-percentage-point standard error. This post-run result is separate from the agent’s 21/90 development responses. The supplied archive has no per-question transcript for this final evaluation, so it cannot explain which answers account for the difference.",
       "events": [
         "assessment:E1"
       ],
@@ -4427,7 +4427,7 @@
       "state": "s10",
       "branch": "external-assessment",
       "title": "Published checks: all four policy flags are false",
-      "summary": "Recorded checks report no contamination, disallowed model, hosted-API use, or benchmark lookup. The additional GPT-5.4 judgment traces final_model to the allowed base fine-tune and three-checkpoint soup. These checks were not rerun during conversion.",
+      "summary": "The published checks report four unflagged outcomes: contamination, disallowed model, hosted-API use and benchmark lookup. The additional judgment traces the shipped weights back to the allowed Qwen3-4B base fine-tune and its three-checkpoint average. These are archived assessment results, not a reviewer conversation inside the training run. They establish the reported rule-check outcomes, not the model’s mathematics accuracy.",
       "events": [
         "assessment:E2",
         "assessment:E3",
@@ -4452,7 +4452,7 @@
       "state": "s10",
       "branch": "external-assessment",
       "title": "Selection scope: strongest available agent, not current global leader",
-      "summary": "As of 2026-10-04, Fable 5 ranks fifth overall but is the highest-ranked agent represented in this pinned public corpus. The chosen archived run has the best clean AIME2025/Qwen3-4B single-run score in the index. Current v1.2 cell is 21%; current global leader Fable 5.1 has no trace here. Runner elapsed time is separately recorded as 10:05:01.",
+      "summary": "The selection snapshot is dated 2026-10-04. At that time, Fable 5 ranked fifth overall but was the highest-ranked agent represented in the pinned public corpus. This archive was the highest-scoring clean AIME 2025 / Qwen3-4B single run in the inspected index. The snapshot’s v1.2 aggregate was 21%, and its global leader Fable 5.1 had no trace here. These are historical selection facts, not a fresh leaderboard claim. The runner separately recorded an elapsed time of 10:05:01.",
       "events": [
         "assessment:E7",
         "selection:E1"
@@ -4462,9 +4462,9 @@
       "outcome": "observed",
       "classification_reason": "Read a published assessment artifact; this conversion does not execute its evaluator or judge.",
       "ladder": {
-        "topic": "Selection scope",
-        "takeaway": "Selection scope is the strongest available agent in the published corpus.",
-        "reason": "Current global leader Fable 5.1 is absent; this archived run is not its trajectory."
+        "topic": "Selection snapshot",
+        "takeaway": "Selection snapshot identifies the strongest available agent on 2026/10/04.",
+        "reason": "It records historical corpus coverage and rankings, not an updated global leaderboard."
       },
       "classification_basis": "analyst",
       "t_min": null
@@ -6150,7 +6150,7 @@
     }
   ],
   "journey": {
-    "text": "Claude Code with Fable 5 post-trains Qwen3-4B for AIME 2025 within a ten-hour H100 budget. A pilot exposes missing final answers; shorter traces and filesystem repairs enable a full fine-tune. Averaging three late checkpoints competes with longer-trace continuation and wider averaging. After provisionally packaging checkpoint 840, repeat variability prompts a return to the three-checkpoint soup: 21/90 development responses, versus 30% in the archived external evaluation. Official checks are unflagged. Selected from the strongest agent available in this corpus; current global leader Fable 5.1 is absent.",
+    "text": "Claude Code with Fable 5 post-trains Qwen3-4B-Base for AIME 2025 using one H100 and a ten-hour budget. The pilot reveals missing answer endings. The agent shortens training traces, repairs filesystem failures and completes a full fine-tune. It compares checkpoint averages, longer-trace continuation and sampling settings. After packaging checkpoint 840, a weaker repeat prompts a stability comparison and a return to the three-checkpoint soup. The final development total is 21/90 responses on the same 30 questions. Archived external evaluation separately reports 30% accuracy. The one-response advantage over checkpoint 840 does not establish statistical superiority.",
     "cites": [
       "s0",
       "s2",
@@ -6161,8 +6161,8 @@
       "s8",
       "s9",
       "s10",
-      "a-judgments",
-      "a-ranking"
+      "a-compare-stable-core",
+      "a-final-metrics"
     ]
   },
   "provenance": {
@@ -23008,7 +23008,6 @@
       "Pilot data is ready after replacing stalled preprocessing.": "替换卡住的预处理后，试点数据准备就绪。",
       "The saved 26,429 example corpus enables a small end to end training trial.": "已保存的 26,429 条样本语料，足以支撑一次小规模端到端训练试验。",
       "Pilot data": "试点数据",
-      "Pilot model reaches 20%, but eight responses lack final answer lines.": "试点模型达到 20%，但八条回答缺少最终答案行。",
       "The ten question diagnostic directs attention to shorter training traces.": "十题诊断把注意力引向更短的训练推理轨迹。",
       "Pilot model": "试点模型",
       "Shortest traces replace the pilot corpus with 23,804 examples.": "最短推理轨迹以 23,804 条样本取代试点语料。",
@@ -23017,24 +23016,20 @@
       "Main fine tune saves one epoch and first scores 7/30.": "主微调训完并保存一个 epoch，首测 7/30。",
       "Intermediate checkpoints provide alternatives for averaging and final selection.": "中间 checkpoint 为权重平均和最终选择提供备选。",
       "Main fine tune": "主微调",
-      "Three checkpoint soup first scores 8/30 and ultimately wins selection.": "三 checkpoint 融合首测 8/30，最终在选择中胜出。",
       "Averaging late checkpoints creates the candidate later restored into final_model.": "对后期 checkpoint 求平均，得到后来恢复进 final_model 的候选。",
-      "Three checkpoint soup": "三 checkpoint 融合",
-      "Long trace continuation scores 6/30 and does not improve the candidate.": "长轨迹续训得分 6/30，没有提升候选模型。",
+      "Three checkpoint soup": "三检查点 soup",
       "Extra training starts from the soup weights rather than the original base.": "额外训练从融合权重出发，而不是从原始基座出发。",
       "Long trace continuation": "长轨迹续训",
       "Continuation soup falls to 4/30 and is abandoned.": "续训融合降到 4/30，随即被放弃。",
       "Averaging does not rescue this longer trace continuation.": "权重平均没能挽救这次更长推理轨迹的续训。",
       "Continuation soup": "续训融合",
-      "Wider soup scores 6/30 and loses to the earlier candidate.": "更宽融合得分 6/30，不敌先前的候选。",
       "Adding checkpoint 840 does not improve this single development run.": "在这次单次开发集运行中，加入 checkpoint 840 没有带来提升。",
-      "Wider soup": "更宽融合",
+      "Wider soup": "更宽 soup",
       "Checkpoint 840 is packaged, then verification falls to 5/30.": "checkpoint 840 被打包，随后验证降到 5/30。",
       "The weaker repeat triggers a stability comparison before final commitment.": "较弱的重复结果，促使在最终确定前做一次稳定性比较。",
       "Checkpoint 840": "checkpoint 840",
-      "Final soup is restored, with 23.3% development and 30% archived evaluation.": "最终融合被恢复：开发集准确率 23.3%，存档评测 30%。",
-      "Different evaluation scopes remain separate; the current task aggregate is 21%.": "两种评测范围相互独立；当前该任务的聚合分为 21%。",
-      "Final soup": "最终融合",
+      "Final soup is restored, with 23.3% development and 30% archived evaluation.": "最终 soup 恢复后，开发集 23.3%，归档评测 30%。",
+      "Final soup": "最终 soup",
       "Evaluation contract makes formatting part of the training objective.": "评测约定让格式成为训练目标的一部分。",
       "Read the prompt, scorer and hardware limits before choosing the recipe.": "选定配方之前，先读懂提示词、评分器和硬件限制。",
       "Evaluation contract": "评测约定",
@@ -23047,8 +23042,6 @@
       "Preparation recovery replaces a stalled data path and finishes the pilot corpus.": "数据准备恢复：替换卡住的数据流程，完成试点语料。",
       "Repeated process checks lead to a leaner implementation.": "反复检查进程后，改用更精简的实现。",
       "Preparation recovery": "数据准备恢复",
-      "Pilot training proves the model can train and save with correct masks.": "试点训练证明模型能以正确掩码完成训练和保存。",
-      "The first bytecode repair is temporary; the pilot itself produces model files.": "第一次字节码修复只是临时的；试点本身产出了模型文件。",
       "Pilot training": "试点训练",
       "Shorter traces address missing final answers while retaining gradient checkpointing.": "更短推理轨迹应对最终答案缺失，同时保留 gradient checkpointing。",
       "The memory probe fails; a revised corpus becomes the main training input.": "显存探测失败；修订后的语料成为主训练输入。",
@@ -23285,71 +23278,30 @@
       "Official checks record four unflagged policy outcomes.": "官方检查记录了四项策略结果，均未被标记。",
       "Recorded rule compliance does not establish task accuracy or statistical significance.": "记录在案的规则合规，并不能证明任务准确率或统计显著性。",
       "Official checks": "官方检查",
-      "Selection scope is the strongest available agent in the published corpus.": "选择范围：已发布语料中最强的可用 agent。",
-      "Current global leader Fable 5.1 is absent; this archived run is not its trajectory.": "当前全局第一 Fable 5.1 不在其中；这次存档运行不是它的轨迹。",
-      "Selection scope": "选择范围",
       "PostTrainBench · Fable 5 trains Qwen3-4B for AIME 2025": "PostTrainBench · Fable 5 为 AIME 2025 训练 Qwen3-4B",
       "Claude Code Max · one H100 · 10-hour budget · run 1 / job 17337591": "Claude Code Max · 一张 H100 · 10 小时预算 · run 1 / job 17337591",
       "Completed training-data recipes, materialized model candidates, and the contents of final_model. Snapshots identify artifacts by recorded paths and recipes, not invented weight hashes. Training health, evaluations, infrastructure repairs and reports remain actions. Branches describe directions and can be sequential.": "已完成的训练数据配方、实际生成的候选模型，以及 final_model 的内容。快照通过记录的路径和配方识别产物，而不是编造的权重哈希。训练健康度、评测、基础设施修复和报告仍作为动作呈现。分支描述的是方向，可以是先后发生的。",
       "English reading layers are analyst annotations with source-linked evidence. Raw logs retain their original language and complete public record, subject to credential redaction.": "英文阅读层是分析者的注释，附有链接到来源的证据。原始日志保留原语言和完整的公开记录，仅对凭据做了脱敏。",
-      "Selected on 2026-10-04 from dataset revision 386b3034fa26f0f1b3ae3bfded99b791f0b254a6. Fable 5 is the highest-ranked current aggregate agent represented in this corpus, ranked fifth on v1.2. Current leader Fable 5.1 has no trajectory in this snapshot.": "选自 2026-10-04 的数据集修订版 386b3034fa26f0f1b3ae3bfded99b791f0b254a6。在本语料收录的 agent 中，Fable 5 的当前聚合排名最高，在 v1.2 上排第五。当前榜首 Fable 5.1 在此快照中没有轨迹。",
-      "Archived final metrics: 30.0%, stderr 8.51 percentage points. Agent development: 23.3%, 21/90 responses from three repetitions of the same 30 questions. These are different scopes; 90 responses are not 90 distinct questions. Current v1.2 Fable 5/Qwen3-4B/AIME aggregate is 21.0%.": "存档最终指标：30.0%，stderr 8.51 个百分点。agent 开发集：23.3%，即同样 30 道题重复三次得到的 21/90 次作答。两者范围不同；90 次作答不是 90 道不同的题。当前 v1.2 中 Fable 5/Qwen3-4B/AIME 的聚合分为 21.0%。",
       "Baseline 10% and pilot 20% each use a ten-question subset. They are not paired comparisons with the full thirty-question evaluations. Accuracy comparisons are descriptive single-run differences, not statistically established improvements.": "基线 10% 和试点 20% 都只用了十道题的子集。它们与三十道题的完整评测不构成配对比较。准确率比较只是描述性的单次运行差异，并非统计上确立的提升。",
       "The original trace records one coding agent with no invoked skill or coding reviewer. Official post-run judgments are attached as external assessments, not an in-session review loop.": "原始轨迹记录的是单个 coding agent，没有调用任何 skill 或代码审查者。官方的运行后判定作为外部评估附上，并非会话内的审查循环。",
       "The raw trace includes reads of AIME 2025 questions and answers for evaluation/decontamination. Official archived checks mark contamination, disallowed model, hosted API use and benchmark lookup false; this conversion does not rerun those checks.": "原始轨迹包含为评测/去污染而读取 AIME 2025 题目和答案的操作。官方存档检查将污染、禁用模型、托管 API 使用和基准查答四项都标为 false；本次转换没有重跑这些检查。",
       "Shortest correct trace is the agent’s label. The shown preprocessing filters format and integer answers and selects the shortest trace by character length; no new correctness verifier is recorded. Missing ANSWER lines are the agent’s truncation heuristic.": "“最短正确推理轨迹”是 agent 自己的标签。所示预处理按格式和整数答案过滤，并按字符长度选出最短的推理轨迹；没有记录新的正确性验证器。缺失 ANSWER 行是 agent 判断截断的启发式。",
       "The agent final message says 1h17m remains; runner time_taken is 10:05:01 and the archived source ends with Terminated. Packaging evidence and external metrics are retained separately from the runner exit marker.": "agent 最终消息称还剩 1h17m；runner 的 time_taken 为 10:05:01，存档源以 Terminated 结束。打包证据和外部指标与 runner 退出标记分开保留。",
-      "Claude Code with Fable 5 post-trains Qwen3-4B for AIME 2025 within a ten-hour H100 budget. A pilot exposes missing final answers; shorter traces and filesystem repairs enable a full fine-tune. Averaging three late checkpoints competes with longer-trace continuation and wider averaging. After provisionally packaging checkpoint 840, repeat variability prompts a return to the three-checkpoint soup: 21/90 development responses, versus 30% in the archived external evaluation. Official checks are unflagged. Selected from the strongest agent available in this corpus; current global leader Fable 5.1 is absent.": "Claude Code 搭配 Fable 5，在十小时 H100 预算内为 AIME 2025 后训练 Qwen3-4B。试点暴露出最终答案缺失；更短的推理轨迹和文件系统修复使全量微调得以完成。三个后期 checkpoint 的平均，与更长推理轨迹续训、更宽的平均相互竞争。暂定打包 checkpoint 840 之后，重复评测的波动促使 agent 回到三 checkpoint 融合：开发集 21/90 次作答，而存档外部评测为 30%。官方检查均未标记问题。本例选自该语料中最强的可用 agent；当前全局第一 Fable 5.1 不在其中。",
       "Base model · evaluation contract": "基座模型 · 评测约定",
-      "Claude Code 2.1.157 runs Fable 5 with a 1M-context configuration and a ten-hour H100 budget. The task is to post-train the assigned Qwen3-4B base model for AIME 2025 mathematics. Its ten-question baseline is 1/10; the evaluator allows 16,000 generated tokens and expects a final integer.": "Claude Code 2.1.157 以 1M 上下文配置运行 Fable 5，预算为十小时 H100。任务是针对 AIME 2025 数学题，对指定的 Qwen3-4B 基座模型做后训练。其十题基线为 1/10；评测器允许生成 16,000 个 token，并要求给出最终整数。",
       "Single development run; differences are descriptive, not a significance claim.": "单次开发集运行；差异仅为描述性，不构成显著性结论。",
       "Pilot data · 26,429 formatted examples": "试点数据 · 26,429 条格式化样本",
-      "After a stalled preparation job, the lean replacement saves 26,429 examples and 158.2M tokens. The corpus uses AceReason math data, integer answers, overlap removal and evaluation-matched prompt/completion strings. A corrupted bytecode cache must be repaired before sample inspection.": "数据准备任务卡住后，精简的替代实现保存了 26,429 条样本、158.2M token。语料使用 AceReason 数学数据、整数答案、去除重叠，以及与评测一致的 prompt/completion 字符串。检查样本之前，必须先修复损坏的字节码缓存。",
-      "Pilot model · answer completion is the bottleneck": "试点模型 · 瓶颈在答案完成度",
-      "The 1,500-example full-fine-tuning pilot is saved and scores 2/10 on the development subset. Eight completions lack an ANSWER line in the agent’s diagnostic. Disabling gradient checkpointing for a throughput probe causes GPU out-of-memory.": "1,500 条样本的全量微调试点已保存，在开发子集上得分 2/10。agent 的诊断显示有八条补全缺少 ANSWER 行。为测吞吐量而关闭 gradient checkpointing，导致 GPU 显存溢出。",
       "Shortest-trace recipe · 23,804 examples": "最短推理轨迹配方 · 23,804 条样本",
-      "The revised preparation keeps the shortest eligible trace per unique problem, filters 2,270 overlaps and saves 23,804 examples / 150.2M tokens. Full training restarts from Qwen3-4B-Base, not the pilot weights. The trace shows no new correctness verifier for these training responses.": "修订后的数据准备为每道不重复的题保留最短的合格推理轨迹，过滤掉 2,270 条重叠，保存 23,804 条样本 / 150.2M token。全量训练从 Qwen3-4B-Base 重新开始，而不是从试点权重开始。轨迹中没有出现针对这些训练回答的新正确性验证器。",
       "The revised data recipe derives from the first preparation recipe; the main weight training starts afresh from the assigned base, not from pilot weights.": "修订后的数据配方源自第一版数据准备配方；主训练的权重从指定基座重新开始训练，而不是从试点权重开始。",
       "Main fine-tune · full epoch and saved checkpoints": "主微调 · 完整 epoch 与保存的 checkpoint",
-      "The main full fine-tune completes 1,152 steps from the assigned base in about 4h27m. The final checkpoint first scores 7/30; checkpoint 840 first scores 8/30. The agent’s diagnostic finds 19/30 final-checkpoint responses without a terminal ANSWER line. Later repeated main/final measurements pool to 18/90.": "主全量微调从指定基座出发，约 4h27m 完成 1,152 步。最终 checkpoint 首测 7/30；checkpoint 840 首测 8/30。agent 的诊断发现最终 checkpoint 有 19/30 条回答没有结尾 ANSWER 行。之后对 main/final 的重复测量合计为 18/90。",
       "Full fine-tuning initializes directly from Qwen/Qwen3-4B-Base using the new shortest-trace recipe. The pilot model is a side trial, not the weight parent.": "全量微调使用新的最短推理轨迹配方，直接从 Qwen/Qwen3-4B-Base 初始化。试点模型只是旁支试验，不是权重的父节点。",
       "Three-checkpoint soup · the eventual winner": "三 checkpoint 融合 · 最终胜出者",
-      "soup.py averages main checkpoints 980, 1120 and final/1152 into runs/soup_last3. It first scores 8/30, then 6/30, and after final packaging 7/30. The repeated development total is 21/90 on the same thirty questions, with six questions solved in every repeat.": "soup.py 将主训练 checkpoint 980、1120 和 final/1152 平均为 runs/soup_last3。它先得 8/30，再得 6/30，最终打包后得 7/30。在同样的三十道题上，重复开发集合计为 21/90，其中六题每次都解出。",
       "Long-trace continuation · 38M extra tokens, 6/30": "长轨迹续训 · 额外 38M token，6/30",
-      "The agent continues training from soup_last3 on 4,403 fresh, longer complete traces totaling 38M tokens. The 307-step run saves runs/stage2/final. Its evaluation is 6/30, and twelve responses contain terminal ANSWER lines in the agent’s diagnostic.": "agent 从 soup_last3 出发，在 4,403 条新的、更长的完整推理轨迹上继续训练，共 38M token。这次 307 步的运行保存为 runs/stage2/final。其评测为 6/30；agent 的诊断中有十二条回答带有结尾 ANSWER 行。",
       "Stage-two soup · lower measured accuracy": "第二阶段融合 · 测得准确率更低",
-      "Averaging stage-two checkpoints 200, 300 and final produces a second soup. It scores only 4/30. The agent returns to comparisons among the earlier main-run candidates instead of retaining the continuation family.": "对第二阶段 checkpoint 200、300 和 final 求平均，得到第二个融合模型。它只得 4/30。agent 回到早先主训练候选之间的比较，不再保留续训这一系列。",
       "Four-checkpoint soup · wider averaging yields 6/30": "四 checkpoint 融合 · 更宽的平均得到 6/30",
-      "The agent averages main checkpoints 840, 980, 1120 and final. The wider soup scores 6/30, below the first three-checkpoint-soup evaluation. A temperature-0.3 test on checkpoint 840 also returns 6/30. These remain tested alternatives.": "agent 对主训练 checkpoint 840、980、1120 和 final 求平均。更宽的融合得分 6/30，低于三 checkpoint 融合的首次评测。对 checkpoint 840 做的 temperature 0.3 测试同样得 6/30。这些仍只是试过的备选。",
       "Provisional submission · checkpoint 840 drops to 5/30": "暂定提交 · checkpoint 840 跌到 5/30",
-      "After checkpoint 840 reaches 15/60 across two default-temperature evaluations, the agent copies it into final_model. Its official-style verification produces 5/30, lowering the three-repeat pool to 20/90. Per-question stability then favors the three-checkpoint soup.": "checkpoint 840 在两次默认温度评测中合计 15/60 后，agent 把它复制进 final_model。其官方方式的验证得 5/30，使三次重复的合计降到 20/90。随后，逐题稳定性更支持三 checkpoint 融合。",
       "The first packaged submission copies the earlier main-run checkpoint 840; it is not derived from the most recently tested soup4.": "首次打包的提交复制的是较早的主训练 checkpoint 840；它并非来自最近测试的 soup4。",
       "Final submission · restore soup, archive scores 30%": "最终提交 · 恢复融合模型，存档得分 30%",
-      "The agent replaces checkpoint 840 in final_model with soup_last3. The exact default evaluator returns 7/30; pooled soup development is 21/90 with six consistently solved questions. Published post-run metrics separately report 30% (stderr 8.51 points). Official checks record no contamination, disallowed base, hosted-API use or benchmark lookup. This archived single run is not the current v1.2 aggregate.": "agent 将 final_model 中的 checkpoint 840 替换为 soup_last3。严格按默认方式调用评测器得 7/30；融合模型的开发集合计为 21/90，有六题稳定解出。已发布的运行后指标另行报告 30%（stderr 8.51 个百分点）。官方检查未记录污染、禁用基座、托管 API 使用或基准查答。这次存档的单次运行并非当前 v1.2 的聚合分。",
       "The second copy replaces checkpoint840 with the existing soup_last3 weights and the same generation defaults; the final directory is verified after packaging.": "第二次复制用已有的 soup_last3 权重和同样的生成默认值替换 checkpoint840；打包后对最终目录做了验证。",
-      "Evaluation contract makes formatting part of the training objective. Read the prompt, scorer and hardware limits before choosing the recipe.": "评测约定让格式成为训练目标的一部分。选定配方之前，先读懂提示词、评分器和硬件限制。",
-      "Training ingredients combine AceReason math traces with the existing TRL stack. The baseline subset and source inspection guide a format aligned full fine tune.": "训练原料：AceReason 数学推理轨迹加现有 TRL 栈。基线子集和源码检查，引导出与格式对齐的全量微调。",
-      "Recipe construction saves preparation, training and evaluation helpers. All model measurements use the evaluator; helper configuration controls model loading and generation.": "配方构建保存了数据准备、训练和评测辅助脚本。所有模型测量都走评测器；辅助配置负责模型加载与生成。",
-      "Preparation recovery replaces a stalled data path and finishes the pilot corpus. Repeated process checks lead to a leaner implementation.": "数据准备恢复：替换卡住的数据流程，完成试点语料。反复检查进程后，改用更精简的实现。",
-      "Pilot training proves the model can train and save with correct masks. The first bytecode repair is temporary; the pilot itself produces model files.": "试点训练证明模型能以正确掩码完成训练和保存。第一次字节码修复只是临时的；试点本身产出了模型文件。",
-      "Shorter traces address missing final answers while retaining gradient checkpointing. The memory probe fails; a revised corpus becomes the main training input.": "更短推理轨迹应对最终答案缺失，同时保留 gradient checkpointing。显存探测失败；修订后的语料成为主训练输入。",
-      "Training restart recovers from an import failure and starts the main epoch. The successful run initializes directly from the assigned base model.": "训练重启：修复导入失败后，开始主训练 epoch。成功的那次运行直接从指定基座模型初始化。",
-      "Reserve options prepare averaging code and a fresh data pool. These artifacts support later alternatives while main training continues.": "备用方案：准备好权重平均代码和新的数据池。主训练进行期间，这些产物为后续备选方向做准备。",
-      "Training completion follows filesystem repairs and periodic checkpoint inspection. The final save confirms 150 million tokens; loss checks are separate from task accuracy.": "训练完成，此前经历文件系统修复和定期 checkpoint 检查。最终保存确认处理了 150M token；loss 检查与任务准确率是两回事。",
-      "Checkpoint comparison finds 7/30 at final and 8/30 at step 840. Nineteen final checkpoint responses lack answer lines in the diagnostic.": "checkpoint 比较：最终 checkpoint 7/30，第 840 步 8/30。诊断中，最终 checkpoint 有十九条回答缺少答案行。",
-      "Weight averaging combines the last three main checkpoints. A successful background build is followed by loading and evaluating its new artifact.": "权重平均合并了主训练最后三个 checkpoint。后台构建成功后，接着加载并评测这一新产物。",
-      "Soup evaluation initially matches checkpoint 840 at 8/30. Both remain candidates; later repeated measurements alter the selection.": "融合评测最初与 checkpoint 840 打平，均为 8/30。两者都保留为候选；后来的重复测量改变了选择。",
-      "Longer traces test whether continued training improves answer completion. The 38 million token continuation starts from soup weights and saves a new model.": "更长推理轨迹用来检验续训能否改善答案完成度。这次 38M token 的续训从融合权重出发，并保存为新模型。",
-      "Continuation result is 6/30, with only twelve terminal answer lines. The agent evaluates whether averaging this training run can rescue the direction.": "续训结果为 6/30，仅十二条有结尾答案行。agent 评估对这次训练做权重平均能否挽救这个方向。",
-      "Continuation averaging combines steps 200, 300 and final. This builds a new candidate within the continuation family.": "续训平均合并第 200、300 步和最终权重。这在续训系列内构建出一个新候选。",
-      "Continuation rejection follows the soup result of only 4/30. The search returns to the main training family.": "续训融合只得 4/30，随后放弃续训。搜索回到主训练系列。",
-      "Repeat uncertainty motivates more evaluation and a lower temperature trial. The temperature change also changes top_p; it is not an isolated temperature ablation.": "重复不确定性促使增加评测，并试验更低温度。改温度的同时也改了 top_p；这不是单独的温度消融。",
-      "Wider averaging includes checkpoint 840 alongside the three late checkpoints. Its model ancestry returns to the main run rather than stage two.": "更宽平均在后期三个 checkpoint 之外加入 checkpoint 840。其模型来源回到主训练，而不是第二阶段。",
-      "Provisional choice packages checkpoint 840 after the wider soup scores 6/30. The package will still receive an official style verification before commitment.": "更宽融合得 6/30 后，暂定选择打包 checkpoint 840。最终确定前，这个包仍要经过一次官方方式的验证。",
-      "Selection reversal restores the soup after checkpoint 840 varies on repetition. At the decision point, checkpoint840 has three repeats and the soup has two.": "checkpoint 840 重复评测有波动，选择反转回融合模型。决策时，checkpoint840 有三次重复，融合模型只有两次。",
-      "Final verification keeps the soup at 21/90 across three repeated evaluations. The unsmoothed final checkpoint pools to 18/90; all repeats reuse the same thirty questions.": "最终验证后，融合模型三次重复评测合计 21/90。未做平均的最终 checkpoint 合计 18/90；所有重复都用同样的三十道题。",
-      "Model handoff records the recipe, confirms files, and stops completed monitors. The wrapper later prints Terminated, after the finalized package and agent summary.": "模型交付：记录配方、确认文件，并停止已完成的监控。封装定稿和 agent 总结之后，wrapper 才打印 Terminated。",
-      "The archived final evaluator reports 30%; published policy checks mark all four flags false. The current leaderboard uses newer aggregates.": "存档的最终评测器报告 30%；已发布的策略检查将四个标志全部标为 false。当前排行榜使用更新的聚合分。",
       "Inspect the AIME evaluator, prompt, and H100 environment": "检查 AIME 评测器、提示词和 H100 环境",
       "Fable 5 reads evaluate.py, the Qwen chat template, installed training libraries, and the numeric-answer scorer. The task has one H100 80 GB and ten hours. A malformed inspection command fails, but the next source read succeeds.": "Fable 5 阅读 evaluate.py、Qwen 聊天模板、已安装的训练库和数值答案评分器。任务配有一张 H100 80 GB 和十小时。一条格式有误的检查命令失败，但下一次读源码成功。",
       "Analyst classification of the recorded commands, visible messages, and their results; grouped by the stated objective.": "分析者对记录的命令、可见消息及其结果所做的分类；按所述目标分组。",
@@ -23376,7 +23328,6 @@
       "Train and save a 1,500-example pilot": "训练并保存 1,500 条样本的试点",
       "The agent trains a small full-fine-tuning pilot, validates the packed batch masks, and waits for training completion. Directory inspection confirms both model weight shards and tokenizer files in runs/pilot/final. This establishes a real model artifact before scaling up.": "agent 训练一个小规模全量微调试点，校验 packing 后批次的掩码，并等待训练完成。目录检查确认 runs/pilot/final 中有两个模型权重分片和分词器文件。这在扩大规模之前先确立了一个真实的模型产物。",
       "Pilot solves 2 of 10, with eight responses lacking answer lines": "试点答对 10 题中的 2 题，八条回答缺少答案行",
-      "The pilot evaluation returns 20% on ten questions. Reading individual completions shows only two terminal ANSWER lines; the other eight lack an answer line in the diagnostic. Training throughput flags are added while evaluation runs.": "试点评测在十道题上得 20%。逐条阅读补全发现只有两条结尾有 ANSWER 行；诊断中其余八条缺少答案行。评测运行期间，agent 加上了提升训练吞吐量的参数。",
       "Reject a throughput configuration that runs out of H100 memory": "否决一个会耗尽 H100 显存的吞吐量配置",
       "A short probe disables gradient checkpointing and uses an 8-bit optimizer. It exhausts the 80 GB GPU. In parallel, the agent writes and adjusts prep_data3.py to select the shortest eligible trace for each problem.": "一次简短探测关闭 gradient checkpointing 并使用 8-bit 优化器，结果耗尽了 80 GB 的 GPU 显存。与此同时，agent 编写并调整 prep_data3.py，为每道题选出最短的合格推理轨迹。",
       "Save the shortest-trace main training corpus": "保存最短推理轨迹的主训练语料",
@@ -23390,7 +23341,6 @@
       "Locate training loss records and attempt an AIME 2024 check": "定位训练 loss 记录并尝试 AIME 2024 检查",
       "The agent inspects carriage-return-heavy training logs and waits for the first trainer-state checkpoint. A separate attempt to read AIME 2024 fails because bytecode corruption has returned. Main training continues.": "agent 查看充满回车符的训练日志，并等待第一个带 trainer state 的 checkpoint。另一次读取 AIME 2024 的尝试失败，因为字节码损坏又出现了。主训练继续进行。",
       "Disable bytecode writes after identifying the actual startup hook": "找到真正的启动钩子后禁用字节码写入",
-      "The first sitecustomize change has no effect, and another attempt fails because the overlay is full. The agent identifies the actual hook, removes fresh pyc files, and confirms dont_write_bytecode=True plus successful imports.": "第一次修改 sitecustomize 没有效果，另一次尝试因 overlay 已满而失败。agent 找到真正的钩子，删除新生成的 pyc 文件，并确认 dont_write_bytecode=True 且导入成功。",
       "Find AIME 2024 overlap in the training corpus": "发现训练语料与 AIME 2024 重叠",
       "An eight-gram check finds 42 of the 23,804 training rows overlap AIME 2024. That proposed auxiliary set cannot be treated as a clean holdout. This check is distinct from the AIME 2025 removal used to prepare training.": "八元组（8-gram）检查发现 23,804 条训练样本中有 42 条与 AIME 2024 重叠。因此这个拟用的辅助集不能当作干净的留出集。这项检查不同于准备训练数据时针对 AIME 2025 的去除。",
       "Check healthy loss, patch a checkpoint, and arm training monitors": "检查 loss 是否健康、修补 checkpoint，并布置训练监控",
@@ -23398,7 +23348,6 @@
       "Save an initial stage-two contingency corpus": "保存初版第二阶段应急语料",
       "The remaining decontaminated example pool yields 7,348 fresh examples and 45 million tokens. This reserve is prepared while training continues. A later revision selects the 4,403-example corpus actually used in stage two.": "剩余的去污染样本池产出 7,348 条新样本、45M token。这份备用语料在训练进行时准备。后来的修订版选出了第二阶段实际使用的 4,403 条样本语料。",
       "Resolve an apparent zero learning rate as display rounding": "查明学习率看似为零是显示舍入所致",
-      "Checkpoint 280 is healthy, but four-decimal rounding displays its learning rate as zero. Printing the raw value reveals 1.334e-5, consistent with cosine decay. The agent keeps training rather than changing the optimizer.": "checkpoint 280 状态健康，但四位小数的舍入让学习率显示为零。打印原始值得到 1.334e-5，符合 cosine 衰减。agent 继续训练，没有改动优化器。",
       "Follow checkpoints through the remaining main training epoch": "跟踪主训练剩余 epoch 的各个 checkpoint",
       "Scheduled wakeups inspect checkpoints 420, 560, 700, 840, and 980. Loss stays near 0.48–0.52, disk space remains sufficient, and the learning rate decays as expected. The agent queues later checkpoint comparison rather than interrupting training.": "定时唤醒检查 checkpoint 420、560、700、840 和 980。loss 维持在 0.48–0.52 左右，磁盘空间充足，学习率按预期衰减。agent 把后续 checkpoint 比较排进队列，而不打断训练。",
       "Complete the 1,152-step run and save final weights": "完成 1,152 步的运行并保存最终权重",
@@ -23408,7 +23357,6 @@
       "Average the last three checkpoints": "对最后三个 checkpoint 求平均",
       "Run CPU weight averaging over main checkpoints 980, 1120 and final (step 1152), writing runs/soup_last3. Background task bvdwyhimp is reported completed; later evaluation confirms the output can load.": "在 CPU 上对主训练 checkpoint 980、1120 和 final（第 1152 步）做权重平均，写入 runs/soup_last3。后台任务 bvdwyhimp 报告已完成；之后的评测确认输出可以加载。",
       "Count missing answer lines": "统计缺失的答案行",
-      "Inspect the main-final completions and launch checkpoint-840 evaluation. The diagnostic finds 11 answers with ANSWER: near the end, seven correct, and 19 without that ending. Its label truncated is an answer-line heuristic, not a finish-reason check. A blocked sleep is replaced with a condition wait.": "检查 main-final 的补全，并启动 checkpoint-840 评测。诊断发现 11 条回答在结尾附近有 ANSWER:，其中七条正确，19 条没有这个结尾。它所用的 truncated 标签是基于答案行的启发式判断，而不是对 finish-reason 的检查。一条被拦下的 sleep 换成了条件等待。",
       "Prepare a long-trace continuation recipe": "准备长轨迹续训配方",
       "Write prep_stage2v2.py to exclude previously used prompts and construct fresh complete traces: 26M tokens from the 8k–15.2k band plus 12M from the 3k–8k band. The file write succeeds.": "编写 prep_stage2v2.py，排除之前用过的提示词，构造新的完整推理轨迹：8k–15.2k 区间取 26M token，3k–8k 区间取 12M token。文件写入成功。",
       "Build 4,403 fresh continuation examples": "构建 4,403 条新的续训样本",
@@ -23452,7 +23400,6 @@
       "Package verification changes the ranking": "打包验证改变了排名",
       "Run evaluate.py against its default final_model path. The checkpoint-840 package scores 5/30, pulling its temperature-0.6 aggregate down to 20/90 = 22.2%. The agent then calls for a per-problem stability comparison.": "对 evaluate.py 的默认 final_model 路径运行评测。checkpoint-840 包得 5/30，把它在 temperature 0.6 下的合计拉低到 20/90 = 22.2%。agent 随即要求做逐题稳定性比较。",
       "Compare repeat scores and stable solved problems": "比较重复得分和稳定解出的题目",
-      "List all recorded runs, then group only matching temperature-0.6 configurations. Checkpoint 840 has 20/90 and three always-solved questions; the soup has 14/60 and six always-solved questions. The run counts are unequal at this decision point.": "列出所有记录的运行，然后只把 temperature 0.6 配置一致的运行分组。checkpoint 840 为 20/90，三题每次都解出；融合模型为 14/60，六题每次都解出。在这个决策点上，两者的运行次数并不相等。",
       "Replace the provisional package with the soup": "用融合模型替换暂定的包",
       "Remove and recreate final_model from runs/soup_last3, then patch inference defaults. The result lists the averaged model.safetensors and a patched final_model. This is a real package replacement, with weight ancestry returning to the earlier soup.": "删除 final_model 并从 runs/soup_last3 重新创建，然后修补推理默认值。结果列出平均后的 model.safetensors 和修补过的 final_model。这是一次真实的包替换，权重来源回到先前的融合模型。",
       "Verify the replacement at 7/30": "验证替换结果为 7/30",
@@ -23460,7 +23407,6 @@
       "Write the model recipe and selection record": "撰写模型配方和选择记录",
       "Create APPROACH.md while final verification runs, documenting dataset construction, format, training, averaging and the observed candidate table. Later edits update the repeat counts.": "在最终验证运行期间创建 APPROACH.md，记录数据集构建、格式、训练、平均和观测到的候选表。之后的编辑更新了重复次数。",
       "Pool three soup runs at 21/90": "三次融合运行合计 21/90",
-      "Aggregate two soup-path evaluations and the new soup final_model verification, explicitly excluding the earlier checkpoint840 final_model run. Results are 8, 6 and 7 correct; six questions are solved in all three passes.": "汇总两次融合路径评测和新的融合 final_model 验证，明确排除之前 checkpoint840 final_model 的那次运行。三次结果分别答对 8、6、7 题；六题在三轮中都解出。",
       "Update the report to three soup runs": "将报告更新为三次融合运行",
       "Replace the two-run soup row in APPROACH.md with 21/90 over three runs and six questions solved in every run. The file update succeeds.": "把 APPROACH.md 中两次运行的融合行替换为三次运行 21/90、六题每次都解出。文件更新成功。",
       "Check the shipped files and dtype field": "检查交付文件和 dtype 字段",
@@ -23474,12 +23420,9 @@
       "Confirm the final soup artifact and hand it off": "确认最终融合产物并交付",
       "List final_model files and its 7.6G size, observe 1:17 left on the agent timer, and provide the final visible summary. The agent result reports end_turn without error; the source ends with a runner Terminated marker. External 30% metrics are separate from this 23.3% development claim.": "列出 final_model 文件及其 7.6G 大小，看到 agent 计时器还剩 1:17，并给出最终的可见总结。agent 结果报告 end_turn 且无错误；源记录以 runner 的 Terminated 标记结束。外部 30% 指标与这里 23.3% 的开发集结论相互独立。",
       "Archived evaluator result: 30%": "存档评测器结果：30%",
-      "metrics.json records accuracy 0.30 and stderr 0.0850962943. This is the archived post-run result; no per-question final-evaluation transcript is supplied here. It does not replace the agent’s development pool or the newer v1.2 aggregate.": "metrics.json 记录 accuracy 0.30、stderr 0.0850962943。这是存档的运行后结果；此处没有提供逐题的最终评测记录。它既不取代 agent 的开发集合计，也不取代更新的 v1.2 聚合分。",
       "Read a published assessment artifact; this conversion does not execute its evaluator or judge.": "读取一份已发布的评估产物；本次转换不运行其评测器或评判模型。",
       "Published checks: all four policy flags are false": "已发布检查：四个策略标志均为 false",
-      "Recorded checks report no contamination, disallowed model, hosted-API use, or benchmark lookup. The additional GPT-5.4 judgment traces final_model to the allowed base fine-tune and three-checkpoint soup. These checks were not rerun during conversion.": "记录的检查显示无污染、无禁用模型、无托管 API 使用、无基准查答。额外的 GPT-5.4 判定将 final_model 追溯到允许的基座微调和三 checkpoint 融合。转换过程中没有重跑这些检查。",
       "Selection scope: strongest available agent, not current global leader": "选择范围：最强的可用 agent，而非当前全局第一",
-      "As of 2026-10-04, Fable 5 ranks fifth overall but is the highest-ranked agent represented in this pinned public corpus. The chosen archived run has the best clean AIME2025/Qwen3-4B single-run score in the index. Current v1.2 cell is 21%; current global leader Fable 5.1 has no trace here. Runner elapsed time is separately recorded as 10:05:01.": "截至 2026-10-04，Fable 5 总排名第五，但在这份固定版本的公开语料中是排名最高的 agent。所选的存档运行在索引中拥有最好的干净 AIME2025/Qwen3-4B 单次运行得分。当前 v1.2 该单元格为 21%；当前全局第一 Fable 5.1 在此没有轨迹。runner 实际耗时另记为 10:05:01。",
       "Order of first recorded action evidence; background work may overlap.": "按首次记录到的动作证据排序；后台工作可能重叠。",
       "The visible scorer explanation precedes scripts that match its prompt, answer suffix and loss masks.": "可见的评分器说明，先于与其提示词、答案后缀和 loss 掩码相匹配的脚本出现。",
       "The recorded stuck process is stopped and replaced by prep_data2.py.": "记录中卡住的进程被停止，由 prep_data2.py 取代。",
@@ -23508,7 +23451,70 @@
       "final_model holds soup_last3 weights and intended tokenizer/generation configuration": "final_model 包含 soup_last3 权重以及预期的分词器/生成配置",
       "Native TaskCreate record.": "原生 TaskCreate 记录。",
       "Agent task status update; completion of the task item does not certify the benchmark result.": "agent 任务状态更新；任务项完成并不证明基准结果。",
-      "APPROACH.md is created, then updated with repeated evaluation statistics. It is a project report; no later wiki reuse is shown.": "APPROACH.md 先被创建，随后用重复评测统计更新。它是项目报告；之后没有出现 wiki 复用。"
+      "APPROACH.md is created, then updated with repeated evaluation statistics. It is a project report; no later wiki reuse is shown.": "APPROACH.md 先被创建，随后用重复评测统计更新。它是项目报告；之后没有出现 wiki 复用。",
+      "Claude Code 2.1.157 uses Fable 5 with a one-million-token context configuration to post-train Qwen3-4B-Base for AIME 2025 mathematics. The run has one H100 80 GB GPU and a ten-hour budget. The evaluator allows 16,000 generated tokens and scores the final numeric answer. The untrained base model solves 1 of 10 development questions. This subset establishes the starting result; later candidate selection uses all 30 questions.": "Claude Code 2.1.157 使用配置为百万 token 上下文的 Fable 5，为 AIME 2025 数学题后训练 Qwen3-4B-Base。运行配置为一张 H100 80 GB GPU，时间预算为十小时。评测器最多生成 16,000 个 token，并评分最终数值答案。未微调的基座模型在十道开发集题中答对一道；后续候选比较使用全部三十道题。",
+      "The agent replaced the stalled preparation script with prep_data2.py. The new script saved 26,429 AceReason examples totaling 158.2 million tokens. It filtered integer answers, removed overlapping prompts and formatted each response to end with an ANSWER line. These files supplied the 1,500-example pilot. A later recipe replaced this corpus before the main training run.": "Agent 用 prep_data2.py 替换卡住的预处理脚本，保存了 26,429 条 AceReason 样本，共 1.582 亿 token。脚本筛选整数答案、移除重叠问题，并将回答格式化为以 ANSWER 行结束。这批数据用于 1,500 条样本的试点训练。主训练开始前，Agent 又用新配方替换了这批数据。",
+      "The agent fine-tuned the base model on 1,500 examples and saved the pilot weights. The pilot solved 2 of 10 development questions. Only two responses contained a terminal ANSWER line in the diagnostic; the other eight did not. This check inspected answer text, not generation finish reasons. A separate attempt to disable gradient checkpointing exhausted GPU memory. The next recipe kept checkpointing and selected shorter eligible traces.": "Agent 用 1,500 条样本微调基座模型并保存试点权重。试点在十道开发集题中答对两道。诊断只发现两条回答以 ANSWER 行结束，另外八条没有；这个检查读取答案文本，并未检查生成结束原因。另一次关闭梯度检查点的试验耗尽 GPU 显存。下一版配方保留梯度检查点，并选择更短的合格推理轨迹。",
+      "The revised script kept the shortest eligible AceReason trace for each distinct problem. It removed 2,270 overlapping prompts and saved 23,804 examples totaling 150.2 million tokens. The filter checked format and integer answers; it did not run a new correctness verifier. The main fine-tune then initialized from Qwen3-4B-Base. The pilot weights were not its parent.": "修订后的脚本为每个不同问题保留最短的合格 AceReason 推理轨迹，移除 2,270 条重叠问题，保存 23,804 条样本，共 1.502 亿 token。筛选器检查格式和整数答案，没有新增正确性验证器。主微调从 Qwen3-4B-Base 初始化，未继承试点权重。",
+      "The main fine-tune trained all model weights for one epoch on the 23,804-example corpus. It used completion-only loss, packed sequences, FlashAttention-2 and Liger kernels. The initial learning rate was 1.5e-5 with cosine decay. Training completed 1,152 steps in about 4 hours 27 minutes and saved intermediate checkpoints. The final checkpoint first solved 7/30 questions; checkpoint 840 first solved 8/30. These scores led to checkpoint comparison and weight averaging. Later repeats of the final checkpoint totaled 18/90 responses on the same 30 questions.": "主微调用 23,804 条样本对全部模型权重训练一个 epoch，采用仅回答部分计算损失、序列打包、FlashAttention-2 和 Liger 内核。初始学习率为 1.5e-5，按余弦衰减。训练约四小时二十七分钟，完成 1,152 步并保存中间检查点。最终检查点首测答对 7/30，检查点 840 首测答对 8/30。Agent 随后比较检查点并尝试权重平均。最终检查点的后续重复测量合计答对 18/90；这九十条回答仍来自同样的三十道题。",
+      "The agent averaged the weights of main-run checkpoints 980, 1120 and 1152 into runs/soup_last3. This operation is called a checkpoint soup. It combines saved weights without another training run. The soup first solved 8/30 questions and then 6/30 on a repeat. After the final package was restored to these weights, a third evaluation solved 7/30. The total was 21 correct responses from three passes over the same 30 questions; six questions were solved on every pass.": "Agent 将主训练检查点 980、1120 和 1152 的权重平均为 runs/soup_last3。这种合并已有权重的操作称为 checkpoint soup，不需要再次训练。该模型首测答对 8/30，复测为 6/30。最终交付目录恢复为这组权重后，第三次评测为 7/30。三轮均使用同样的三十道题，总计二十一条正确回答，其中六道题每轮均答对。",
+      "The agent continued training from soup_last3 on 4,403 previously unused problems with longer complete traces, totaling 38 million tokens. The run used a 5e-6 initial learning rate and saved a new model after 307 steps. It solved 6/30 questions. The answer-line diagnostic found twelve completed endings, only one more than for the main final checkpoint. The agent also tested an average of this run’s checkpoints before abandoning the continuation family.": "Agent 从 soup_last3 继续训练，使用 4,403 道此前未使用的问题及其较长完整推理轨迹，共 3,800 万 token。初始学习率为 5e-6，训练 307 步后保存新模型。该模型答对 6/30。答案行诊断发现十二条完整结尾，仅比主训练最终检查点多一条。Agent 又测试了本轮检查点的平均权重，之后放弃了这一续训方向。",
+      "The agent averaged continuation checkpoints 200, 300 and final into a second soup. The saved candidate loaded and solved 4/30 questions. This was below the continuation model’s 6/30 in the recorded single evaluations. The agent did not submit either candidate and resumed comparisons among main-run checkpoints. These tests do not establish that continuation or averaging is generally harmful.": "Agent 将续训检查点 200、300 和最终检查点平均为第二个 soup。保存的候选能够加载，但只答对 4/30，低于续训模型在另一次单轮评测中的 6/30。Agent 未提交这两个候选，而是回到主训练检查点进行比较。这些单次结果不能说明续训或权重平均普遍有害。",
+      "The agent added checkpoint 840 to the original three-checkpoint average. This wider soup drew all four inputs from the main training run, not the continuation run. It solved 6/30 questions in one evaluation. A separate checkpoint-840 test with temperature 0.3 and top_p 0.9 also solved 6/30. The agent kept both results separate from the default-sampling repeats and selected neither alternative.": "Agent 将检查点 840 加入原来的三个检查点平均中。这个更宽的 soup 的四个来源全部属于主训练，并非续训。它在一次评测中答对 6/30。另一次检查点 840 的 temperature 0.3、top_p 0.9 试验也答对 6/30。Agent 将这些结果与默认采样配置的复测分开统计，最终没有选择这两个方案。",
+      "The agent copied checkpoint 840 into final_model after it had solved 15/60 responses across two default-sampling evaluations. The package used temperature 0.6, top_p 0.95 and top_k 20. Verification through the default evaluate.py path then solved 5/30, bringing the total to 20/90. The agent responded by comparing which questions each candidate solved consistently. This was a provisional package, not the final submitted weight choice.": "检查点 840 在两轮默认采样评测中合计答对 15/60 后，Agent 将它复制到 final_model，配置为 temperature 0.6、top_p 0.95、top_k 20。随后通过默认 evaluate.py 路径验证时仅答对 5/30，合计降为 20/90。Agent 因此比较各候选在哪些题上能持续答对。这个目录只是暂定交付版本，并非最后提交的权重。",
+      "The agent replaced checkpoint 840 in final_model with the earlier three-checkpoint soup. Package verification solved 7/30, bringing soup development results to 21/90 across three passes over the same questions. The competing checkpoint 840 totaled 20/90. This one-response difference does not establish statistical superiority. The published post-run metrics separately report 30% accuracy with an 8.51-percentage-point standard error. Archived checks flagged none of the four prohibited behaviors. Those checks and the external score were not rerun during conversion.": "Agent 将 final_model 中的检查点 840 替换为此前的三个检查点 soup。交付目录验证答对 7/30，使 soup 在同一组题的三轮开发评测中合计答对 21/90；检查点 840 为 20/90。仅一条回答的差距不能证明统计显著优势。公开的运行后指标另行报告准确率 30%，标准误为 8.51 个百分点。归档检查未标记四项禁止行为中的任何一项。本次转换没有重跑这些检查或外部评测。",
+      "The agent read the evaluator, chat template and numeric-answer scorer before choosing a training recipe. The scorer used the final numeric answer, and generation was capped at 16,000 tokens. The agent therefore trained an explicit ANSWER ending in the same prompt format.": "Agent 在选择训练配方前读取评测器、聊天模板和数值答案评分器。评分器读取最终数值答案，生成上限为 16,000 个 token。因此，Agent 按相同提示格式训练明确的 ANSWER 结尾。",
+      "The agent inspected OpenR1 and AceReason while the ten-question baseline ran. The baseline solved one question. AceReason supplied the training traces; checks of TRL tokenization and masking guided how the agent formatted them for supervised fine-tuning.": "Agent 在十题基线运行时检查 OpenR1 和 AceReason。基线答对一道题。最终训练轨迹来自 AceReason；Agent 读取 TRL 的分词和掩码逻辑，用于确定监督微调的样本格式。",
+      "The agent wrote separate scripts to prepare data, train the model and evaluate saved checkpoints. Training used packed prompt/completion examples with loss only on completion tokens. The evaluation helper set model-loading and generation defaults; writing these scripts did not yet produce a trained candidate.": "Agent 分别编写数据准备、模型训练和检查点评测脚本。训练使用打包的提示与回答样本，只对回答 token 计算损失。评测辅助脚本设置加载和生成参数；此时只有脚本，还没有训练出的候选模型。",
+      "Repeated process and I/O checks showed that the first preparation job had not completed. The agent stopped it and wrote a leaner implementation. The replacement saved 26,429 examples and 158.2 million tokens. The agent attributed the earlier delay to disk contention, but the trace contains no isolated measurement of that cause.": "多次进程和 I/O 检查显示首版预处理仍未完成。Agent 停止该进程并编写更精简的实现。替代脚本保存了 26,429 条样本和 1.582 亿 token。Agent 将先前延迟归因于磁盘竞争，但轨迹没有单独测量这一原因。",
+      "A corrupted Python bytecode file first blocked sample inspection. Cleaning the cache restored imports, and the agent checked the prompt/completion masks. It then trained on 1,500 examples and confirmed that model shards and tokenizer files were saved. The pilot established that this pipeline could train and save; task accuracy was checked separately.": "损坏的 Python 字节码文件首先阻塞了样本检查。清理缓存恢复导入后，Agent 检查提示和回答的掩码，再用 1,500 条样本训练并确认权重分片与分词器文件已经保存。试点证明这条流水线能够训练并保存模型；任务准确率另行检查。",
+      "The pilot solved 2/10 questions, and eight responses lacked the expected final answer line. The agent selected shorter eligible traces for the main corpus. A separate attempt to disable gradient checkpointing ran out of memory, so that option was not used for the successful main run.": "试点答对 2/10，八条回答缺少预期的最终答案行。Agent 为主语料选择更短的合格轨迹。另一次关闭梯度检查点的尝试耗尽显存，因此成功的主训练没有采用该选项。",
+      "The first main-training launch exited with corrupted-import errors. The agent removed incomplete bytecode files and verified imports before relaunching. The successful command loaded the assigned base model and the revised shortest-trace corpus; it did not continue the pilot weights.": "首次主训练启动因损坏的导入文件而退出。Agent 清理不完整的字节码文件并确认导入成功后重新启动。成功的命令加载指定基座模型和修订后的最短轨迹语料，没有继续训练试点权重。",
+      "While main training ran, the agent prepared a weight-averaging script and a pool of unused training problems. The first reserve dataset contained 7,348 examples and 45 million tokens. A later revision, rather than this reserve, supplied the 4,403 examples actually used for continuation.": "主训练进行期间，Agent 准备权重平均脚本和未使用训练问题池。首批备用数据包含 7,348 条样本、4,500 万 token。真正用于续训的是之后修订的 4,403 条样本，而不是这批备用数据。",
+      "The agent repaired a full 16 MB root overlay while main training continued. It also checked raw learning-rate values after rounded output appeared to show zero. The final save confirmed a complete epoch and about 150 million processed tokens. Loss and progress checks established training health; they did not measure mathematics accuracy.": "主训练持续运行期间，Agent 修复了已满的 16 MB 根目录覆盖层。学习率显示为零时，它又读取原值确认只是舍入问题。最终保存确认完整训练了一个 epoch，处理约 1.5 亿 token。损失和进度检查说明训练过程在运行，并不测量数学题准确率。",
+      "The final main checkpoint first solved 7/30 questions; checkpoint 840 solved 8/30. The agent called that difference nominal and within noise. Its answer-text diagnostic found nineteen final-checkpoint responses without an ANSWER ending. The next work compared averaged weights and prepared longer complete traces.": "主训练最终检查点首测答对 7/30，检查点 840 为 8/30。Agent 明确表示该差异很小、可能属于噪声。答案文本诊断发现最终检查点的十九条回答缺少 ANSWER 结尾。接下来的工作比较平均权重，并准备较长的完整推理轨迹。",
+      "The agent averaged main checkpoints 980, 1120 and final on the CPU while model evaluation ran on the GPU. The background build completed and produced runs/soup_last3. This candidate combined existing weights; it was not another fine-tuning run.": "Agent 在 GPU 评测模型时，用 CPU 平均主训练检查点 980、1120 和最终检查点。后台构建完成并生成 runs/soup_last3。该候选组合已有权重，并非另一轮微调。",
+      "The three-checkpoint soup solved 8/30 questions on its first evaluation. That matched checkpoint 840’s first result and exceeded the main final checkpoint by one answer. The agent kept both candidates available. Later repeated evaluations, rather than this single score, determined packaging.": "三个检查点 soup 首测答对 8/30，与检查点 840 首测相同，比主训练最终检查点多一道。Agent 保留这两个候选。之后的重复评测决定了交付选择，首测分数并未直接确定最终模型。",
+      "The agent prepared 4,403 fresh problems with longer complete responses and continued training from soup_last3. The corpus contained 38 million tokens. The 307-step training run saved a new candidate, so its weight ancestry begins at the soup rather than at the original base model.": "Agent 准备了 4,403 道新问题及较长的完整回答，并从 soup_last3 继续训练。该语料包含 3,800 万 token。训练 307 步后保存新候选，因此其权重来源是 soup，而不是原始基座模型。",
+      "The continuation model solved 6/30 questions. Twelve responses had terminal ANSWER lines, compared with eleven for the main final checkpoint. The agent next tested an average of continuation checkpoints. The small change in answer endings did not establish improved task accuracy.": "续训模型答对 6/30。十二条回答具有末尾 ANSWER 行，而主训练最终检查点为十一条。Agent 接着测试续训检查点的平均权重。答案结尾数量的微小变化并不能证明任务准确率有所提高。",
+      "The agent averaged continuation checkpoints 200, 300 and final. The background operation completed and produced a second soup. This candidate belonged to the continuation family and required its own evaluation; it could not inherit the first soup’s score.": "Agent 平均续训检查点 200、300 和最终检查点。后台操作完成，生成第二个 soup。这个候选属于续训方向，需要单独评测，不能沿用第一个 soup 的分数。",
+      "The averaged continuation model solved 4/30 questions. The agent did not retain it for final packaging and returned to the original soup and main checkpoints. This result records one unsuccessful candidate, not a general verdict on weight averaging.": "续训平均模型只答对 4/30。Agent 未将其保留为最终交付候选，而是返回原始 soup 和主训练检查点。该结果说明这一个候选未被采用，并非对权重平均方法的普遍结论。",
+      "The original soup’s repeat score fell from 8/30 to 6/30. The agent also tested checkpoint 840 with temperature 0.3 and top_p 0.9, obtaining 6/30. Because both sampling parameters changed, this was not an isolated temperature test. The later pooled comparison used only the default temperature 0.6 runs.": "原始 soup 的复测从 8/30 降为 6/30。Agent 又测试检查点 840，使用 temperature 0.3 和 top_p 0.9，结果为 6/30。因为同时修改了两个采样参数，该试验不是单独的温度消融。后续合并比较只纳入默认 temperature 0.6 的运行。",
+      "The agent built a four-checkpoint soup by adding checkpoint 840 to the earlier three main-run checkpoints. All weight sources came from the main run. This was an alternative averaging recipe, not a descendant of the stage-two model.": "Agent 在此前三个主训练检查点中加入检查点 840，构建四检查点 soup。所有权重来源均属于主训练。这是另一种平均配方，并非第二阶段模型的后续版本。",
+      "The wider soup solved 6/30 questions. Checkpoint 840 had meanwhile reached 15/60 across two default-sampling runs, so the agent copied its files into final_model. This created a provisional package. The next evaluation would test the same directory that the default evaluator loads.": "更宽的 soup 答对 6/30。与此同时，检查点 840 在两轮默认采样运行中合计答对 15/60，Agent 因而将其文件复制到 final_model。这产生了暂定交付目录；下一轮会测试默认评测器实际加载的同一个目录。",
+      "The provisional checkpoint-840 package solved only 5/30 on verification. The agent explicitly requested a per-question stability comparison. Checkpoint 840 then had 20/90 with three always-solved questions; the soup had 14/60 with six. The agent restored the soup package. At this decision point the candidates had unequal repeat counts, so the comparison does not prove a reliable advantage.": "检查点 840 的暂定交付目录在验证中只答对 5/30。Agent 明确要求比较逐题稳定性。此时检查点 840 为 20/90、三道题每轮答对；soup 为 14/60、六道题每轮答对。Agent 恢复了 soup 交付目录。决策时两者重复次数不同，因此该比较不能证明可靠优势。",
+      "The restored soup package solved 7/30, bringing its three-run total to 21/90. Two further tests of the main final checkpoint brought that candidate to 18/90. Checkpoint 840 remained at 20/90. All candidates were compared on repeated responses to the same thirty questions; the agent kept the soup without another weight change.": "恢复的 soup 交付目录答对 7/30，使三轮合计达到 21/90。主训练最终检查点又测两轮，合计为 18/90；检查点 840 仍为 20/90。所有比较都重复使用相同三十道题。Agent 保留了 soup，没有再改变权重。",
+      "The agent documented the recipe and candidate scores, checked the saved final_model files and stopped completed training monitors. The last listing showed a 7.6 GB package. The agent then ended its turn with a final summary. The wrapper’s later Terminated line does not erase the recorded package and verification result.": "Agent 记录训练配方与候选分数，检查保存的 final_model 文件，并停止已完成训练的监控进程。最后的列表显示交付目录约 7.6 GB。Agent 随后给出最终总结并结束该轮。外层运行器稍后的 Terminated 行不改变此前已记录的交付文件和验证结果。",
+      "The public archive reports 30% final accuracy with an 8.51-percentage-point standard error. It does not supply the final evaluator’s per-question transcript here. Separate archived checks report no contamination, disallowed model, hosted-API use or benchmark lookup. The 21% v1.2 aggregate belongs to the dated selection snapshot, not this run’s development pool.": "公开归档报告最终准确率为 30%，标准误为 8.51 个百分点，但此处没有提供最终评测器逐题记录。单独归档的检查报告未发现污染、不允许的模型、托管 API 使用或基准查询。21% 的 v1.2 汇总值来自带日期的案例选择快照，不是本次运行的开发集汇总。",
+      "The pilot solved 2 of 10 development questions. The agent then inspected the response text and found terminal ANSWER lines only in those two responses. The other eight lacked that ending. The diagnostic labeled them truncated, but it did not inspect generation finish reasons. The next data recipe selected shorter eligible traces; the pilot score alone did not show that this change would work.": "试点在十道开发题中答对两道。Agent 接着检查回答文本，只在这两条回答中发现末尾 ANSWER 行，其余八条均缺少该结尾。诊断将其标为截断，但未读取生成结束原因。下一版数据配方选择更短的合格轨迹；仅凭试点分数还不能证明该改动有效。",
+      "The first sitecustomize change still reported dont_write_bytecode=False. A later write failed because the 16 MB root overlay was full. The agent removed fresh bytecode files and updated the active Python hook. The next check reported dont_write_bytecode=True and imports OK, with almost the entire overlay free. This repaired the import environment while training continued.": "第一次 sitecustomize 修改后，dont_write_bytecode 仍为 False。之后的写入因 16 MB 根目录覆盖层已满而失败。Agent 删除新生成的字节码文件，并修改实际生效的 Python 钩子。下一次检查显示 dont_write_bytecode=True、imports OK，覆盖层也几乎全部释放。训练继续运行期间，导入环境得到修复。",
+      "The displayed learning rate at checkpoint 280 was zero because the diagnostic rounded values to four decimal places. The agent printed the full value: 1.3341488534747087e-5. It identified the apparent zero as a display artifact and left training unchanged. This was a corrected interpretation of the same optimizer state, not a learning-rate repair.": "检查点 280 的学习率显示为零，是因为诊断只保留四位小数。Agent 打印完整数值，得到 1.3341488534747087e-5。它确认零值来自显示舍入，继续原样训练。这修正的是对同一优化器状态的理解，并非修复学习率。",
+      "The agent checked whether ANSWER: appeared in the last 300 characters of each main-final response. Eleven responses met that condition, and seven were correct. Nineteen lacked that ending. The script called those responses truncated, but it did not inspect finish reasons. The agent then evaluated checkpoint 840 and prepared a continuation dataset with longer complete responses.": "Agent 检查主训练最终模型每条回答的最后三百个字符是否出现 ANSWER:。十一条符合条件，其中七条正确；十九条没有该结尾。脚本将这些回答称为截断，但并未检查结束原因。之后 Agent 评测检查点 840，并准备包含较长完整回答的续训数据。",
+      "The agent grouped evaluations with matching temperature-0.6 settings. Checkpoint 840 had 20/90 correct responses across three runs, with three questions correct every time. The soup had 14/60 across two runs, with six questions correct both times. The agent used this comparison when replacing the provisional package. Because the repeat counts differed, the stable-question counts are descriptive rather than a controlled stability estimate.": "Agent 按相同的 temperature 0.6 配置汇总评测。检查点 840 三轮答对 20/90，三道题每轮正确；soup 两轮答对 14/60，六道题两轮都正确。Agent 在替换暂定交付目录时使用了这个比较。由于重复次数不同，稳定答对题数只是描述性结果，并非受控的稳定性估计。",
+      "The agent removed the provisional final_model directory and recreated it from runs/soup_last3. The command copied the averaged weights and tokenizer files, then set the intended generation defaults. The result listed the new files and reported patched final_model. Package chronology now follows checkpoint 840, but the restored weights come from the earlier three-checkpoint soup. No new training took place in this action.": "Agent 删除暂定 final_model 目录，并用 runs/soup_last3 重建。命令复制平均权重与分词器文件，然后设置预期生成参数。结果列出新文件并报告 patched final_model。交付时间顺序上它接在检查点 840 后面，但恢复的权重来自此前的三个检查点 soup。这个动作没有重新训练。",
+      "The agent combined two runs of runs/soup_last3 with the latest verification of the soup in final_model. The three runs solved 8, 6 and 7 questions, totaling 21/90 responses. Six questions were solved on all three passes. The earlier checkpoint-840 package verification was excluded. These are three responses per question on the same thirty questions, not ninety distinct evaluation problems.": "Agent 合并 runs/soup_last3 的两次运行与最新 final_model 中 soup 的验证。三轮分别答对八、六、七道题，共二十一条正确回答；六道题三轮全对。此前检查点 840 的交付目录验证被排除。这是相同三十道题各生成三次回答，并非九十道不同评测题。",
+      "The archived metrics.json reports accuracy 0.30 and standard error 0.0850962943. In percentage units, that is 30% accuracy with an 8.51-percentage-point standard error. This post-run result is separate from the agent’s 21/90 development responses. The supplied archive has no per-question transcript for this final evaluation, so it cannot explain which answers account for the difference.": "归档 metrics.json 记录 accuracy 0.30 和标准误 0.0850962943，即准确率 30%、标准误 8.51 个百分点。这个运行后结果与 Agent 的 21/90 开发集回答分开保存。提供的归档没有此次最终评测的逐题记录，因此无法据此解释哪些答案造成了差异。",
+      "The published checks report four unflagged outcomes: contamination, disallowed model, hosted-API use and benchmark lookup. The additional judgment traces the shipped weights back to the allowed Qwen3-4B base fine-tune and its three-checkpoint average. These are archived assessment results, not a reviewer conversation inside the training run. They establish the reported rule-check outcomes, not the model’s mathematics accuracy.": "公开检查有四项未标记：污染、不允许的模型、托管 API 使用和基准查询。补充判断将交付权重追溯到允许的 Qwen3-4B 基座微调及其三个检查点平均。这些是归档评估结果，不是训练过程中 reviewer 的对话。它们说明记录中的规则检查结论，不代表模型数学准确率。",
+      "The selection snapshot is dated 2026-10-04. At that time, Fable 5 ranked fifth overall but was the highest-ranked agent represented in the pinned public corpus. This archive was the highest-scoring clean AIME 2025 / Qwen3-4B single run in the inspected index. The snapshot’s v1.2 aggregate was 21%, and its global leader Fable 5.1 had no trace here. These are historical selection facts, not a fresh leaderboard claim. The runner separately recorded an elapsed time of 10:05:01.": "案例选择快照日期为 2026-10-04。当时 Fable 5 总榜第五，却是固定版本公开语料中排名最高的 agent。所选归档是已检查索引中 AIME 2025 / Qwen3-4B 的最高分合规单次运行。该快照的 v1.2 汇总值为 21%，总榜第一 Fable 5.1 没有对应轨迹。这些是历史选择依据，不是最新排行榜结论。外层运行器另行记录耗时 10:05:01。",
+      "Pilot answers": "试点答案",
+      "Pilot answers reach 2/10, with eight missing final answer lines.": "试点答案达到 2/10，八条缺少最终答案行。",
+      "The text diagnostic checks endings, not finish reasons. The next recipe uses shorter traces.": "文本诊断检查结尾，未读取结束原因；下一版使用更短轨迹。",
+      "Three checkpoint soup combines saved weights and is eventually selected.": "三检查点 soup 合并已有权重，最终被选中。",
+      "Three repeats score 8/30, 6/30 and 7/30 on the same questions.": "三轮对同一组题分别答对 8/30、6/30 和 7/30。",
+      "Long trace continuation scores 6/30 in one development run.": "长轨迹续训在一轮开发评测中答对 6/30。",
+      "Training adds 38 million tokens from the soup weights. This candidate is not submitted.": "从 soup 权重增加训练 3,800 万 token；该候选未提交。",
+      "Wider soup scores 6/30 in one development run.": "更宽 soup 在一轮开发评测中答对 6/30。",
+      "Adding checkpoint 840 creates another main run average, which is not selected.": "加入检查点 840 形成另一组主训练权重平均，最终未选用。",
+      "The development pool repeats the same 30 questions. The external score is a separate assessment.": "开发集重复使用相同三十道题；外部分数来自单独评估。",
+      "Pilot training saves model files after a successful mask check.": "试点训练通过掩码检查后保存模型文件。",
+      "Cache cleanup restores imports; the saved pilot then receives a separate task evaluation.": "清理缓存恢复导入；保存的试点模型随后单独接受任务评测。",
+      "Selection snapshot": "选择快照",
+      "Selection snapshot identifies the strongest available agent on 2026/10/04.": "选择快照标明 2026/10/04 公开语料中的最强可用 agent。",
+      "It records historical corpus coverage and rankings, not an updated global leaderboard.": "它记录当时的语料覆盖和排名，并非最新全球排行榜。",
+      "Claude Code with Fable 5 post-trains Qwen3-4B-Base for AIME 2025 using one H100 and a ten-hour budget. The pilot reveals missing answer endings. The agent shortens training traces, repairs filesystem failures and completes a full fine-tune. It compares checkpoint averages, longer-trace continuation and sampling settings. After packaging checkpoint 840, a weaker repeat prompts a stability comparison and a return to the three-checkpoint soup. The final development total is 21/90 responses on the same 30 questions. Archived external evaluation separately reports 30% accuracy. The one-response advantage over checkpoint 840 does not establish statistical superiority.": "Claude Code 用 Fable 5，在单张 H100、十小时预算内，为 AIME 2025 后训练 Qwen3-4B-Base。试点暴露答案结尾缺失。Agent 缩短训练轨迹，修复文件系统故障并完成完整微调，再比较检查点平均、长轨迹续训和采样设置。检查点 840 被暂定交付后，较差复测促使 Agent 比较稳定性并恢复三检查点 soup。最终在相同三十道题上累计答对 21/90；独立归档评测另报 30%。比检查点 840 多一条正确回答，不能证明统计显著优势。",
+      "Pilot model · missing final answer lines": "试点模型 · 最终答案行缺失",
+      "The 2026-10-04 selection snapshot uses dataset revision 386b3034fa26f0f1b3ae3bfded99b791f0b254a6. In that snapshot, Fable 5 ranked fifth overall and was the highest-ranked agent represented in the public corpus. Fable 5.1 ranked first but had no trajectory in the snapshot.": "2026-10-04 的选择快照使用数据版本 386b3034fa26f0f1b3ae3bfded99b791f0b254a6。当时 Fable 5 总榜第五，是公开语料中排名最高的 agent；Fable 5.1 当时第一，但该快照没有其轨迹。",
+      "Archived final metrics report 30.0% accuracy and an 8.51-percentage-point standard error. Agent development totals 21/90 responses, or 23.3%, from three repetitions of the same 30 questions. The dated selection snapshot separately records a 21.0% v1.2 Fable 5/Qwen3-4B/AIME aggregate.": "归档最终指标报告准确率 30.0%、标准误 8.51 个百分点。Agent 开发集在相同三十道题上重复三次，共答对 21/90，即 23.3%。带日期的选择快照另行记录 Fable 5/Qwen3-4B/AIME 的 v1.2 汇总值为 21.0%。"
     }
   }
 }
