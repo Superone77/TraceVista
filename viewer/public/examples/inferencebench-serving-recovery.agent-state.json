@@ -17,7 +17,7 @@
     {
       "id": "s0",
       "title": "Stub launcher",
-      "summary": "An engine-agnostic start_server.sh exits 2 and its fallback names Qwen, while the task requires Mistral-7B-Instruct-v0.3. Codex gpt-5.5 with high effort receives one H100 80GB HBM3, 180GB RAM and a nominal two hour budget. The scoring contract restarts the canonical launcher in a fresh container.",
+      "summary": "Codex uses GPT-5.5 with high reasoning effort to deploy Mistral-7B-Instruct-v0.3 for InferenceBench Scenario D. The task balances latency, throughput and answer quality on one H100 80GB HBM3 with 180GB RAM and a nominal two-hour budget. The starting start_server.sh contains no inference engine and exits with code 2. The final evaluator will restart this launcher in a fresh container, so the saved recipe must work without a surviving development process.",
       "events": [
         "E1",
         "E2",
@@ -126,8 +126,8 @@
       },
       "ladder": {
         "topic": "Stub launcher",
-        "takeaway": "Stub launcher cannot serve the required Mistral model.",
-        "reason": "The task requires balanced serving, fresh restart reproducibility and a quality gate.",
+        "takeaway": "Stub launcher has no engine for the required Mistral server.",
+        "reason": "Codex must build a restartable server on one H100 and balance latency, throughput and quality.",
         "abstract": [
           {
             "event": "E17",
@@ -139,7 +139,7 @@
     {
       "id": "s1",
       "title": "BF16 launcher",
-      "summary": "The launcher now selects vLLM 0.10.2, Mistral BF16, FlashAttention, 8192 context, 16 sequences, 32768 batched tokens, block size 16 and GPU utilization 0.94. This is an implementation milestone, not a working-server claim; first startup exposes a GPU-UUID incompatibility.",
+      "summary": "The agent replaced the empty launcher with vLLM 0.10.2 serving Mistral in BF16. It selected FlashAttention, an 8192-token context, 16 active sequences, 32768 batched tokens, block size 16 and 0.94 GPU memory utilization. The first launch failed during model inspection because the GPU identifier was a UUID. The file was saved, but this configuration had not yet served a request.",
       "events": [
         "E86",
         "E94",
@@ -189,7 +189,7 @@
     {
       "id": "s2",
       "title": "Numeric GPU",
-      "summary": "The code normalizes CUDA_VISIBLE_DEVICES to numeric device 0. This fixes the model-inspection path for the one-GPU sandbox, but the installed Transformers 5.x tokenizer path remains incompatible. A successful edit is separate from endpoint readiness.",
+      "summary": "The launcher now maps the single visible GPU to numeric device 0. Model inspection gets past the UUID parsing error. Startup then fails because the installed Transformers 5.x tokenizer lacks an attribute expected by vLLM. The GPU repair removes one blocker and exposes the next one.",
       "events": [
         "E94",
         "E99",
@@ -243,7 +243,7 @@
     {
       "id": "s3",
       "title": "Mistral tokenizer",
-      "summary": "Adding tokenizer-mode mistral permits startup, yet the quick evaluator gets special_token_policy errors for chat. This alternative is genuinely tried and abandoned; a listening endpoint alone does not satisfy the task.",
+      "summary": "The agent tried the Mistral-specific tokenizer mode after the standard tokenizer failed. The server reached readiness, but the quick evaluator received special_token_policy errors from chat requests. This trial showed that a responding model endpoint did not establish working generation. The agent next chose to pin Transformers and restore the standard tokenizer path.",
       "events": [
         "E111",
         "E112",
@@ -303,7 +303,7 @@
     {
       "id": "s4",
       "title": "Pinned tokenizer",
-      "summary": "The environment pins Transformers 4.55.4 and removes tokenizer-mode mistral, retaining vLLM 0.10.2. Quick requests now generate rather than returning API errors. Dependency self-installation is added later; this state records the initially working environment.",
+      "summary": "Transformers is pinned to 4.55.4, and the launcher no longer requests Mistral tokenizer mode. With vLLM 0.10.2 unchanged, the quick evaluator now receives generated answers instead of API errors. Its first speed check runs four long requests serially. This establishes a working development environment; automatic dependency installation is added in a later state.",
       "events": [
         "E118",
         "E123",
@@ -375,7 +375,7 @@
     {
       "id": "s5",
       "title": "Usage flag",
-      "summary": "The persisted launcher adds enable-force-include-usage and related API defaults. The early FlashInfer install does not establish a retained sampler. Later inspection shows the flag is ignored when clients omit stream_options; apparent generation throughput still relies on word counts.",
+      "summary": "The launcher enables streamed usage reporting so the evaluator can count generated tokens. The agent also begins an early FlashInfer installation attempt. The usage flag alone is insufficient: requests without stream_options still receive no token count. Later inspection shows that the evaluator falls back to counting words, so the reported token throughput at this point uses an incomplete measurement path.",
       "events": [
         "E140",
         "E146",
@@ -433,7 +433,7 @@
     {
       "id": "s6",
       "title": "Burst concurrency",
-      "summary": "scenario.json gains profile.concurrency=4. This changes the local evaluation workload, rather than the model. Four-request smoke tests become much shorter; a 200-question quality run gives 29.5% versus 25.5% baseline. The later external evaluator nevertheless reports concurrency 1.",
+      "summary": "The agent added concurrency=4 inside scenario.profile, which is the field the local evaluator reads. Earlier quick checks had run at concurrency 1 despite a top-level value of 4. The new four-request smoke run completes in about 18 seconds. A separate 200-question MMLU-Pro check records 29.5% accuracy against a 25.5% baseline. This state changes the development workload, not the model; the published final evaluator later uses concurrency 1.",
       "events": [
         "E146",
         "E161",
@@ -541,9 +541,9 @@
         "sampler": "default, FlashInfer absent"
       },
       "ladder": {
-        "topic": "Burst concurrency",
-        "takeaway": "Burst concurrency becomes four in the active development profile.",
-        "reason": "The local evaluator read profile concurrency, ignoring the previous top-level declaration.",
+        "topic": "Development concurrency",
+        "takeaway": "Development concurrency changes from one to four after a profile repair.",
+        "reason": "The local evaluator ignored the top-level field. The final evaluator later uses concurrency one.",
         "abstract": [
           {
             "event": "E146",
@@ -577,7 +577,7 @@
     {
       "id": "s7",
       "title": "Portable launcher",
-      "summary": "After restoring 32k batching and 16 sequences, the agent records 96/96 speed and 200/200 quality request success. Development generation throughput is 84.92 reported tok/s and quality 31%; missing usage still affects the token metric. start_server.sh now checks and installs vLLM 0.10.2 plus Transformers 4.55.4.",
+      "summary": "The agent kept 32768 batched tokens and 16 active sequences after smaller settings lost on quick probes. The first full development evaluation completed all 96 speed requests and 200 quality requests. It reported 31% MMLU-Pro accuracy and 84.92 generated tokens per second, although token accounting still used the earlier fallback. The launcher now checks for vLLM 0.10.2 and Transformers 4.55.4 and installs them when needed for a fresh restart.",
       "events": [
         "E252",
         "E253",
@@ -628,9 +628,9 @@
         "sampler": "default, FlashInfer absent"
       },
       "ladder": {
-        "topic": "Portable launcher",
-        "takeaway": "Portable launcher preserves a first full evaluation with quality passing.",
-        "reason": "Pinned self installation makes the selected runtime reproducible after a fresh restart.",
+        "topic": "Dependency pins",
+        "takeaway": "Dependency pins make the working launcher install its required runtime.",
+        "reason": "The first full run passed quality at 31%, but its token count still used a fallback.",
         "abstract": [
           {
             "event": "E252",
@@ -657,7 +657,7 @@
     {
       "id": "s8",
       "title": "Usage patch",
-      "summary": "An idempotent launcher patch fixes vLLM serving_chat.py and serving_completion.py so force_include_usage also works without stream_options. The same-seed quick comparison reports 76.95 versus 129.42 tok/s, while request throughput is 0.2495 versus 0.2468 req/s. The metric definition changed; a matched speedup claim would be misleading.",
+      "summary": "The launcher now patches vLLM chat and completion streaming so force_include_usage works even when the client omits stream_options. After restart, all four quick records contain output_tokens=2048. Reported generation throughput changes from 76.95 to 129.42 tok/s on the same seed, while request throughput changes from 0.2495 to 0.2468 req/s. The token metric now counts completion tokens instead of words; these numbers do not establish a serving speedup.",
       "events": [
         "E283",
         "E288",
@@ -694,9 +694,9 @@
         "sampler": "default, FlashInfer absent"
       },
       "ladder": {
-        "topic": "Usage patch",
-        "takeaway": "Usage patch reports real completion tokens instead of word counts.",
-        "reason": "About 77 to 129 reported tok/s reflects accounting, not proven faster kernels.",
+        "topic": "Token accounting",
+        "takeaway": "Token accounting changes reported throughput from 77 to 129 tok/s.",
+        "reason": "Completion counts replace word counts. Request throughput barely changes, so this is not a speedup.",
         "abstract": [
           {
             "event": "E283",
@@ -729,7 +729,7 @@
     {
       "id": "s9",
       "title": "Tuning hooks",
-      "summary": "CHUNKED_PREFILL_FLAG and EXTRA_VLLM_ARGS enable isolated experiments. The default remains chunked prefill, prefix caching, block size 16, context 8192, 16 sequences and 32768 batch tokens. Temporary async, block-size, context and frontend overrides are trials, not selected defaults. Orphaned wrapper cleanup precedes a better full measured run.",
+      "summary": "The launcher gained CHUNKED_PREFILL_FLAG and EXTRA_VLLM_ARGS hooks for temporary trials. The agent tested scheduling, block size, context length, frontend multiprocessing and cache options. It retained the default scheduler, an 8192-token context, block size 16, 16 sequences and 32768 batched tokens after the alternatives lost on quick checks or failed to start. A full run after stale-wrapper cleanup recorded 130.47 tok/s and 29% MMLU-Pro accuracy. A later fresh restart still exposed a slow first batch, so the next change targets startup.",
       "events": [
         "E309",
         "E310",
@@ -931,9 +931,9 @@
         "sampler": "default, FlashInfer absent"
       },
       "ladder": {
-        "topic": "Tuning hooks",
-        "takeaway": "Tuning hooks expose runtime alternatives while retaining default scheduler settings.",
-        "reason": "Most quick variants lose latency or fail support checks, so defaults survive.",
+        "topic": "Runtime trials",
+        "takeaway": "Runtime trials retain defaults, but a fresh restart exposes slow first tokens.",
+        "reason": "Quick alternatives lose or fail. The next change targets startup rather than another scheduler setting.",
         "abstract": [
           {
             "event": "E354",
@@ -961,7 +961,7 @@
     {
       "id": "s10",
       "title": "Warmup gate",
-      "summary": "The launcher patches /v1/models readiness and warms four representative requests before writing a ready marker. The first prompt repeats Warmup token. 2048 times and exceeds context. The handler catches exceptions and still opens readiness, so the gate is not a universal guarantee of successful warmup.",
+      "summary": "The launcher now delays /v1/models readiness until four warmup requests finish. The first warmup prompt repeats “Warmup token.” 2048 times and exceeds the 8192-token context, producing HTTP 400. The exception handler still writes the ready marker after a warmup error. The gate therefore delays readiness but does not guarantee successful warmup; the immediate repair is to shorten the prompt.",
       "events": [
         "E496",
         "E497",
@@ -988,8 +988,8 @@
       },
       "ladder": {
         "topic": "Warmup gate",
-        "takeaway": "Warmup gate delays readiness, but its first prompt exceeds context.",
-        "reason": "The new startup lifecycle is saved; the initial warmup request returns HTTP 400.",
+        "takeaway": "Warmup gate opens even when its oversized prompt fails.",
+        "reason": "The first prompt returns HTTP 400. The exception path still writes the ready marker.",
         "abstract": [
           {
             "event": "E496",
@@ -1018,7 +1018,7 @@
     {
       "id": "s11",
       "title": "Shorter warmup",
-      "summary": "The warmup prompt is shortened from 2048 to 700 repetitions. Fresh-launch quick TTFT p50 is 0.4399 s versus 1.6737 s before the fix. The full development result is 96/96 speed success, 130.75575 tok/s, TTFT p99 0.4167585 s, ITL p99 9.96685 ms and MMLU-Pro 30.5%. These are development results at concurrency 4.",
+      "summary": "The agent reduced the warmup prompt from 2048 repetitions to 700. After a fresh launch, quick-test median time to first token (TTFT) fell from 1.6737 s to 0.4399 s. The full development evaluation at concurrency 4 completed 96 speed requests and recorded 130.75575 tok/s. TTFT p99 was 0.41676 s, inter-token latency p99 was 9.96685 ms, and MMLU-Pro accuracy was 30.5% against a 25.5% baseline. This warmed configuration becomes the comparison point for FlashInfer.",
       "events": [
         "E507",
         "E508",
@@ -1077,8 +1077,8 @@
       },
       "ladder": {
         "topic": "Shorter warmup",
-        "takeaway": "Shorter warmup lowers fresh start TTFT from 1.67 to 0.44 seconds.",
-        "reason": "A 700-repeat prompt fits; full development evaluation retains 130.76 tok/s.",
+        "takeaway": "Shorter warmup reduces fresh launch median TTFT from 1.67 to 0.44 seconds.",
+        "reason": "The full development run then records 130.76 tok/s and 30.5% quality at concurrency four.",
         "abstract": [
           {
             "event": "E507",
@@ -1117,7 +1117,7 @@
     {
       "id": "s12",
       "title": "FlashInfer sampler",
-      "summary": "FlashInfer Python 0.6.9 installs successfully and vLLM detects its top-k/top-p sampler. A full development comparison yields 130.88473 versus 130.75575 tok/s, but TTFT p99 increases from 0.41676 to 0.44888 s and ITL p99 from 9.97 to 14.97 ms; quality is 30% and passes. The selected direction will be restored.",
+      "summary": "FlashInfer Python 0.6.9 installed, and the server log confirmed its top-k/top-p sampler was active. The full development comparison measured 130.88473 tok/s versus 130.75575 without FlashInfer. TTFT p99 increased from 0.41676 to 0.44888 s, and inter-token latency p99 increased from 9.97 to 14.97 ms. Quality passed at 30% versus 30.5% for the earlier configuration. The agent rejected the sampler because the small throughput gain came with worse latency tails and longer startup.",
       "events": [
         "E550",
         "E551",
@@ -1198,7 +1198,7 @@
     {
       "id": "s13",
       "title": "Restored sampler",
-      "summary": "VLLM_USE_FLASHINFER_SAMPLER defaults to 0 and the server relaunches. Behavior returns to the warmed pre-FlashInfer recipe, but code gains an explicit setting, so lineage is derived from the earlier recipe rather than an identical code restore. The 130.76 tok/s result is reused, not remeasured by this edit.",
+      "summary": "The launcher now defaults VLLM_USE_FLASHINFER_SAMPLER to 0 and restarts without the rejected sampler. This restores the earlier sampling behavior while adding an explicit setting to the code. The selected 130.76 tok/s result still comes from the earlier full run; this edit did not repeat that measurement. Package removal is the next cleanup step.",
       "events": [
         "E577",
         "E578",
@@ -1229,9 +1229,9 @@
         "sampler": "FlashInfer installed, explicitly disabled"
       },
       "ladder": {
-        "topic": "Restored sampler",
-        "takeaway": "Restored sampler explicitly disables FlashInfer and preserves the earlier full result.",
-        "reason": "The launcher gains an off switch; the saved metrics are historical reuse.",
+        "topic": "Sampler rollback",
+        "takeaway": "Sampler rollback restores earlier behavior while retaining historical full metrics.",
+        "reason": "The launcher explicitly disables FlashInfer. The selected 130.76 tok/s is not remeasured here.",
         "abstract": [
           {
             "event": "E577",
@@ -1276,7 +1276,7 @@
     {
       "id": "s14",
       "title": "Clean handoff",
-      "summary": "The rejected FlashInfer package is uninstalled and absence is checked. Subsequent continuation turns find port 45091 down, cancel a hanging smoke evaluator and repeatedly relaunch the same recipe. The last agent message says ready; external capture finds no live server, then independently restarts start_server.sh and evaluates successfully. Published final burst throughput is 144.5143 tok/s with 32% MMLU-Pro, versus 25.5% baseline, at speed concurrency 1.",
+      "summary": "The agent removed FlashInfer and checked that it could no longer be imported. Later checks repeatedly found port 45091 closed, so the agent relaunched the same saved recipe without changing its selected metrics. The cause of the repeated exits is not recorded. The external harness also found no live server, then restarted start_server.sh successfully. Its final evaluation recorded 144.5143 tok/s and 32% MMLU-Pro accuracy at speed concurrency 1. Development used concurrency 4, so this final result is not a matched comparison with 130.76 tok/s.",
       "events": [
         "E592",
         "E593",
@@ -1350,9 +1350,9 @@
         "sampler": "FlashInfer uninstalled, explicitly disabled"
       },
       "ladder": {
-        "topic": "Clean handoff",
-        "takeaway": "Clean handoff removes FlashInfer, then repeatedly repairs a disappearing live endpoint.",
-        "reason": "External restart succeeds; its concurrency one result is measured under a different protocol.",
+        "topic": "Restarted evaluation",
+        "takeaway": "Restarted evaluation passes despite repeated endpoint loss during handoff.",
+        "reason": "The external harness records 144.51 tok/s at concurrency one, unlike development concurrency four.",
         "abstract": [
           {
             "event": "E592",
@@ -1400,7 +1400,7 @@
       "id": "setup",
       "state": "s0",
       "title": "Task and runtime",
-      "summary": "Read the original task: canonical foreground launcher, OpenAI streaming API, H100 80GB, 180GB RAM and no external inference or response caching. Final evaluation kills and restarts the server. Inspect files, GPU, package indexes, cache, evaluator, quality scorer and supervised launch lifecycle. The evaluator reads profile concurrency and has a quality registry; no initial model server exists. Install vLLM 0.10.2 and inspect its CLI and cached configuration; the package command reports successful installation. This is setup, not a throughput result.",
+      "summary": "The agent read the task and inspected the launcher, benchmark scripts, GPU and Python stack. The task requires a reproducible Mistral server on one H100 within two hours. Weights were cached, but start_server.sh was empty. After checking the evaluator and available packages, the agent installed vLLM 0.10.2 as its first serving engine.",
       "events": [
         "E1",
         "E2",
@@ -1505,7 +1505,7 @@
       "id": "first-launch",
       "state": "s0",
       "title": "First deployment",
-      "summary": "Patch start_server.sh to select Mistral and port 45091, context 8192, sequences 16, batch 32768, block 16, BF16, FlashAttention and prefix/chunked prefill. The file edit completes; subsequent startup fails before model load.",
+      "summary": "The agent wrote a foreground vLLM launcher for BF16 Mistral on port 45091. It set an 8192-token context, 16 sequences, 32768 batched tokens and block size 16, with prefix caching and chunked prefill enabled. The file edit succeeded. The supervised launch then failed before model loading, so this action establishes a saved configuration rather than a working server.",
       "events": [
         "E86",
         "E87",
@@ -1533,7 +1533,7 @@
       "id": "gpu",
       "state": "s1",
       "title": "GPU repair",
-      "summary": "Change CUDA_VISIBLE_DEVICES after the UUID parser failure and relaunch. A tokenizer compatibility failure replaces the earlier startup blocker.",
+      "summary": "The startup failure identified CUDA_VISIBLE_DEVICES as a GPU UUID where this vLLM path expected an integer. The agent mapped the one-GPU sandbox to device 0 and relaunched. Model inspection passed that point, but the next error came from the tokenizer.",
       "events": [
         "E94",
         "E95",
@@ -1558,7 +1558,7 @@
       "id": "tokenizer-alternative",
       "state": "s2",
       "title": "Tokenizer alternative",
-      "summary": "Add tokenizer-mode mistral, start the supervised server, and run the quick evaluator. Endpoint readiness does not establish chat compatibility.",
+      "summary": "After the Transformers tokenizer failed, the agent added --tokenizer-mode mistral. The supervised server became ready, and the agent ran the quick evaluator. Chat requests then failed with special_token_policy errors. Readiness alone had missed this API incompatibility.",
       "events": [
         "E99",
         "E100",
@@ -1590,7 +1590,7 @@
       "id": "tokenizer-recovery",
       "state": "s3",
       "title": "Tokenizer recovery",
-      "summary": "Install Transformers 4.55.4, remove tokenizer-mode mistral and relaunch. This is the documented compatibility recovery.",
+      "summary": "The agent responded to the chat errors by installing Transformers 4.55.4 and removing Mistral tokenizer mode. It restarted through the same supervised launcher. The next smoke evaluation produced generated answers, establishing that the standard tokenizer path worked with the pinned version.",
       "events": [
         "E111",
         "E112",
@@ -1622,7 +1622,7 @@
       "id": "first-proof",
       "state": "s4",
       "title": "First validation",
-      "summary": "Allow the first usable smoke evaluation to finish and inspect metrics. Local quick mode still runs long 4096-input/2048-output requests; the initial active profile defaults to concurrency 1.",
+      "summary": "The agent let the first usable smoke evaluation finish and inspected its output. All four speed requests succeeded. Quick mode still requested roughly 4096 input tokens and 2048 output tokens per request, with concurrency 1. The long serial workload explains why this small check took substantial time.",
       "events": [
         "E123",
         "E124",
@@ -1659,7 +1659,7 @@
       "id": "instrument",
       "state": "s4",
       "title": "Streaming instrumentation",
-      "summary": "Add force streamed usage and API settings; attempt installing a matching FlashInfer sampler. The later source shows missing metadata, not a retained working install at this point.",
+      "summary": "The agent enabled forced streamed usage reporting and added API defaults to the launcher. It also attempted to install the vLLM-compatible FlashInfer package. This did not yet establish a working sampler or correct token accounting: later records show missing package metadata and missing usage when stream_options is omitted.",
       "events": [
         "E140",
         "E141",
@@ -1685,7 +1685,7 @@
       "id": "profile",
       "state": "s5",
       "title": "Development protocol",
-      "summary": "Patch scenario.profile.concurrency=4 and rerun the smoke workload. This alters the development protocol and is tracked independently of serving optimizations.",
+      "summary": "The agent found that the evaluator ignored the top-level concurrency field and read scenario.profile instead. It added concurrency=4 there and reran the four-request smoke workload. The run completed in about 18 seconds with all requests successful. This is a workload correction and must be kept separate from engine speed improvements.",
       "events": [
         "E146",
         "E147",
@@ -1720,7 +1720,7 @@
       "id": "quality",
       "state": "s6",
       "title": "Quality validation",
-      "summary": "Run quality after tokenizer changes; inspect 200-sample accuracy, ratio 1.1569 and tau 0.95. Also measure an alternate-seed uncached smoke baseline, reported 76.95 tok/s before usage repair.",
+      "summary": "The agent checked quality after changing the tokenizer. All 200 MMLU-Pro requests completed, and accuracy was 29.5% versus the 25.5% baseline. The ratio of 1.1569 exceeded the 0.95 threshold. It then used another quick-test seed to reduce prompt-cache reuse before scheduler comparisons; that run reported 76.95 tok/s with the old token-counting path.",
       "events": [
         "E161",
         "E162",
@@ -1751,7 +1751,7 @@
       "id": "batching",
       "state": "s6",
       "title": "Scheduler alternatives",
-      "summary": "Launch an 8192 batched-token override. A different-seed run has 2.994 s TTFTp99; same-seed repeat 0.436 s vs 0.422 s baseline, 0.2444 vs 0.2495 req/s and worse ITLp99. These are four-request probes. Launch the middle batching override; quick request throughput 0.2282 req/s versus 0.2495 and TTFTp50 about 1.705 s. Do not generalize this startup-sensitive small sample. Set MAX_NUM_SEQS=4 while restoring batch 32768; compare same-seed metrics with baseline 16 sequences. Request throughput falls to 0.2222 req/s. Restart the canonical launcher with no trial environment overrides. The agent explicitly keeps the higher sequence capacity after the slow four-sequence probe.",
+      "summary": "The agent tested smaller batch-token limits and fewer active sequences, one setting at a time. The 8192-token trial gave no clear benefit; 16384 tokens and four sequences lost request throughput or first-token latency on quick probes. It restored 32768 batched tokens and 16 sequences before a full evaluation. Each quick trial used only four requests, with startup and cache conditions limiting the comparison.",
       "events": [
         "E172",
         "E173",
@@ -1807,7 +1807,7 @@
       "id": "confirmation",
       "state": "s6",
       "title": "Portable baseline",
-      "summary": "Run 96-request speed plus 200-question quality, inspect GPU/process health and remove stale wrappers. The completed metrics record 31% quality, 0.231618 req/s and TTFTp991.7901 s. Add self-install checks for vLLM 0.10.2 and Transformers 4.55.4, validate syntax, endpoint and recorded metrics. The agent reports 84.92 generation tokens/s, still with accounting limitations.",
+      "summary": "The restored defaults completed a full development evaluation: 96 speed requests, 200 quality requests and 31% MMLU-Pro accuracy. The agent then made the launcher install its pinned runtime dependencies when necessary. This created a working restart recipe, but the reported 84.92 tok/s still used token accounting that was later found incomplete.",
       "events": [
         "E208",
         "E209",
@@ -1872,7 +1872,7 @@
       "id": "accounting",
       "state": "s7",
       "title": "Token accounting",
-      "summary": "On continuation, restart the absent server; compare streaming calls with and without include_usage and inspect serving source. The agent initially proposes a proxy, then chooses an idempotent in-place vLLM fix. Patch both chat and completion serving paths from start_server.sh, restart and check real output_tokens 2048. Quick reported generation throughput rises 76.95→129.42 tok/s; request throughput 0.2495→0.2468 req/s.",
+      "summary": "The agent investigated why generated outputs lacked token counts. Plain streaming requests omitted stream_options, which bypassed vLLM’s forced-usage flag. A launcher-applied patch fixed both serving paths and made all four quick records report 2048 completion tokens. Reported tok/s rose while request throughput barely changed. The change repairs the metric definition rather than demonstrating faster serving.",
       "events": [
         "E253",
         "E254",
@@ -1927,7 +1927,7 @@
       "id": "hooks",
       "state": "s8",
       "title": "Controlled overrides",
-      "summary": "Add CHUNKED_PREFILL_FLAG for a temporary off trial. Measure TTFTp50~1.712 s versus 0.455 s and keep the default. Source warnings limit interpretation of what the flag actually changed. Persist the generic argument hook, start async scheduling and compare quick metrics. The balanced objective makes the latency penalty undesirable.",
+      "summary": "The agent added launcher hooks for temporary chunked-prefill and scheduling trials. The chunked-prefill-off flag did not cleanly disable the V1 engine behavior, and its quick latency worsened. Async scheduling improved decode throughput but raised first-token latency to about 1.7 s. The agent retained the default behavior for the balanced task.",
       "events": [
         "E288",
         "E289",
@@ -1968,7 +1968,7 @@
       "id": "runtime-options",
       "state": "s9",
       "title": "Runtime alternatives",
-      "summary": "After declining async scheduling, test block-size 32 through runtime overrides and inspect metrics. The source conclusion is based on a small smoke sample. Attempt FP8 KV cache. The agent reports the backend rejects it; no valid speedup or quality conclusion is available. Inspect a dry-run for SGLang 0.5.10; no SGLang serving candidate is launched. This is a considered alternative, not an executed engine comparison. Inspect/install attempts for the compatible 0.3.x package fail on metadata. The agent declines baking a fragile source install into the launcher. Read GPU clock/power state after dependency options stall. This is environment diagnosis, not an optimization or new state. Test a lower maximum model length intended to reduce profiling/scheduling overhead. The agent calls the result worse and attributes it tentatively to a different compile path. Test disabling frontend multiprocessing after the 6400-context regression. The measured result does not justify retaining the override. Restore originalV1 scheduler, block 16, context 8192, batch 32768 and usage patch; run a full evaluator before the next continuation. Saved metrics are then inspected again.",
+      "summary": "The agent explored several alternatives without changing the saved default recipe. Block size 32, a 6400-token context and disabled frontend multiprocessing lost on quick checks. FP8 KV cache failed compatibility checks; an SGLang dependency dry run and FlashInfer package errors prevented those early installations. GPU clock settings offered no obvious change. The agent returned to the default vLLM configuration and measured a full run with corrected token counts.",
       "events": [
         "E309",
         "E310",
@@ -2053,7 +2053,7 @@
       "id": "noise",
       "state": "s9",
       "title": "Host cleanup",
-      "summary": "Reinspect current scripts, saved comparisons, GPU and process tree. The agent identifies old supervised wrappers burning CPU; it avoids killing the live endpoint. Terminate identified orphaned wrapper PIDs, check liveness and measure a quick run. Causal attribution to CPU pressure remains the agent interpretation; no repeated controlled experiment is supplied. Run and inspect a full evaluation after wrapper cleanup. Development metrics show 0.249643 req/s, 130.4664 tok/s, TTFTp99.41783 s and 29% MMLU-Pro.",
+      "summary": "Process inspection found stale supervised wrappers beside the active vLLM server. The agent stopped only the stale processes and verified that the endpoint stayed available. The next quick result improved, and a full evaluation recorded 130.47 tok/s with TTFT p99 below 0.42 s. Reduced CPU contention is the agent’s explanation; the trace contains no repeated experiment that isolates this cause.",
       "events": [
         "E374",
         "E375",
@@ -2123,9 +2123,9 @@
       ],
       "status": "retained",
       "ladder": {
-        "topic": "Host cleanup",
-        "takeaway": "Host cleanup removes stale supervisors and produces a better full measurement.",
-        "reason": "The active model server stays intact throughout cleanup.",
+        "topic": "Wrapper cleanup",
+        "takeaway": "Wrapper cleanup precedes a better full result, but causality remains unisolated.",
+        "reason": "The agent removes stale supervisors while keeping the live server. A full run reaches 130.47 tok/s.",
         "abstract": [
           {
             "event": "E374",
@@ -2138,7 +2138,7 @@
       "id": "cache-options",
       "state": "s9",
       "title": "Cache alternatives",
-      "summary": "A bounded trial disables prefix caching via EXTRA_VLLM_ARGS. Fresh/cached conditions can confound quick comparisons; the observed no-prefix result is not retained. Attempt max-num-partial-prefills 4 and observe the compatibility failure. The default startup path is restored next. Restore defaults, run a fresh quick benchmark and compare against warmed full metrics. Four quick requests have TTFTp50~1.674 s while the full run hasp99~.418 s.",
+      "summary": "Disabling prefix caching worsened the quick latency, and concurrent partial prefill failed to start in the V1 engine. The agent restored defaults. A fresh quick test then had median TTFT of 1.6737 s despite the stronger saved warm full result. That discrepancy shifted attention from cache flags to warming the server before final evaluation.",
       "events": [
         "E439",
         "E440",
@@ -2192,7 +2192,7 @@
       "id": "cold-start",
       "state": "s9",
       "title": "Cold start",
-      "summary": "Use the cold-start observation to inspect vLLM warmup paths and /v1/models handling. The agent explicitly ties the change to fresh container final evaluation. Patch canonical startup and vLLM readiness route, validate shell syntax and relaunch. The warmup exception handler still writes readiness; the first long prompt fails later.",
+      "summary": "The agent connected the slow first batch with the final evaluator’s fresh restart. It chose to hold /v1/models readiness until four warmup requests completed and implemented that path in start_server.sh. The first prompt exceeded the context limit. The exception handler still opened readiness, so prompt length and the limits of the gate needed explicit attention.",
       "events": [
         "E473",
         "E474",
@@ -2235,7 +2235,7 @@
       "id": "warmup-repair",
       "state": "s10",
       "title": "Warmup repair",
-      "summary": "Correct the HTTP 400-causing prompt and compare quick metrics after relaunch: p50.4399 versus 1.6737 seconds. This directly addresses the observed cold-start issue.",
+      "summary": "The first warmup prompt returned HTTP 400 because it exceeded 8192 tokens. The agent reduced repetitions from 2048 to 700 and relaunched. The fresh quick test then recorded median TTFT of 0.4399 s versus 1.6737 s before the repair. This local comparison supports keeping the shorter prompt.",
       "events": [
         "E496",
         "E497",
@@ -2266,7 +2266,7 @@
       "id": "warm-proof",
       "state": "s11",
       "title": "Warm validation",
-      "summary": "Run full evaluation with the final warmup recipe, monitor workload completion, check syntax and endpoint. Preserve the development result and serving settings.",
+      "summary": "The agent measured the final warmup path with the full development workload at concurrency 4. All 96 speed requests succeeded, with 130.75575 tok/s, TTFT p99 of 0.41676 s and inter-token latency p99 of 9.96685 ms. The 200-question quality check reached 30.5% versus the 25.5% baseline and passed. These saved measurements become the reference for the next sampler trial.",
       "events": [
         "E507",
         "E508",
@@ -2309,7 +2309,7 @@
       "id": "sampler-candidate",
       "state": "s11",
       "title": "Sampler candidate",
-      "summary": "After continuation, search alternate FlashInfer wheel indexes. The plan is conditional: retain only if a real full measurement improves balanced performance. Install the package from the CUDA 12.8/Torch 2.8 index and start the canonical server. Later logs confirm vLLM uses FlashInfer top-k/top-p sampling.",
+      "summary": "The agent revisited FlashInfer after finding a wheel index compatible with Torch 2.8 and CUDA 12.8. Version 0.6.9 installed successfully, unlike the earlier metadata-blocked attempts. It launched the canonical server to verify sampler selection, with retention conditional on a full performance comparison.",
       "events": [
         "E530",
         "E531",
@@ -2349,7 +2349,7 @@
       "id": "sampler-test",
       "state": "s12",
       "title": "Sampler tradeoff",
-      "summary": "Quick generation throughput 130.7648 versus 130.5561 tok/s offers little separation; startup autotuning is visibly costly. Escalate to a full comparison. The full run produces 130.88473 tok/s versus 130.75575, quality 30% versus 30.5% and both gates pass. This multi-metric evidence explains the subsequent rollback. Set VLLM_USE_FLASHINFER_SAMPLER=0, relaunch and validate endpoint/syntax. Compare saved full metrics once more; report the rejected package, startup cost and worse tails.",
+      "summary": "FlashInfer activated successfully, but its quick throughput gain was small and startup autotuning was long. The full run improved throughput by about 0.1% while worsening TTFT p99 and inter-token latency p99. Both quality checks passed. The agent cited the latency and startup costs, disabled FlashInfer in the launcher and kept the earlier full development result.",
       "events": [
         "E550",
         "E551",
@@ -2397,7 +2397,7 @@
       "id": "remove",
       "state": "s13",
       "title": "Environment cleanup",
-      "summary": "Uninstall flashinfer-python 0.6.9, relaunch, inspect process arguments, verify /v1/models and confirm importlib cannot find flashinfer. Saved metrics remain historical.",
+      "summary": "The agent uninstalled the rejected FlashInfer package so the live environment would match the intended fresh-launch recipe. It restarted, checked /v1/models and process arguments, and confirmed that importlib could no longer find flashinfer. Saved full-run metrics stayed unchanged.",
       "events": [
         "E578",
         "E579",
@@ -2432,7 +2432,7 @@
       "id": "handoff",
       "state": "s14",
       "title": "Handoff recovery",
-      "summary": "The late quick run never produces its own metrics. Process/GPU/port checks show the server is gone; this is a liveness failure, not a measured throughput regression. Stop the waiting evaluator and restart via test_server.sh. Verify process arguments, /v1/models, syntax, no FlashInfer and saved full metrics. The local timer says expired. A continuation prompt offers five minutes while timer already expired. Process and endpoint checks fail, but file modes, syntax and saved metrics are unchanged. Relaunch canonical supervised server, confirm intended process and endpoint, validate syntax and report timer expiry. The final continuation gives two minutes; process table and curl show the server absent. Metrics and without FlashInfer environment still match the selected recipe. Start canonical supervised launcher once more; the agent final message says warmup complete and server running. External capture later reports no live agent server, so final success rests on the clean supervised restart.",
+      "summary": "Late checks repeatedly found that the selected server process had disappeared. One smoke evaluator waited on a closed port and produced no new metrics. The agent stopped that probe and repeatedly restarted the unchanged canonical recipe, reporting readiness after each recovery. The cause of the exits remains unknown. The final archived metrics still refer to the earlier full run, not to these restarts.",
       "events": [
         "E593",
         "E594",
@@ -2510,7 +2510,7 @@
       "id": "published",
       "state": "s14",
       "title": "Published evaluation",
-      "summary": "The external harness finds no live server, restarts the canonical launcher, and measures 96 speed requests at concurrency 1 plus 200 MMLU-Pro requests. Metrics and policy judgments are attached verbatim.",
+      "summary": "The external harness found no surviving agent server, then restarted the canonical launcher in a clean environment. It completed 96 speed requests at concurrency 1 and 200 MMLU-Pro requests, recording 144.51 tok/s and 32% accuracy. Development had used concurrency 4. The separate published policy checks were unflagged; they do not turn these two protocols into a matched performance comparison.",
       "events": [
         "E651",
         "E652",
@@ -2521,7 +2521,13 @@
       "ladder": {
         "topic": "Published evaluation",
         "takeaway": "Published evaluation passes after a clean restart under concurrency one.",
-        "reason": "Its protocol differs from the agent development workload."
+        "reason": "Its protocol differs from the agent development workload.",
+        "abstract": [
+          {
+            "event": "E653",
+            "quote": "[eval:speed] running profile name=burst pattern=burst num_requests=96 concurrency=1"
+          }
+        ]
       }
     }
   ],
@@ -2531,7 +2537,7 @@
       "state": "s0",
       "branch": "setup",
       "title": "Serving contract",
-      "summary": "Read the original task: canonical foreground launcher, OpenAI streaming API, H100 80GB, 180GB RAM and no external inference or response caching. Final evaluation kills and restarts the server. Runner metadata records a 7500-second timeout, distinct from the nominal two-hour task budget; the archived elapsed time is 02:05:00.",
+      "summary": "The task asks Codex to serve Mistral-7B-Instruct-v0.3 through an OpenAI-compatible streaming API. Scenario D balances latency, throughput and quality on one H100 80GB and 180GB RAM. The canonical entrypoint is start_server.sh; final evaluation restarts it in a fresh container. The task states two hours, while runner metadata permits 7500 seconds.",
       "events": [
         "E1",
         "E2",
@@ -2575,7 +2581,7 @@
       "state": "s0",
       "branch": "setup",
       "title": "Runtime inventory",
-      "summary": "Inspect files, GPU, package indexes, cache, evaluator, quality scorer and supervised launch lifecycle. The evaluator reads profile concurrency and has a quality registry; no initial model server exists.",
+      "summary": "The agent inspected the launcher, evaluator, GPU and installed packages. Mistral weights were already cached, but the launcher had no serving engine. The environment contained Torch 2.8, CUDA 12.8 and Transformers 5.6.2. The local evaluator reads concurrency inside profile, a detail that later explains why the initial smoke tests ran serially.",
       "events": [
         "E19",
         "E20",
@@ -2656,7 +2662,7 @@
       "state": "s0",
       "branch": "setup",
       "title": "Engine installation",
-      "summary": "Install vLLM 0.10.2 and inspect its CLI and cached configuration; the package command reports successful installation. This is setup, not a throughput result.",
+      "summary": "The agent installed vLLM 0.10.2 into the user environment and inspected its command-line options. The package command reported success. Cached Mistral weights avoided a download, allowing the agent to move directly to writing and launching the server.",
       "events": [
         "E73",
         "E74",
@@ -2695,7 +2701,7 @@
       "state": "s0",
       "branch": "first-launch",
       "title": "Foreground launcher",
-      "summary": "Patch start_server.sh to select Mistral and port 45091, context 8192, sequences 16, batch 32768, block 16, BF16, FlashAttention and prefix/chunked prefill. The file edit completes; subsequent startup fails before model load.",
+      "summary": "The agent wrote a foreground vLLM launcher for BF16 Mistral on port 45091. It set an 8192-token context, 16 sequences, 32768 batched tokens and block size 16, with prefix caching and chunked prefill enabled. The file edit succeeded. The supervised launch then failed before model loading, so this action establishes a saved configuration rather than a working server.",
       "events": [
         "E86",
         "E87",
@@ -2729,7 +2735,7 @@
       "state": "s1",
       "branch": "gpu",
       "title": "GPU identifier",
-      "summary": "Change CUDA_VISIBLE_DEVICES after the UUID parser failure and relaunch. A tokenizer compatibility failure replaces the earlier startup blocker.",
+      "summary": "The startup failure identified CUDA_VISIBLE_DEVICES as a GPU UUID where this vLLM path expected an integer. The agent mapped the one-GPU sandbox to device 0 and relaunched. Model inspection passed that point, but the next error came from the tokenizer.",
       "events": [
         "E94",
         "E95",
@@ -2761,7 +2767,7 @@
       "state": "s2",
       "branch": "tokenizer-alternative",
       "title": "Tokenizer mode",
-      "summary": "Add tokenizer-mode mistral, start the supervised server, and run the quick evaluator. Endpoint readiness does not establish chat compatibility.",
+      "summary": "After the Transformers tokenizer failed, the agent added --tokenizer-mode mistral. The supervised server became ready, and the agent ran the quick evaluator. Chat requests then failed with special_token_policy errors. Readiness alone had missed this API incompatibility.",
       "events": [
         "E99",
         "E100",
@@ -2799,7 +2805,7 @@
       "state": "s3",
       "branch": "tokenizer-recovery",
       "title": "Tokenizer pin",
-      "summary": "Install Transformers 4.55.4, remove tokenizer-mode mistral and relaunch. This is the documented compatibility recovery.",
+      "summary": "The agent responded to the chat errors by installing Transformers 4.55.4 and removing Mistral tokenizer mode. It restarted through the same supervised launcher. The next smoke evaluation produced generated answers, establishing that the standard tokenizer path worked with the pinned version.",
       "events": [
         "E111",
         "E112",
@@ -2838,7 +2844,7 @@
       "state": "s4",
       "branch": "first-proof",
       "title": "First generations",
-      "summary": "Allow the first usable smoke evaluation to finish and inspect metrics. Local quick mode still runs long 4096-input/2048-output requests; the initial active profile defaults to concurrency 1.",
+      "summary": "The agent let the first usable smoke evaluation finish and inspected its output. All four speed requests succeeded. Quick mode still requested roughly 4096 input tokens and 2048 output tokens per request, with concurrency 1. The long serial workload explains why this small check took substantial time.",
       "events": [
         "E123",
         "E124",
@@ -2882,7 +2888,7 @@
       "state": "s4",
       "branch": "instrument",
       "title": "Usage option",
-      "summary": "Add force streamed usage and API settings; attempt installing a matching FlashInfer sampler. The later source shows missing metadata, not a retained working install at this point.",
+      "summary": "The agent enabled forced streamed usage reporting and added API defaults to the launcher. It also attempted to install the vLLM-compatible FlashInfer package. This did not yet establish a working sampler or correct token accounting: later records show missing package metadata and missing usage when stream_options is omitted.",
       "events": [
         "E140",
         "E141",
@@ -2914,7 +2920,7 @@
       "state": "s5",
       "branch": "profile",
       "title": "Profile concurrency",
-      "summary": "Patch scenario.profile.concurrency=4 and rerun the smoke workload. This alters the development protocol and is tracked independently of serving optimizations.",
+      "summary": "The agent found that the evaluator ignored the top-level concurrency field and read scenario.profile instead. It added concurrency=4 there and reran the four-request smoke workload. The run completed in about 18 seconds with all requests successful. This is a workload correction and must be kept separate from engine speed improvements.",
       "events": [
         "E146",
         "E147",
@@ -2956,7 +2962,7 @@
       "state": "s6",
       "branch": "quality",
       "title": "Quality gate",
-      "summary": "Run quality after tokenizer changes; inspect 200-sample accuracy, ratio 1.1569 and tau 0.95. Also measure an alternate-seed uncached smoke baseline, reported 76.95 tok/s before usage repair.",
+      "summary": "The agent checked quality after changing the tokenizer. All 200 MMLU-Pro requests completed, and accuracy was 29.5% versus the 25.5% baseline. The ratio of 1.1569 exceeded the 0.95 threshold. It then used another quick-test seed to reduce prompt-cache reuse before scheduler comparisons; that run reported 76.95 tok/s with the old token-counting path.",
       "events": [
         "E161",
         "E162",
@@ -2994,7 +3000,7 @@
       "state": "s6",
       "branch": "batching",
       "title": "Smaller prefill",
-      "summary": "Launch an 8192 batched-token override. A different-seed run has 2.994 s TTFTp99; same-seed repeat 0.436 s vs 0.422 s baseline, 0.2444 vs 0.2495 req/s and worse ITLp99. These are four-request probes.",
+      "summary": "The agent reduced the batched-token limit to 8192. A different-seed quick run had TTFT p99 of 2.994 s. On the same seed as the reference, TTFT p99 was 0.436 s versus 0.422 s, and request throughput was 0.2444 versus 0.2495 req/s. The four-request probes did not show a clear benefit, so the next trial used a 16384-token limit.",
       "events": [
         "E172",
         "E173",
@@ -3034,7 +3040,7 @@
       "state": "s6",
       "branch": "batching",
       "title": "Middle prefill",
-      "summary": "Launch the middle batching override; quick request throughput 0.2282 req/s versus 0.2495 and TTFTp50 about 1.705 s. Do not generalize this startup-sensitive small sample.",
+      "summary": "The agent tested a 16384-token batch limit. The quick result recorded 0.2282 req/s versus 0.2495 req/s for the reference and median TTFT near 1.705 s. The agent called this setting worse and returned to the 32768-token limit for the next trial. These small probes remain sensitive to startup and cache conditions.",
       "events": [
         "E185",
         "E186",
@@ -3070,7 +3076,7 @@
       "state": "s6",
       "branch": "batching",
       "title": "Four sequences",
-      "summary": "Set MAX_NUM_SEQS=4 while restoring batch 32768; compare same-seed metrics with baseline 16 sequences. Request throughput falls to 0.2222 req/s.",
+      "summary": "The agent reduced MAX_NUM_SEQS from 16 to 4 while retaining 32768 batched tokens. The same-seed quick test fell to 0.2222 req/s and had worse time to first token. The agent rejected the lower sequence limit and kept capacity for 16 active sequences.",
       "events": [
         "E194",
         "E195",
@@ -3106,7 +3112,7 @@
       "state": "s6",
       "branch": "batching",
       "title": "Default restore",
-      "summary": "Restart the canonical launcher with no trial environment overrides. The agent explicitly keeps the higher sequence capacity after the slow four-sequence probe.",
+      "summary": "The agent removed the trial environment overrides and restarted the canonical launcher. It explicitly retained 32768 batched tokens and 16 sequences after the smaller settings lost on quick checks. With the selected configuration live again, it proceeded to a full evaluation.",
       "events": [
         "E203",
         "E204",
@@ -3138,7 +3144,7 @@
       "state": "s6",
       "branch": "confirmation",
       "title": "Full confirmation",
-      "summary": "Run 96-request speed plus 200-question quality, inspect GPU/process health and remove stale wrappers. The completed metrics record 31% quality, 0.231618 req/s and TTFTp991.7901 s.",
+      "summary": "The full development run completed 96 speed requests and 200 quality requests. It recorded 0.231618 req/s, TTFT p99 of 1.7901 s and MMLU-Pro accuracy of 31%. The agent also checked GPU and process health while the long run progressed. The generated-token throughput still used the accounting path that would later be corrected.",
       "events": [
         "E208",
         "E209",
@@ -3202,7 +3208,7 @@
       "state": "s6",
       "branch": "confirmation",
       "title": "Dependency bootstrap",
-      "summary": "Add self-install checks for vLLM 0.10.2 and Transformers 4.55.4, validate syntax, endpoint and recorded metrics. The agent reports 84.92 generation tokens/s, still with accounting limitations.",
+      "summary": "After the full run passed, the agent added dependency checks to start_server.sh. A fresh container can now install vLLM 0.10.2 and Transformers 4.55.4 when needed. The agent checked shell syntax and endpoint readiness and retained the full-run metrics. The reported 84.92 tok/s still predates the streamed-usage repair.",
       "events": [
         "E245",
         "E246",
@@ -3237,7 +3243,7 @@
       "state": "s7",
       "branch": "accounting",
       "title": "Missing usage",
-      "summary": "On continuation, restart the absent server; compare streaming calls with and without include_usage and inspect serving source. The agent initially proposes a proxy, then chooses an idempotent in-place vLLM fix.",
+      "summary": "A continuation found no live server, so the agent restarted the selected configuration. It compared streaming requests with and without stream_options.include_usage. vLLM returned token usage only when the option was explicit, while the evaluator omitted it and counted words instead. The agent first considered a proxy, then inspected the serving code and chose a direct idempotent patch.",
       "events": [
         "E253",
         "E254",
@@ -3285,7 +3291,7 @@
       "state": "s7",
       "branch": "accounting",
       "title": "Accounting repair",
-      "summary": "Patch both chat and completion serving paths from start_server.sh, restart and check real output_tokens 2048. Quick reported generation throughput rises 76.95→129.42 tok/s; request throughput 0.2495→0.2468 req/s.",
+      "summary": "The agent patched both vLLM chat and completion serving from start_server.sh, then restarted. All four quick records now contained output_tokens=2048. Reported generation throughput rose from 76.95 to 129.42 tok/s, while request throughput slightly fell from 0.2495 to 0.2468 req/s. The patch corrects what the metric counts; the token-throughput jump is not evidence of faster generation.",
       "events": [
         "E274",
         "E275",
@@ -3326,7 +3332,7 @@
       "state": "s8",
       "branch": "hooks",
       "title": "Chunked prefill",
-      "summary": "Add CHUNKED_PREFILL_FLAG for a temporary off trial. Measure TTFTp50~1.712 s versus 0.455 s and keep the default. Source warnings limit interpretation of what the flag actually changed.",
+      "summary": "The agent added CHUNKED_PREFILL_FLAG and tried disabling chunked prefill. The CLI accepted the flag, but the V1 engine still reported chunked prefill enabled. The quick test had median TTFT near 1.712 s versus 0.455 s for the reference. The agent kept the default; the log does not support treating this as a clean chunked-prefill comparison.",
       "events": [
         "E288",
         "E289",
@@ -3346,9 +3352,9 @@
       "outcome": "observed",
       "classification_reason": "Analyst grouping by the recorded objective and observed effect; mixed read, edit, execute and check records retain their full source evidence.",
       "ladder": {
-        "topic": "Chunked prefill",
-        "takeaway": "Chunked prefill off reports worse TTFT despite the accepted flag.",
-        "reason": "The V1 engine still says chunked prefill enabled internally.",
+        "topic": "Chunking flag",
+        "takeaway": "Chunking flag is accepted, but the engine still reports chunked prefill enabled.",
+        "reason": "Quick median TTFT worsens to 1.71 s. This is not a clean on versus off comparison.",
         "abstract": [
           {
             "event": "E288",
@@ -3364,7 +3370,7 @@
       "state": "s8",
       "branch": "hooks",
       "title": "Async scheduling",
-      "summary": "Persist the generic argument hook, start async scheduling and compare quick metrics. The balanced objective makes the latency penalty undesirable.",
+      "summary": "The agent added EXTRA_VLLM_ARGS so it could test settings without changing the saved defaults. Async scheduling improved quick decode throughput but raised time to first token to about 1.7 s per request. The agent considered that latency cost too high for Scenario D and moved to block-size tests.",
       "events": [
         "E300",
         "E301",
@@ -3399,7 +3405,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "Larger blocks",
-      "summary": "After declining async scheduling, test block-size 32 through runtime overrides and inspect metrics. The source conclusion is based on a small smoke sample.",
+      "summary": "The agent tried block size 32 through the temporary runtime arguments. It judged the quick benchmark worse than block size 16 and retained 16. This was a small smoke comparison, followed by a separate attempt to use FP8 for the KV cache.",
       "events": [
         "E309",
         "E310",
@@ -3435,7 +3441,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "FP8 cache",
-      "summary": "Attempt FP8 KV cache. The agent reports the backend rejects it; no valid speedup or quality conclusion is available.",
+      "summary": "The agent attempted FP8 KV cache with the installed vLLM V1 engine. The configuration was rejected as unsupported in this build. No valid speed or quality result came from this trial, so the agent abandoned it and inspected another engine option.",
       "events": [
         "E318",
         "E319",
@@ -3467,7 +3473,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "SGLang dependency",
-      "summary": "Inspect a dry-run for SGLang 0.5.10; no SGLang serving candidate is launched. This is a considered alternative, not an executed engine comparison.",
+      "summary": "A dependency dry run showed that SGLang 0.5.10 would replace Torch, Transformers and several kernel packages. The agent judged that change too disruptive for the remaining time and kept vLLM. No SGLang server was launched, so this is a rejected installation plan rather than an engine benchmark.",
       "events": [
         "E323",
         "E324",
@@ -3499,7 +3505,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "Sampler metadata",
-      "summary": "Inspect/install attempts for the compatible 0.3.x package fail on metadata. The agent declines baking a fragile source install into the launcher.",
+      "summary": "The agent inspected compatible FlashInfer 0.3.x packages, but installation attempts encountered broken metadata in the index. It declined to add a fragile source installation to the reproducible launcher. A later attempt uses a different wheel index and package version.",
       "events": [
         "E328",
         "E329",
@@ -3529,7 +3535,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "GPU clocks",
-      "summary": "Read GPU clock/power state after dependency options stall. This is environment diagnosis, not an optimization or new state.",
+      "summary": "The agent inspected GPU clock and power settings after dependency trials stalled. The H100 was already at the maximum application clocks with a 700 W power limit. It found no obvious clock-setting change to try and moved to the server context-length limit.",
       "events": [
         "E331",
         "E332",
@@ -3561,7 +3567,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "Smaller context",
-      "summary": "Test a lower maximum model length intended to reduce profiling/scheduling overhead. The agent calls the result worse and attributes it tentatively to a different compile path.",
+      "summary": "The agent reduced max_model_len from 8192 to 6400, hoping to reduce profiling or scheduling overhead while fitting the workload. The quick result was worse. It suggested a different compilation path as a possible cause, but did not isolate that cause. The final setting remained 8192.",
       "events": [
         "E336",
         "E337",
@@ -3597,7 +3603,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "Frontend process",
-      "summary": "Test disabling frontend multiprocessing after the 6400-context regression. The measured result does not justify retaining the override.",
+      "summary": "The agent disabled frontend multiprocessing for one quick trial. The result did not improve the balanced objective, so it rejected the override. The next step restored the default runtime and measured a full workload with the corrected token accounting.",
       "events": [
         "E345",
         "E346",
@@ -3633,7 +3639,7 @@
       "state": "s9",
       "branch": "runtime-options",
       "title": "Default confirmation",
-      "summary": "Restore originalV1 scheduler, block 16, context 8192, batch 32768 and usage patch; run a full evaluator before the next continuation. Saved metrics are then inspected again.",
+      "summary": "The agent restored the default V1 scheduler, block size 16, an 8192-token context and 32768 batched tokens. It retained the streamed-usage patch and ran a full evaluation. This measurement uses real completion-token counts, so its token throughput cannot be directly interpreted as a speedup over the earlier word-count result.",
       "events": [
         "E354",
         "E355",
@@ -3679,7 +3685,7 @@
       "state": "s9",
       "branch": "noise",
       "title": "Orphaned wrappers",
-      "summary": "Reinspect current scripts, saved comparisons, GPU and process tree. The agent identifies old supervised wrappers burning CPU; it avoids killing the live endpoint.",
+      "summary": "The agent checked the live server, saved comparisons and process tree. It found several old supervised wrappers but only one active vLLM API server. It later identified the stale wrappers as consuming CPU and planned to stop only those processes. The trace does not isolate their contribution to latency.",
       "events": [
         "E374",
         "E375",
@@ -3741,7 +3747,7 @@
       "state": "s9",
       "branch": "noise",
       "title": "Wrapper cleanup",
-      "summary": "Terminate identified orphaned wrapper PIDs, check liveness and measure a quick run. Causal attribution to CPU pressure remains the agent interpretation; no repeated controlled experiment is supplied.",
+      "summary": "The agent terminated the identified stale wrapper processes and confirmed that the live endpoint still responded. It then ran a quick benchmark and observed better token latency and throughput than the previous saved quick result. The agent attributed the change to reduced host contention, but there was no repeated controlled comparison.",
       "events": [
         "E409",
         "E410",
@@ -3778,7 +3784,7 @@
       "state": "s9",
       "branch": "noise",
       "title": "Clean full",
-      "summary": "Run and inspect a full evaluation after wrapper cleanup. Development metrics show 0.249643 req/s, 130.4664 tok/s, TTFTp99.41783 s and 29% MMLU-Pro.",
+      "summary": "The agent followed the improved quick result with a full development evaluation. All 96 speed requests succeeded, at 0.249643 req/s and 130.4664 tok/s. TTFT p99 was 0.41783 s, and MMLU-Pro accuracy was 29% against the 25.5% baseline. It saved these results before trying further runtime options.",
       "events": [
         "E420",
         "E421",
@@ -3824,7 +3830,7 @@
       "state": "s9",
       "branch": "cache-options",
       "title": "Prefix caching",
-      "summary": "A bounded trial disables prefix caching via EXTRA_VLLM_ARGS. Fresh/cached conditions can confound quick comparisons; the observed no-prefix result is not retained.",
+      "summary": "The agent tested --no-enable-prefix-caching through EXTRA_VLLM_ARGS. Quick-test TTFT rose above 1.6 s and request throughput fell. The agent rejected the option and kept prefix caching. Startup and cache conditions were not controlled across repeated trials, so the trace supports this local decision rather than a general claim about prefix caching.",
       "events": [
         "E439",
         "E440",
@@ -3862,7 +3868,7 @@
       "state": "s9",
       "branch": "cache-options",
       "title": "Partial prefill",
-      "summary": "Attempt max-num-partial-prefills 4 and observe the compatibility failure. The default startup path is restored next.",
+      "summary": "The agent requested max-num-partial-prefills=4. Startup returned NotImplementedError because concurrent partial prefill is unsupported with VLLM_USE_V1=1 in this build. This trial produced no benchmark result. The next action restored the default launcher settings.",
       "events": [
         "E450",
         "E451",
@@ -3896,7 +3902,7 @@
       "state": "s9",
       "branch": "cache-options",
       "title": "Fresh startup",
-      "summary": "Restore defaults, run a fresh quick benchmark and compare against warmed full metrics. Four quick requests have TTFTp50~1.674 s while the full run hasp99~.418 s.",
+      "summary": "After restoring defaults, the agent restarted the server and ran four quick speed requests. Median TTFT was 1.6737 s, while the saved warm full run had TTFT p99 of 0.41783 s. These are different sample sizes and percentiles, but the fresh first batch was visibly slower. The agent then investigated warmup because the final evaluator also restarts the server.",
       "events": [
         "E457",
         "E458",
@@ -3921,8 +3927,8 @@
       "classification_reason": "Analyst grouping by the recorded objective and observed effect; mixed read, edit, execute and check records retain their full source evidence.",
       "ladder": {
         "topic": "Fresh startup",
-        "takeaway": "Fresh startup reveals 1.67-second TTFT despite the good warmed full result.",
-        "reason": "This matters because final evaluation restarts the launcher.",
+        "takeaway": "Fresh startup records 1.67 seconds median TTFT, revealing a slow first batch.",
+        "reason": "The saved warm full run has 0.42 s p99. Different sample sizes and percentiles limit comparison.",
         "abstract": [
           {
             "event": "E457",
@@ -3939,7 +3945,7 @@
       "state": "s9",
       "branch": "cold-start",
       "title": "Readiness strategy",
-      "summary": "Use the cold-start observation to inspect vLLM warmup paths and /v1/models handling. The agent explicitly ties the change to fresh container final evaluation.",
+      "summary": "The agent linked the slow first batch to the final harness requirement for a fresh restart. It inspected vLLM health and model-list routes, then chose to delay public model readiness until representative warmup requests finish. This moves the next change from scheduler tuning to startup behavior.",
       "events": [
         "E473",
         "E474",
@@ -3979,7 +3985,7 @@
       "state": "s9",
       "branch": "cold-start",
       "title": "Readiness gate",
-      "summary": "Patch canonical startup and vLLM readiness route, validate shell syntax and relaunch. The warmup exception handler still writes readiness; the first long prompt fails later.",
+      "summary": "The agent patched /v1/models to wait for a ready marker and added four warmup requests to start_server.sh. Shell syntax passed, and it restarted through the supervised wrapper. The handler writes the ready marker even after a warmup exception. The first prompt later exceeded the context limit, so the saved gate still needed a prompt-length repair.",
       "events": [
         "E486",
         "E487",
@@ -4015,7 +4021,7 @@
       "state": "s10",
       "branch": "warmup-repair",
       "title": "Shortened warmup",
-      "summary": "Correct the HTTP 400-causing prompt and compare quick metrics after relaunch: p50.4399 versus 1.6737 seconds. This directly addresses the observed cold-start issue.",
+      "summary": "The first warmup prompt returned HTTP 400 because it exceeded 8192 tokens. The agent reduced repetitions from 2048 to 700 and relaunched. The fresh quick test then recorded median TTFT of 0.4399 s versus 1.6737 s before the repair. This local comparison supports keeping the shorter prompt.",
       "events": [
         "E496",
         "E497",
@@ -4053,7 +4059,7 @@
       "state": "s11",
       "branch": "warm-proof",
       "title": "Warm full",
-      "summary": "Run full evaluation with the final warmup recipe, monitor workload completion, check syntax and endpoint. Preserve the development result and serving settings.",
+      "summary": "The agent measured the final warmup path with the full development workload at concurrency 4. All 96 speed requests succeeded, with 130.75575 tok/s, TTFT p99 of 0.41676 s and inter-token latency p99 of 9.96685 ms. The 200-question quality check reached 30.5% versus the 25.5% baseline and passed. These saved measurements become the reference for the next sampler trial.",
       "events": [
         "E507",
         "E508",
@@ -4103,7 +4109,7 @@
       "state": "s11",
       "branch": "sampler-candidate",
       "title": "Sampler revisit",
-      "summary": "After continuation, search alternate FlashInfer wheel indexes. The plan is conditional: retain only if a real full measurement improves balanced performance.",
+      "summary": "With about 27 minutes shown in the continuation window, the agent revisited sampling overhead. It searched alternate FlashInfer wheel indexes for the installed Torch 2.8 and CUDA 12.8 stack. An index exposed an installable 0.6.9 package. The agent planned to keep it only if a real benchmark improved the balanced objective.",
       "events": [
         "E530",
         "E531",
@@ -4143,7 +4149,7 @@
       "state": "s11",
       "branch": "sampler-candidate",
       "title": "Sampler installation",
-      "summary": "Install the package from the CUDA 12.8/Torch 2.8 index and start the canonical server. Later logs confirm vLLM uses FlashInfer top-k/top-p sampling.",
+      "summary": "The agent installed FlashInfer Python 0.6.9 from the compatible wheel index and launched the canonical server. Installation succeeded. It then checked whether vLLM actually selected the sampler before making any performance claim.",
       "events": [
         "E544",
         "E545",
@@ -4175,7 +4181,7 @@
       "state": "s12",
       "branch": "sampler-test",
       "title": "Sampler smoke",
-      "summary": "Quick generation throughput 130.7648 versus 130.5561 tok/s offers little separation; startup autotuning is visibly costly. Escalate to a full comparison.",
+      "summary": "The server log confirmed FlashInfer top-k/top-p sampling, with a long startup autotuning step. The quick comparison measured 130.7648 tok/s versus 130.5561 for the saved quick reference. The small difference did not settle the choice, so the agent required a full run before retaining the dependency.",
       "events": [
         "E550",
         "E551",
@@ -4209,7 +4215,7 @@
       "state": "s12",
       "branch": "sampler-test",
       "title": "Sampler comparison",
-      "summary": "The full run produces 130.88473 tok/s versus 130.75575, quality 30% versus 30.5% and both gates pass. This multi-metric evidence explains the subsequent rollback.",
+      "summary": "The full FlashInfer run measured 130.88473 tok/s, compared with 130.75575 for the warmed configuration without it. TTFT p99 worsened from 0.41676 to 0.44888 s, and inter-token latency p99 rose from 9.97 to 14.97 ms. MMLU-Pro accuracy was 30% versus 30.5%, with both checks passing. This shows the tradeoff that the agent cited when choosing rollback.",
       "events": [
         "E557",
         "E558",
@@ -4242,7 +4248,7 @@
       "state": "s12",
       "branch": "sampler-test",
       "title": "Sampler rollback",
-      "summary": "Set VLLM_USE_FLASHINFER_SAMPLER=0, relaunch and validate endpoint/syntax. Compare saved full metrics once more; report the rejected package, startup cost and worse tails.",
+      "summary": "The agent explicitly rejected FlashInfer because its roughly 0.1% throughput gain came with worse latency tails and longer startup. It set VLLM_USE_FLASHINFER_SAMPLER=0 in the launcher, restarted and checked endpoint readiness and shell syntax. The selected metrics remain the earlier full result at 130.76 tok/s; they were not remeasured by this rollback edit.",
       "events": [
         "E563",
         "E564",
@@ -4284,7 +4290,7 @@
       "state": "s13",
       "branch": "remove",
       "title": "Package removal",
-      "summary": "Uninstall flashinfer-python 0.6.9, relaunch, inspect process arguments, verify /v1/models and confirm importlib cannot find flashinfer. Saved metrics remain historical.",
+      "summary": "The agent uninstalled the rejected FlashInfer package so the live environment would match the intended fresh-launch recipe. It restarted, checked /v1/models and process arguments, and confirmed that importlib could no longer find flashinfer. Saved full-run metrics stayed unchanged.",
       "events": [
         "E578",
         "E579",
@@ -4325,7 +4331,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Lost endpoint",
-      "summary": "The late quick run never produces its own metrics. Process/GPU/port checks show the server is gone; this is a liveness failure, not a measured throughput regression.",
+      "summary": "A late smoke evaluator made no progress. GPU, process and port checks showed that the server had exited and port 45091 refused connections. This probe produced no new speed result. The next action stopped the waiting evaluator and restarted the server.",
       "events": [
         "E593",
         "E594",
@@ -4365,7 +4371,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Emergency restart",
-      "summary": "Stop the waiting evaluator and restart via test_server.sh. Verify process arguments, /v1/models, syntax, no FlashInfer and saved full metrics. The local timer says expired.",
+      "summary": "The agent stopped the evaluator that was waiting on a closed port and relaunched test_server.sh. It checked the process arguments, /v1/models, launcher syntax and absence of FlashInfer. The selected full-run metrics remained intact. The local timer now reported that the budget had expired.",
       "events": [
         "E606",
         "E607",
@@ -4401,7 +4407,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Handoff check",
-      "summary": "A continuation prompt offers five minutes while timer already expired. Process and endpoint checks fail, but file modes, syntax and saved metrics are unchanged.",
+      "summary": "Another continuation offered five minutes, although the local timer already showed expiry. The agent checked the process and endpoint and again found the server absent. Launcher syntax, file modes and selected metrics were intact. The failure concerned live process availability, not loss of the saved recipe.",
       "events": [
         "E616",
         "E617",
@@ -4438,7 +4444,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Handoff restart",
-      "summary": "Relaunch canonical supervised server, confirm intended process and endpoint, validate syntax and report timer expiry.",
+      "summary": "The agent relaunched the same canonical server through the supervised wrapper. It confirmed the intended vLLM process and a responding model endpoint, then checked shell syntax. No serving setting or selected metric changed. The record does not establish why the previous process had disappeared.",
       "events": [
         "E626",
         "E627",
@@ -4474,7 +4480,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Last check",
-      "summary": "The final continuation gives two minutes; process table and curl show the server absent. Metrics and without FlashInfer environment still match the selected recipe.",
+      "summary": "In the final two-minute continuation, process and port checks again found no live server. The launcher, absence of FlashInfer and saved 130.76 tok/s result still matched the selected recipe. A historical benchmark file did not establish that the endpoint was currently available.",
       "events": [
         "E636",
         "E637",
@@ -4510,7 +4516,7 @@
       "state": "s14",
       "branch": "handoff",
       "title": "Last restart",
-      "summary": "Start canonical supervised launcher once more; the agent final message says warmup complete and server running. External capture later reports no live agent server, so final success rests on the clean supervised restart. The final 17-second continuation prompt has no recorded subsequent assistant response.",
+      "summary": "The agent launched the canonical server once more and reported completed warmup and readiness. No new benchmark ran in this last window. The final 17-second continuation has no recorded assistant reply. The external capture later found no live server, so the final score depends on the harness restart recorded separately.",
       "events": [
         "E646",
         "E647",
@@ -4541,7 +4547,7 @@
       "state": "s14",
       "branch": "published",
       "title": "Final burst evaluation: 144.51 tok/s",
-      "summary": "The published final evaluator records 96/96 speed requests and 200/200 quality request successes. Speed uses precomputed burst requests at concurrency 1, while development uses concurrency 4. Final generation throughput is 144.514328 tok/s, request throughput is 0.0699851 req/s, median TTFT is 0.116410 s and median inter-token latency is 6.9155 ms. MMLU-Pro accuracy is 32% versus a 25.5% baseline; the ratio of 1.2549 exceeds the 0.95 quality threshold. These are archived external results, not a rerun or a matched development speedup.",
+      "summary": "The published evaluator found no live agent server, cleaned the environment and restarted start_server.sh. It completed all 96 precomputed speed requests at concurrency 1 and all 200 quality requests. Generation throughput was 144.514328 tok/s, request throughput was 0.0699851 req/s, median TTFT was 0.116410 s and median inter-token latency was 6.9155 ms. MMLU-Pro accuracy was 32% versus a 25.5% baseline, passing the 0.95 ratio threshold. Development used concurrency 4, so the final and development throughput values are not a matched speed comparison.",
       "events": [
         "E651",
         "E653",
@@ -4554,7 +4560,13 @@
       "ladder": {
         "topic": "Final evaluation",
         "takeaway": "Final evaluation records 144.51 tok/s and 32% MMLU-Pro under a changed protocol.",
-        "reason": "Only the burst profile is published, with speed concurrency one."
+        "reason": "Only the burst profile is published, with speed concurrency one.",
+        "abstract": [
+          {
+            "event": "E651",
+            "quote": "\"generation_throughput_tokens_per_s\": 144.5143282098839,"
+          }
+        ]
       },
       "classification_basis": "analyst",
       "t_min": null
@@ -4564,7 +4576,7 @@
       "state": "s14",
       "branch": "published",
       "title": "Run metadata and policy checks",
-      "summary": "run_meta namesgpt-5.5-high viaCodex, ScenarioD, 2 h budget and 02: 05: 00 elapsed. invalid_or_reward_hack isfalse, contamination saysno contamination detected and disallowed model saysonly allowed use detected. These are published judgments, not a new review or proof beyond their recorded scope.",
+      "summary": "Published run_meta identifies Codex with gpt-5.5-high, Scenario D, a two-hour budget and 02:05:00 elapsed time. Its invalid_or_reward_hack flag is false. The recorded judgments say “no contamination detected” and “only allowed use detected.” These are the dataset authors’ archived checks, separate from the speed and quality measurements.",
       "events": [
         "E652"
       ],
@@ -4574,8 +4586,14 @@
       "classification_reason": "Published post-run evidence is read, not executed by this conversion.",
       "ladder": {
         "topic": "Published checks",
-        "takeaway": "Published checks are unflagged and elapsed time is 02: 05: 00.",
-        "reason": "Nominal budget is two hours; the recorded runner allows 7500 seconds."
+        "takeaway": "Published checks are unflagged; recorded elapsed time is 02:05:00.",
+        "reason": "The task budget is two hours. Runner metadata allows 7500 seconds.",
+        "abstract": [
+          {
+            "event": "E652",
+            "quote": "\"invalid_or_reward_hack\": false,"
+          }
+        ]
       },
       "classification_basis": "analyst",
       "t_min": null
@@ -6020,13 +6038,15 @@
     }
   ],
   "journey": {
-    "text": "Codex GPT-5.5 High optimizes Mistral-7B-Instruct-v0.3 serving for Scenario D on one H100 80GB, 180GB RAM and a two hour budget. It balances latency, throughput and quality, repairs tokenizer compatibility, corrects token accounting and adds startup warmup. FlashInfer barely improves throughput but worsens latency tails, prompting rollback. Development uses 96 burst requests at concurrency 4 and 200 MMLU-Pro questions. The published fresh container evaluation instead uses concurrency 1, records 144.51 tok/s and passes quality at 32% versus a 25.5% baseline. Repeated endpoint loss makes reproducible restart essential.",
+    "text": "Codex with GPT-5.5 High builds a Mistral-7B-Instruct-v0.3 server for InferenceBench Scenario D on one H100 80GB, 180GB RAM and a two-hour budget. It repairs GPU and tokenizer compatibility, fixes token accounting, and warms the server before readiness. FlashInfer adds little throughput and worsens latency tails, so the agent disables it. The selected development run reaches 130.76 tok/s at concurrency four. Repeated endpoint loss remains unexplained. The external harness restarts the saved launcher and records 144.51 tok/s with 32% MMLU-Pro accuracy at concurrency one. The two throughput results use different protocols.",
     "cites": [
       "s0",
+      "s2",
       "s4",
       "s8",
       "s11",
       "s12",
+      "s13",
       "s14",
       "a-external"
     ]
@@ -18553,8 +18573,6 @@
   },
   "i18n": {
     "zh": {
-      "Stub launcher cannot serve the required Mistral model.": "占位启动器无法提供所需的 Mistral 模型服务。",
-      "The task requires balanced serving, fresh restart reproducibility and a quality gate.": "任务要求均衡的推理服务、全新重启后可复现，并通过质量门槛。",
       "Stub launcher": "占位启动器",
       "BF16 launcher selects vLLM but startup still needs repairs.": "BF16 启动器选用了 vLLM，但启动仍需修复。",
       "Mistral, an 8192 token context and foreground execution replace the empty stub.": "Mistral、8192 token 上下文和前台运行取代了空的占位脚本。",
@@ -18571,32 +18589,16 @@
       "Usage flag requests completion counts, but misses an API edge case.": "usage 开关请求 completion 计数，但漏掉一个 API 边界情况。",
       "The first flag alone still leaves plain streaming requests without usage.": "仅靠第一个开关，普通流式请求仍不返回 usage。",
       "Usage flag": "usage 开关",
-      "Burst concurrency becomes four in the active development profile.": "当前开发 profile 中的突发并发改为 4。",
-      "The local evaluator read profile concurrency, ignoring the previous top-level declaration.": "本地评测器读取的是 profile 内的并发，忽略了之前的顶层声明。",
       "Burst concurrency": "突发并发",
-      "Portable launcher preserves a first full evaluation with quality passing.": "可移植启动器保住了首个质量达标的完整评测。",
-      "Pinned self installation makes the selected runtime reproducible after a fresh restart.": "固定版本的自安装让所选运行时在全新重启后可复现。",
       "Portable launcher": "可移植启动器",
-      "Usage patch reports real completion tokens instead of word counts.": "usage 补丁报告真实的 completion token 数，而非词数。",
-      "About 77 to 129 reported tok/s reflects accounting, not proven faster kernels.": "报告值从约 77 升到 129 tok/s 源于计数口径，并未证明 kernel 更快。",
       "Usage patch": "usage 补丁",
-      "Tuning hooks expose runtime alternatives while retaining default scheduler settings.": "调参钩子开放运行时备选方案，同时保留默认调度设置。",
-      "Most quick variants lose latency or fail support checks, so defaults survive.": "多数快速变体延迟变差或未通过支持性检查，因此保留默认值。",
       "Tuning hooks": "调参钩子",
-      "Warmup gate delays readiness, but its first prompt exceeds context.": "warmup 门控推迟了就绪，但首个 prompt 超出上下文。",
-      "The new startup lifecycle is saved; the initial warmup request returns HTTP 400.": "新的启动流程已保存；首个 warmup 请求返回 HTTP 400。",
-      "Warmup gate": "warmup 门控",
-      "Shorter warmup lowers fresh start TTFT from 1.67 to 0.44 seconds.": "缩短 warmup 后，全新启动 TTFT 从 1.67 降至 0.44 秒。",
-      "A 700-repeat prompt fits; full development evaluation retains 130.76 tok/s.": "重复 700 次的 prompt 能放进上下文；完整开发评测仍为 130.76 tok/s。",
-      "Shorter warmup": "缩短 warmup",
+      "Warmup gate": "预热门控",
+      "Shorter warmup": "缩短预热",
       "FlashInfer sampler barely improves throughput and worsens tail latency.": "FlashInfer 采样器几乎不提升吞吐，还拉高了尾延迟。",
       "Full comparison shows 130.88 versus 130.76 tok/s, with a longer startup.": "完整对比为 130.88 对 130.76 tok/s，且启动更久。",
       "FlashInfer sampler": "FlashInfer 采样器",
-      "Restored sampler explicitly disables FlashInfer and preserves the earlier full result.": "采样器复原后显式禁用 FlashInfer，沿用此前的完整结果。",
-      "The launcher gains an off switch; the saved metrics are historical reuse.": "启动器新增关闭开关；保存的指标是对历史结果的复用。",
       "Restored sampler": "采样器复原",
-      "Clean handoff removes FlashInfer, then repeatedly repairs a disappearing live endpoint.": "清理交接时移除 FlashInfer，随后反复修复不断消失的在线 endpoint。",
-      "External restart succeeds; its concurrency one result is measured under a different protocol.": "外部重启成功；其并发 1 的结果是在不同协议下测得的。",
       "Clean handoff": "清理交接",
       "Task and runtime establish the serving contract and compatible engine.": "任务与运行时确定了服务契约和兼容的引擎。",
       "An empty launcher and cached weights define the starting point.": "空启动器和已缓存的权重构成起点。",
@@ -18633,15 +18635,13 @@
       "Portable baseline": "可移植基线",
       "Token accounting fixes a metric definition before further comparisons.": "token 计数在后续对比前修正了指标定义。",
       "True completion counts replace a word-count fallback.": "真实的 completion 计数取代了按词数估算的回退方式。",
-      "Token accounting": "token 计数",
+      "Token accounting": "Token 计数",
       "Controlled overrides expose chunking and asynchronous scheduling tradeoffs.": "受控覆盖揭示了分块与异步调度的取舍。",
       "Latency penalties prevent selecting these trial flags.": "延迟代价使这些试验开关未被采用。",
       "Controlled overrides": "受控覆盖",
       "Runtime alternatives retain the stable vLLM defaults after failed or weaker options.": "运行时备选或失败或更弱，保留稳定的 vLLM 默认值。",
       "Compatibility, startup cost and balanced latency guide rejection.": "否决依据是兼容性、启动开销和均衡延迟。",
       "Runtime alternatives": "运行时备选",
-      "Host cleanup removes stale supervisors and produces a better full measurement.": "主机清理移除了残留的监管进程，换来更好的完整测量。",
-      "The active model server stays intact throughout cleanup.": "清理过程中，在线模型服务始终未受影响。",
       "Host cleanup": "主机清理",
       "Cache alternatives expose a fresh start penalty when defaults are restored.": "缓存备选方案暴露出恢复默认值后的全新启动代价。",
       "Unsupported partial prefill and slow prefix-off lead back to the selected recipe.": "partial prefill 不受支持，关闭 prefix 又慢，于是回到选定配置。",
@@ -18727,8 +18727,6 @@
       "Accounting repair makes plain streaming return completion-token counts.": "计数修复让普通流式请求返回 completion token 数。",
       "Reported tokens change; request throughput does not show a corresponding speedup.": "报告的 token 数变了，请求吞吐却没有相应提速。",
       "Accounting repair": "计数修复",
-      "Chunked prefill off reports worse TTFT despite the accepted flag.": "关闭 chunked prefill 后，尽管开关被接受，TTFT 反而更差。",
-      "The V1 engine still says chunked prefill enabled internally.": "V1 引擎内部仍显示 chunked prefill 已启用。",
       "Chunked prefill": "chunked prefill",
       "Async scheduling gains decode throughput but incurs 1.7-second TTFT.": "异步调度提升了 decode 吞吐，但 TTFT 达到 1.7 秒。",
       "EXTRA_VLLM_ARGS enables the trial without changing the selected default.": "EXTRA_VLLM_ARGS 启用此试验，不改变选定的默认值。",
@@ -18762,7 +18760,7 @@
       "Orphaned wrappers": "孤儿包装进程",
       "Wrapper cleanup preserves the endpoint and improves the next quick result.": "包装进程清理保住了 endpoint，下一次快速结果也变好。",
       "Removal of host noise precedes another full measurement.": "先消除主机噪声，再做一次完整测量。",
-      "Wrapper cleanup": "包装进程清理",
+      "Wrapper cleanup": "包装器清理",
       "Clean full reaches 130.47 tok/s and TTFTp99 below 0.42 seconds.": "干净完整运行达到 130.47 tok/s，TTFTp99 低于 0.42 秒。",
       "All 96 speed requests succeed; quality remains above threshold.": "96 个速度请求全部成功；质量仍高于门槛。",
       "Clean full": "干净完整运行",
@@ -18772,8 +18770,6 @@
       "Partial prefill concurrency is unsupported by this V1 engine.": "该 V1 引擎不支持 partial prefill 并发。",
       "A launch rejection provides no valid performance result.": "启动被拒，没有得到有效的性能结果。",
       "Partial prefill": "partial prefill",
-      "Fresh startup reveals 1.67-second TTFT despite the good warmed full result.": "全新启动 TTFT 为 1.67 秒，尽管预热后的完整结果不错。",
-      "This matters because final evaluation restarts the launcher.": "这很关键，因为最终评测会重启启动器。",
       "Fresh startup": "全新启动",
       "Readiness strategy targets the cold first batch before exposing the model endpoint.": "就绪策略：开放模型 endpoint 前先处理冷启动首个 batch。",
       "The agent inspects health and server routes before implementing a gate.": "实现门控前，agent 先检查了健康检查与服务路由。",
@@ -18801,7 +18797,7 @@
       "Sampler comparison": "采样器对比",
       "Sampler rollback disables FlashInfer and preserves the better balanced recipe.": "采样器回退：禁用 FlashInfer，保留更均衡的配置。",
       "The earlier full result is reused after an explicit launcher change.": "显式修改启动器后，复用此前的完整结果。",
-      "Sampler rollback": "采样器回退",
+      "Sampler rollback": "采样回退",
       "Package removal aligns the live environment with the without FlashInfer recipe.": "软件包卸载使在线环境与不含 FlashInfer 的配置一致。",
       "Uninstall confirmation and import absence provide the observed effect.": "卸载确认与无法导入是观察到的效果。",
       "Package removal": "软件包卸载",
@@ -18826,8 +18822,6 @@
       "Final evaluation records 144.51 tok/s and 32% MMLU-Pro under a changed protocol.": "最终评测在不同协议下记录 144.51 tok/s 和 32% MMLU-Pro。",
       "Only the burst profile is published, with speed concurrency one.": "只公开了突发 profile，速度测试并发为 1。",
       "Final evaluation": "最终评测",
-      "Published checks are unflagged and elapsed time is 02: 05: 00.": "公开检查均未标记问题，耗时 02:05:00。",
-      "Nominal budget is two hours; the recorded runner allows 7500 seconds.": "名义预算为两小时；记录中的 runner 允许 7500 秒。",
       "Published checks": "公开检查",
       "InferenceBench · GPT-5.5 tunes a Mistral serving stack": "InferenceBench · GPT-5.5 调优 Mistral 推理服务栈",
       "Codex High · Scenario D · H100 80GB · 2-hour budget · run_0155": "Codex High · 场景 D · H100 80GB · 2 小时预算 · run_0155",
@@ -18840,97 +18834,22 @@
       "Scheduler alternatives are mostly four-request smoke probes with changing cache/startup conditions. Observed differences are descriptive and do not establish statistical superiority. Full FlashInfer comparison adds tail latency and startup evidence.": "调度备选方案大多是四请求的 smoke 探测，缓存和启动条件也在变化。观察到的差异仅作描述，不能证明统计上的优劣。完整的 FlashInfer 对比补充了尾延迟和启动方面的证据。",
       "Final handoff repeatedly loses the live process; root cause is not established. External eval.log reports no live agent server at capture, then a clean restart of the canonical launcher and successful evaluation. Published policy judgments are unflagged; they were not rerun.": "最终交接时在线进程反复丢失，根因未查明。外部 eval.log 显示采集时没有在线的 agent 服务，随后干净重启规范启动器并评测成功。公开的策略判定均未标记问题；这些判定没有重新运行。",
       "No native skill load, separate reviewer agent, review loop, research wiki or explicit TODO tool lifecycle is observed. Public dataset license: Apache-2.0. Selection is for a distinctive recovery and rollback story, not a SOTA claim.": "未观察到原生 skill 加载、独立的 reviewer agent、评审循环、研究 wiki 或显式 TODO 工具的生命周期。公开数据集许可证：Apache-2.0。选中这条轨迹是因为它有独特的恢复与回退过程，并非 SOTA 声明。",
-      "Codex GPT-5.5 High optimizes Mistral-7B-Instruct-v0.3 serving for Scenario D on one H100 80GB, 180GB RAM and a two hour budget. It balances latency, throughput and quality, repairs tokenizer compatibility, corrects token accounting and adds startup warmup. FlashInfer barely improves throughput but worsens latency tails, prompting rollback. Development uses 96 burst requests at concurrency 4 and 200 MMLU-Pro questions. The published fresh container evaluation instead uses concurrency 1, records 144.51 tok/s and passes quality at 32% versus a 25.5% baseline. Repeated endpoint loss makes reproducible restart essential.": "Codex GPT-5.5 High 在一张 H100 80GB、180GB 内存和两小时预算下，为场景 D 优化 Mistral-7B-Instruct-v0.3 的推理服务。它要兼顾延迟、吞吐和质量，修复了 tokenizer 兼容性，纠正了 token 计数，并加入启动 warmup。FlashInfer 几乎不提升吞吐，却拉高了尾延迟，因而被回退。开发阶段使用并发 4 的 96 个突发请求和 200 道 MMLU-Pro 题。公开的全新容器评测则用并发 1，记录 144.51 tok/s，质量 32%，高于 25.5% 的基线，通过质量检查。endpoint 反复丢失，使可复现的重启变得至关重要。",
-      "An engine-agnostic start_server.sh exits 2 and its fallback names Qwen, while the task requires Mistral-7B-Instruct-v0.3. Codex gpt-5.5 with high effort receives one H100 80GB HBM3, 180GB RAM and a nominal two hour budget. The scoring contract restarts the canonical launcher in a fresh container.": "与引擎无关的 start_server.sh 以退出码 2 结束，其回退分支写的是 Qwen，而任务要求 Mistral-7B-Instruct-v0.3。Codex gpt-5.5（high effort）拿到一张 H100 80GB HBM3、180GB 内存和名义上两小时的预算。评分契约会在全新容器中重启规范启动器。",
-      "The launcher now selects vLLM 0.10.2, Mistral BF16, FlashAttention, 8192 context, 16 sequences, 32768 batched tokens, block size 16 and GPU utilization 0.94. This is an implementation milestone, not a working-server claim; first startup exposes a GPU-UUID incompatibility.": "启动器现在选用 vLLM 0.10.2、Mistral BF16、FlashAttention、8192 上下文、16 个序列、32768 batched tokens、block size 16，GPU 利用率 0.94。这是实现层面的里程碑，不代表服务已能工作；首次启动就暴露出 GPU-UUID 不兼容。",
       "The cited completed edit or installation derives this recipe milestone from the previous one.": "所引用的已完成编辑或安装，使这个配置里程碑由上一个派生而来。",
-      "The code normalizes CUDA_VISIBLE_DEVICES to numeric device 0. This fixes the model-inspection path for the one-GPU sandbox, but the installed Transformers 5.x tokenizer path remains incompatible. A successful edit is separate from endpoint readiness.": "代码把 CUDA_VISIBLE_DEVICES 规范为数字设备 0。这修好了单 GPU 沙箱中的模型检查路径，但已安装的 Transformers 5.x 的 tokenizer 路径仍不兼容。编辑成功不等于 endpoint 已就绪。",
-      "Adding tokenizer-mode mistral permits startup, yet the quick evaluator gets special_token_policy errors for chat. This alternative is genuinely tried and abandoned; a listening endpoint alone does not satisfy the task.": "加上 tokenizer-mode mistral 后可以启动，但快速评测器的 chat 请求报 special_token_policy 错误。这个备选方案确实试过并已放弃；仅有一个在监听的 endpoint 并不满足任务要求。",
-      "The environment pins Transformers 4.55.4 and removes tokenizer-mode mistral, retaining vLLM 0.10.2. Quick requests now generate rather than returning API errors. Dependency self-installation is added later; this state records the initially working environment.": "环境固定 Transformers 4.55.4，移除 tokenizer-mode mistral，保留 vLLM 0.10.2。快速请求现在能正常生成，不再返回 API 错误。依赖自安装是之后才加的；这个状态记录的是最初可用的环境。",
-      "The persisted launcher adds enable-force-include-usage and related API defaults. The early FlashInfer install does not establish a retained sampler. Later inspection shows the flag is ignored when clients omit stream_options; apparent generation throughput still relies on word counts.": "持久化的启动器加入 enable-force-include-usage 及相关 API 默认值。早期的 FlashInfer 安装并不意味着采样器被保留。后来的检查发现，客户端省略 stream_options 时这个开关会被忽略；表面上的生成吞吐仍依赖词数统计。",
-      "scenario.json gains profile.concurrency=4. This changes the local evaluation workload, rather than the model. Four-request smoke tests become much shorter; a 200-question quality run gives 29.5% versus 25.5% baseline. The later external evaluator nevertheless reports concurrency 1.": "scenario.json 新增 profile.concurrency=4。改变的是本地评测负载，而不是模型。四请求的 smoke 测试大幅缩短；200 题质量评测得到 29.5%，基线为 25.5%。不过之后的外部评测器报告的并发是 1。",
-      "After restoring 32k batching and 16 sequences, the agent records 96/96 speed and 200/200 quality request success. Development generation throughput is 84.92 reported tok/s and quality 31%; missing usage still affects the token metric. start_server.sh now checks and installs vLLM 0.10.2 plus Transformers 4.55.4.": "恢复 32k batching 和 16 个序列后，agent 记录到速度请求 96/96、质量请求 200/200 全部成功。开发阶段报告的生成吞吐为 84.92 tok/s，质量 31%；usage 缺失仍影响 token 指标。start_server.sh 现在会检查并安装 vLLM 0.10.2 和 Transformers 4.55.4。",
-      "An idempotent launcher patch fixes vLLM serving_chat.py and serving_completion.py so force_include_usage also works without stream_options. The same-seed quick comparison reports 76.95 versus 129.42 tok/s, while request throughput is 0.2495 versus 0.2468 req/s. The metric definition changed; a matched speedup claim would be misleading.": "一个幂等的启动器补丁修改了 vLLM 的 serving_chat.py 和 serving_completion.py，让 force_include_usage 在没有 stream_options 时也生效。同 seed 快速对比报告 76.95 对 129.42 tok/s，而请求吞吐为 0.2495 对 0.2468 req/s。指标定义变了，声称同条件加速会产生误导。",
-      "CHUNKED_PREFILL_FLAG and EXTRA_VLLM_ARGS enable isolated experiments. The default remains chunked prefill, prefix caching, block size 16, context 8192, 16 sequences and 32768 batch tokens. Temporary async, block-size, context and frontend overrides are trials, not selected defaults. Orphaned wrapper cleanup precedes a better full measured run.": "CHUNKED_PREFILL_FLAG 和 EXTRA_VLLM_ARGS 支持隔离实验。默认仍是 chunked prefill、prefix caching、block size 16、上下文 8192、16 个序列和 32768 batch tokens。临时的 async、block size、上下文和前端覆盖都是试验，不是选定的默认值。先清理孤儿包装进程，之后的完整测量结果更好。",
-      "The launcher patches /v1/models readiness and warms four representative requests before writing a ready marker. The first prompt repeats Warmup token. 2048 times and exceeds context. The handler catches exceptions and still opens readiness, so the gate is not a universal guarantee of successful warmup.": "启动器修补了 /v1/models 就绪检查，并在写入就绪标记前用四个代表性请求做 warmup。第一个 prompt 把 Warmup token. 重复 2048 次，超出了上下文。异常处理器捕获异常后仍开放就绪，因此这个门控并不能保证 warmup 一定成功。",
-      "The warmup prompt is shortened from 2048 to 700 repetitions. Fresh-launch quick TTFT p50 is 0.4399 s versus 1.6737 s before the fix. The full development result is 96/96 speed success, 130.75575 tok/s, TTFT p99 0.4167585 s, ITL p99 9.96685 ms and MMLU-Pro 30.5%. These are development results at concurrency 4.": "warmup prompt 的重复次数从 2048 缩到 700。全新启动的快速 TTFT p50 为 0.4399 s，修复前是 1.6737 s。完整开发结果：速度请求 96/96 成功，130.75575 tok/s，TTFT p99 0.4167585 s，ITL p99 9.96685 ms，MMLU-Pro 30.5%。这些是并发 4 下的开发结果。",
       "Selected full development run at concurrency 4; no significance estimate.": "选定的完整开发运行，并发 4；无显著性估计。",
-      "FlashInfer Python 0.6.9 installs successfully and vLLM detects its top-k/top-p sampler. A full development comparison yields 130.88473 versus 130.75575 tok/s, but TTFT p99 increases from 0.41676 to 0.44888 s and ITL p99 from 9.97 to 14.97 ms; quality is 30% and passes. The selected direction will be restored.": "FlashInfer Python 0.6.9 安装成功，vLLM 检测到其 top-k/top-p 采样器。完整开发对比得到 130.88473 对 130.75575 tok/s，但 TTFT p99 从 0.41676 升到 0.44888 s，ITL p99 从 9.97 升到 14.97 ms；质量 30%，通过。之后将恢复选定的方向。",
       "Same-protocol full development comparison; generation throughput barely improves but tail worsens.": "同协议的完整开发对比；生成吞吐几乎没有提升，尾延迟变差。",
-      "VLLM_USE_FLASHINFER_SAMPLER defaults to 0 and the server relaunches. Behavior returns to the warmed pre-FlashInfer recipe, but code gains an explicit setting, so lineage is derived from the earlier recipe rather than an identical code restore. The 130.76 tok/s result is reused, not remeasured by this edit.": "VLLM_USE_FLASHINFER_SAMPLER 默认设为 0，服务重新启动。行为回到加入 FlashInfer 之前、带 warmup 的配置，但代码多了一个显式设置，因此谱系上是从早先配置派生，而不是代码原样恢复。130.76 tok/s 的结果是复用的，这次编辑没有重新测量。",
       "Restores the earlier warmed behavior while adding an explicit sampler-off setting; this is not byte-identical restoration.": "恢复此前带 warmup 的行为，同时新增显式的采样器关闭设置；并非逐字节一致的恢复。",
       "Restores earlier selected result; this state does not independently remeasure it. External evaluation is a separate protocol.": "恢复此前选定的结果；此状态没有独立重新测量。外部评测是另一套协议。",
-      "The rejected FlashInfer package is uninstalled and absence is checked. Subsequent continuation turns find port 45091 down, cancel a hanging smoke evaluator and repeatedly relaunch the same recipe. The last agent message says ready; external capture finds no live server, then independently restarts start_server.sh and evaluates successfully. Published final burst throughput is 144.5143 tok/s with 32% MMLU-Pro, versus 25.5% baseline, at speed concurrency 1.": "被否决的 FlashInfer 包已卸载，并确认已不存在。后续的续接轮次发现端口 45091 已关闭，于是取消一个卡住的 smoke 评测器，并反复用同一配置重新启动。agent 的最后一条消息说已就绪；外部采集却发现没有在线服务，于是独立重启 start_server.sh 并评测成功。公开的最终突发吞吐为 144.5143 tok/s，MMLU-Pro 32%，基线 25.5%，速度测试并发为 1。",
-      "Read the original task: canonical foreground launcher, OpenAI streaming API, H100 80GB, 180GB RAM and no external inference or response caching. Final evaluation kills and restarts the server. Inspect files, GPU, package indexes, cache, evaluator, quality scorer and supervised launch lifecycle. The evaluator reads profile concurrency and has a quality registry; no initial model server exists. Install vLLM 0.10.2 and inspect its CLI and cached configuration; the package command reports successful installation. This is setup, not a throughput result.": "阅读原始任务：规范的前台启动器、OpenAI 流式 API、H100 80GB、180GB 内存，不得使用外部推理或响应缓存。最终评测会杀掉并重启服务。检查文件、GPU、包索引、缓存、评测器、质量评分器和受监管的启动生命周期。评测器读取 profile 中的并发，并带有质量注册表；一开始没有模型服务。安装 vLLM 0.10.2，检查其 CLI 和缓存的配置；包管理命令报告安装成功。这是环境准备，不是吞吐结果。",
-      "Patch start_server.sh to select Mistral and port 45091, context 8192, sequences 16, batch 32768, block 16, BF16, FlashAttention and prefix/chunked prefill. The file edit completes; subsequent startup fails before model load.": "修补 start_server.sh：选用 Mistral、端口 45091、上下文 8192、16 个序列、batch 32768、block 16、BF16、FlashAttention 以及 prefix/chunked prefill。文件编辑完成；随后的启动在加载模型前就失败了。",
       "Change CUDA_VISIBLE_DEVICES after the UUID parser failure and relaunch. A tokenizer compatibility failure replaces the earlier startup blocker.": "在 UUID 解析失败后修改 CUDA_VISIBLE_DEVICES 并重新启动。tokenizer 兼容性失败取代了先前的启动障碍。",
       "Add tokenizer-mode mistral, start the supervised server, and run the quick evaluator. Endpoint readiness does not establish chat compatibility.": "加上 tokenizer-mode mistral，启动受监管的服务，运行快速评测器。endpoint 就绪并不代表 chat 兼容。",
-      "Install Transformers 4.55.4, remove tokenizer-mode mistral and relaunch. This is the documented compatibility recovery.": "安装 Transformers 4.55.4，移除 tokenizer-mode mistral 并重新启动。这是有记录的兼容性恢复。",
-      "Allow the first usable smoke evaluation to finish and inspect metrics. Local quick mode still runs long 4096-input/2048-output requests; the initial active profile defaults to concurrency 1.": "等第一次可用的 smoke 评测跑完并检查指标。本地快速模式仍运行 4096 输入/2048 输出的长请求；最初生效的 profile 默认并发为 1。",
       "Add force streamed usage and API settings; attempt installing a matching FlashInfer sampler. The later source shows missing metadata, not a retained working install at this point.": "加入强制返回流式 usage 和 API 设置；尝试安装匹配的 FlashInfer 采样器。后来的源记录显示缺少元数据，此时并没有保留一个可用的安装。",
       "Patch scenario.profile.concurrency=4 and rerun the smoke workload. This alters the development protocol and is tracked independently of serving optimizations.": "修补 scenario.profile.concurrency=4，重新运行 smoke 负载。这改变了开发协议，与服务优化分开记录。",
-      "Run quality after tokenizer changes; inspect 200-sample accuracy, ratio 1.1569 and tau 0.95. Also measure an alternate-seed uncached smoke baseline, reported 76.95 tok/s before usage repair.": "tokenizer 更改后运行质量评测；检查 200 个样本的准确率、比值 1.1569 和 tau 0.95。另外测量一个换 seed、未缓存的 smoke 基线，在 usage 修复前报告 76.95 tok/s。",
-      "Launch an 8192 batched-token override. A different-seed run has 2.994 s TTFTp99; same-seed repeat 0.436 s vs 0.422 s baseline, 0.2444 vs 0.2495 req/s and worse ITLp99. These are four-request probes. Launch the middle batching override; quick request throughput 0.2282 req/s versus 0.2495 and TTFTp50 about 1.705 s. Do not generalize this startup-sensitive small sample. Set MAX_NUM_SEQS=4 while restoring batch 32768; compare same-seed metrics with baseline 16 sequences. Request throughput falls to 0.2222 req/s. Restart the canonical launcher with no trial environment overrides. The agent explicitly keeps the higher sequence capacity after the slow four-sequence probe.": "启动 8192 batched-token 覆盖。换 seed 运行的 TTFTp99 为 2.994 s；同 seed 重复为 0.436 s 对基线 0.422 s，0.2444 对 0.2495 req/s，ITLp99 更差。这些是四请求探测。启动中等 batching 覆盖；快速请求吞吐 0.2282 req/s 对 0.2495，TTFTp50 约 1.705 s。这个对启动敏感的小样本不宜推广。设置 MAX_NUM_SEQS=4，同时恢复 batch 32768；与 16 序列的基线做同 seed 指标对比。请求吞吐降到 0.2222 req/s。不带任何试验环境覆盖，重启规范启动器。慢的四序列探测之后，agent 明确保留较高的序列容量。",
-      "Run 96-request speed plus 200-question quality, inspect GPU/process health and remove stale wrappers. The completed metrics record 31% quality, 0.231618 req/s and TTFTp991.7901 s. Add self-install checks for vLLM 0.10.2 and Transformers 4.55.4, validate syntax, endpoint and recorded metrics. The agent reports 84.92 generation tokens/s, still with accounting limitations.": "运行 96 个请求的速度评测和 200 题质量评测，检查 GPU/进程健康状况并清除残留的包装进程。完成的指标记录质量 31%、0.231618 req/s，TTFT p99 1.7901 s。加入 vLLM 0.10.2 和 Transformers 4.55.4 的自安装检查，验证语法、endpoint 和记录的指标。agent 报告生成吞吐 84.92 tokens/s，仍受计数口径限制。",
-      "On continuation, restart the absent server; compare streaming calls with and without include_usage and inspect serving source. The agent initially proposes a proxy, then chooses an idempotent in-place vLLM fix. Patch both chat and completion serving paths from start_server.sh, restart and check real output_tokens 2048. Quick reported generation throughput rises 76.95→129.42 tok/s; request throughput 0.2495→0.2468 req/s.": "续接时重启已不存在的服务；对比带与不带 include_usage 的流式调用，并检查服务源码。agent 起初提议用代理，后来改为在 vLLM 内做幂等的原地修复。从 start_server.sh 同时修补 chat 和 completion 服务路径，重启后检查真实的 output_tokens 2048。快速测试报告的生成吞吐上升 76.95→129.42 tok/s；请求吞吐 0.2495→0.2468 req/s。",
-      "Add CHUNKED_PREFILL_FLAG for a temporary off trial. Measure TTFTp50~1.712 s versus 0.455 s and keep the default. Source warnings limit interpretation of what the flag actually changed. Persist the generic argument hook, start async scheduling and compare quick metrics. The balanced objective makes the latency penalty undesirable.": "加入 CHUNKED_PREFILL_FLAG，做一次临时关闭试验。测得 TTFTp50 约 1.712 s，对比 0.455 s，于是保留默认值。源码中的警告让人难以判断这个开关实际改了什么。持久化通用参数钩子，启动异步调度并对比快速指标。在均衡目标下，这样的延迟代价不可取。",
-      "After declining async scheduling, test block-size 32 through runtime overrides and inspect metrics. The source conclusion is based on a small smoke sample. Attempt FP8 KV cache. The agent reports the backend rejects it; no valid speedup or quality conclusion is available. Inspect a dry-run for SGLang 0.5.10; no SGLang serving candidate is launched. This is a considered alternative, not an executed engine comparison. Inspect/install attempts for the compatible 0.3.x package fail on metadata. The agent declines baking a fragile source install into the launcher. Read GPU clock/power state after dependency options stall. This is environment diagnosis, not an optimization or new state. Test a lower maximum model length intended to reduce profiling/scheduling overhead. The agent calls the result worse and attributes it tentatively to a different compile path. Test disabling frontend multiprocessing after the 6400-context regression. The measured result does not justify retaining the override. Restore originalV1 scheduler, block 16, context 8192, batch 32768 and usage patch; run a full evaluator before the next continuation. Saved metrics are then inspected again.": "放弃异步调度后，通过运行时覆盖测试 block-size 32 并检查指标。源记录的结论基于很小的 smoke 样本。尝试 FP8 KV cache。agent 报告后端拒绝了它；得不出有效的加速或质量结论。检查 SGLang 0.5.10 的 dry-run；没有启动任何 SGLang 服务候选。这是考虑过的备选方案，并非实际执行的引擎对比。对兼容的 0.3.x 包的检查/安装尝试因元数据问题失败。agent 拒绝把脆弱的源码安装写进启动器。依赖方案受阻后，读取 GPU 时钟/功耗状态。这是环境诊断，既不是优化，也不是新状态。测试更低的最大模型长度，意在减少 profiling/调度开销。agent 认为结果更差，并初步归因于不同的编译路径。在 6400 上下文出现退化后，测试关闭前端多进程。测得的结果不足以支持保留这个覆盖。恢复原有的 V1 调度器、block 16、上下文 8192、batch 32768 和 usage 补丁；在下一次续接前跑一次完整评测。随后再次检查保存的指标。",
-      "Reinspect current scripts, saved comparisons, GPU and process tree. The agent identifies old supervised wrappers burning CPU; it avoids killing the live endpoint. Terminate identified orphaned wrapper PIDs, check liveness and measure a quick run. Causal attribution to CPU pressure remains the agent interpretation; no repeated controlled experiment is supplied. Run and inspect a full evaluation after wrapper cleanup. Development metrics show 0.249643 req/s, 130.4664 tok/s, TTFTp99.41783 s and 29% MMLU-Pro.": "重新检查当前脚本、已保存的对比、GPU 和进程树。agent 发现旧的受监管包装进程在空耗 CPU；它避免杀掉在线 endpoint。终止已识别的孤儿包装进程 PID，检查存活状态并跑一次快速测试。归因于 CPU 压力只是 agent 的解读；没有提供重复的对照实验。清理包装进程后，运行并检查完整评测。开发指标显示 0.249643 req/s、130.4664 tok/s、TTFT p99 0.41783 s、MMLU-Pro 29%。",
-      "A bounded trial disables prefix caching via EXTRA_VLLM_ARGS. Fresh/cached conditions can confound quick comparisons; the observed no-prefix result is not retained. Attempt max-num-partial-prefills 4 and observe the compatibility failure. The default startup path is restored next. Restore defaults, run a fresh quick benchmark and compare against warmed full metrics. Four quick requests have TTFTp50~1.674 s while the full run hasp99~.418 s.": "一次有界试验通过 EXTRA_VLLM_ARGS 关闭 prefix caching。全新与已缓存的条件可能干扰快速对比；观察到的无 prefix 结果未被保留。尝试 max-num-partial-prefills 4，观察到兼容性失败。接下来恢复默认启动路径。恢复默认值，跑一次全新启动的快速基准，并与预热后的完整指标对比。四个快速请求的 TTFTp50 约 1.674 s，而完整运行的 p99 约 0.418 s。",
-      "Use the cold-start observation to inspect vLLM warmup paths and /v1/models handling. The agent explicitly ties the change to fresh container final evaluation. Patch canonical startup and vLLM readiness route, validate shell syntax and relaunch. The warmup exception handler still writes readiness; the first long prompt fails later.": "根据冷启动的观察，检查 vLLM 的 warmup 路径和 /v1/models 处理逻辑。agent 明确把这次改动与全新容器中的最终评测联系起来。修补规范启动流程和 vLLM 就绪路由，验证 shell 语法并重新启动。warmup 异常处理器仍会写入就绪状态；第一个长 prompt 稍后失败。",
-      "Correct the HTTP 400-causing prompt and compare quick metrics after relaunch: p50.4399 versus 1.6737 seconds. This directly addresses the observed cold-start issue.": "修正导致 HTTP 400 的 prompt，重新启动后对比快速指标：p50 0.4399 秒对 1.6737 秒。这直接解决了观察到的冷启动问题。",
-      "Run full evaluation with the final warmup recipe, monitor workload completion, check syntax and endpoint. Preserve the development result and serving settings.": "用最终的 warmup 配置运行完整评测，监控负载完成情况，检查语法和 endpoint。保留开发结果和服务设置。",
-      "After continuation, search alternate FlashInfer wheel indexes. The plan is conditional: retain only if a real full measurement improves balanced performance. Install the package from the CUDA 12.8/Torch 2.8 index and start the canonical server. Later logs confirm vLLM uses FlashInfer top-k/top-p sampling.": "续接后，搜索其他 FlashInfer wheel 索引。计划是有条件的：只有真实的完整测量证明均衡性能提升，才予以保留。从 CUDA 12.8/Torch 2.8 索引安装该包，并启动规范服务。后续日志确认 vLLM 使用了 FlashInfer 的 top-k/top-p 采样。",
-      "Quick generation throughput 130.7648 versus 130.5561 tok/s offers little separation; startup autotuning is visibly costly. Escalate to a full comparison. The full run produces 130.88473 tok/s versus 130.75575, quality 30% versus 30.5% and both gates pass. This multi-metric evidence explains the subsequent rollback. Set VLLM_USE_FLASHINFER_SAMPLER=0, relaunch and validate endpoint/syntax. Compare saved full metrics once more; report the rejected package, startup cost and worse tails.": "快速测试生成吞吐 130.7648 对 130.5561 tok/s，差距很小；启动时的 autotuning 开销明显。升级为完整对比。完整运行得到 130.88473 tok/s 对 130.75575，质量 30% 对 30.5%，两个门槛都通过。这些多指标证据解释了随后的回退。设置 VLLM_USE_FLASHINFER_SAMPLER=0，重新启动并验证 endpoint/语法。再次对比保存的完整指标；报告被否决的包、启动开销和更差的尾延迟。",
-      "Uninstall flashinfer-python 0.6.9, relaunch, inspect process arguments, verify /v1/models and confirm importlib cannot find flashinfer. Saved metrics remain historical.": "卸载 flashinfer-python 0.6.9，重新启动，检查进程参数，验证 /v1/models，并确认 importlib 找不到 flashinfer。保存的指标仍是历史结果。",
-      "The late quick run never produces its own metrics. Process/GPU/port checks show the server is gone; this is a liveness failure, not a measured throughput regression. Stop the waiting evaluator and restart via test_server.sh. Verify process arguments, /v1/models, syntax, no FlashInfer and saved full metrics. The local timer says expired. A continuation prompt offers five minutes while timer already expired. Process and endpoint checks fail, but file modes, syntax and saved metrics are unchanged. Relaunch canonical supervised server, confirm intended process and endpoint, validate syntax and report timer expiry. The final continuation gives two minutes; process table and curl show the server absent. Metrics and without FlashInfer environment still match the selected recipe. Start canonical supervised launcher once more; the agent final message says warmup complete and server running. External capture later reports no live agent server, so final success rests on the clean supervised restart.": "后期的快速运行始终没有产出自己的指标。进程/GPU/端口检查显示服务已不在；这是存活故障，不是测得的吞吐退化。停止仍在等待的评测器，并通过 test_server.sh 重启。验证进程参数、/v1/models、语法、无 FlashInfer 以及保存的完整指标。本地计时器显示已到期。续接提示给了五分钟，而计时器已经到期。进程和 endpoint 检查失败，但文件权限、语法和保存的指标都没变。重新启动受监管的规范服务，确认目标进程和 endpoint，验证语法并报告计时器到期。最后一次续接给了两分钟；进程表和 curl 显示服务不在。指标和不含 FlashInfer 的环境仍与选定配置一致。再次启动受监管的规范启动器；agent 的最后一条消息称 warmup 完成、服务运行中。外部采集后来报告没有在线的 agent 服务，因此最终成功依赖于那次干净的受监管重启。",
-      "The external harness finds no live server, restarts the canonical launcher, and measures 96 speed requests at concurrency 1 plus 200 MMLU-Pro requests. Metrics and policy judgments are attached verbatim.": "外部 harness 发现没有在线服务，于是重启规范启动器，在并发 1 下测量 96 个速度请求，另测 200 个 MMLU-Pro 请求。指标和策略判定原样附上。",
-      "Read the original task: canonical foreground launcher, OpenAI streaming API, H100 80GB, 180GB RAM and no external inference or response caching. Final evaluation kills and restarts the server. Runner metadata records a 7500-second timeout, distinct from the nominal two-hour task budget; the archived elapsed time is 02:05:00.": "阅读原始任务：规范的前台启动器、OpenAI 流式 API、H100 80GB、180GB 内存，不得使用外部推理或响应缓存。最终评测会杀掉并重启服务。runner 元数据记录的超时为 7500 秒，有别于任务名义上的两小时预算；存档的耗时为 02:05:00。",
       "Analyst grouping by the recorded objective and observed effect; mixed read, edit, execute and check records retain their full source evidence.": "分析者按记录的目标和观察到的效果分组；混合的读取、编辑、执行和检查记录都保留完整的源证据。",
-      "Inspect files, GPU, package indexes, cache, evaluator, quality scorer and supervised launch lifecycle. The evaluator reads profile concurrency and has a quality registry; no initial model server exists.": "检查文件、GPU、包索引、缓存、评测器、质量评分器和受监管的启动生命周期。评测器读取 profile 中的并发，并带有质量注册表；一开始没有模型服务。",
-      "Install vLLM 0.10.2 and inspect its CLI and cached configuration; the package command reports successful installation. This is setup, not a throughput result.": "安装 vLLM 0.10.2，检查其 CLI 和缓存的配置；包管理命令报告安装成功。这是环境准备，不是吞吐结果。",
-      "Launch an 8192 batched-token override. A different-seed run has 2.994 s TTFTp99; same-seed repeat 0.436 s vs 0.422 s baseline, 0.2444 vs 0.2495 req/s and worse ITLp99. These are four-request probes.": "启动 8192 batched-token 覆盖。换 seed 运行的 TTFTp99 为 2.994 s；同 seed 重复为 0.436 s 对基线 0.422 s，0.2444 对 0.2495 req/s，ITLp99 更差。这些是四请求探测。",
-      "Launch the middle batching override; quick request throughput 0.2282 req/s versus 0.2495 and TTFTp50 about 1.705 s. Do not generalize this startup-sensitive small sample.": "启动中等 batching 覆盖；快速请求吞吐 0.2282 req/s 对 0.2495，TTFTp50 约 1.705 s。这个对启动敏感的小样本不宜推广。",
-      "Set MAX_NUM_SEQS=4 while restoring batch 32768; compare same-seed metrics with baseline 16 sequences. Request throughput falls to 0.2222 req/s.": "设置 MAX_NUM_SEQS=4，同时恢复 batch 32768；与 16 序列的基线做同 seed 指标对比。请求吞吐降到 0.2222 req/s。",
-      "Restart the canonical launcher with no trial environment overrides. The agent explicitly keeps the higher sequence capacity after the slow four-sequence probe.": "不带任何试验环境覆盖，重启规范启动器。慢的四序列探测之后，agent 明确保留较高的序列容量。",
-      "Run 96-request speed plus 200-question quality, inspect GPU/process health and remove stale wrappers. The completed metrics record 31% quality, 0.231618 req/s and TTFTp991.7901 s.": "运行 96 个请求的速度评测和 200 题质量评测，检查 GPU/进程健康状况并清除残留的包装进程。完成的指标记录质量 31%、0.231618 req/s，TTFT p99 1.7901 s。",
-      "Add self-install checks for vLLM 0.10.2 and Transformers 4.55.4, validate syntax, endpoint and recorded metrics. The agent reports 84.92 generation tokens/s, still with accounting limitations.": "加入 vLLM 0.10.2 和 Transformers 4.55.4 的自安装检查，验证语法、endpoint 和记录的指标。agent 报告生成吞吐 84.92 tokens/s，仍受计数口径限制。",
-      "On continuation, restart the absent server; compare streaming calls with and without include_usage and inspect serving source. The agent initially proposes a proxy, then chooses an idempotent in-place vLLM fix.": "续接时重启已不存在的服务；对比带与不带 include_usage 的流式调用，并检查服务源码。agent 起初提议用代理，后来改为在 vLLM 内做幂等的原地修复。",
-      "Patch both chat and completion serving paths from start_server.sh, restart and check real output_tokens 2048. Quick reported generation throughput rises 76.95→129.42 tok/s; request throughput 0.2495→0.2468 req/s.": "从 start_server.sh 同时修补 chat 和 completion 服务路径，重启后检查真实的 output_tokens 2048。快速测试报告的生成吞吐上升 76.95→129.42 tok/s；请求吞吐 0.2495→0.2468 req/s。",
-      "Add CHUNKED_PREFILL_FLAG for a temporary off trial. Measure TTFTp50~1.712 s versus 0.455 s and keep the default. Source warnings limit interpretation of what the flag actually changed.": "加入 CHUNKED_PREFILL_FLAG，做一次临时关闭试验。测得 TTFTp50 约 1.712 s，对比 0.455 s，于是保留默认值。源码中的警告让人难以判断这个开关实际改了什么。",
       "Persist the generic argument hook, start async scheduling and compare quick metrics. The balanced objective makes the latency penalty undesirable.": "持久化通用参数钩子，启动异步调度并对比快速指标。在均衡目标下，这样的延迟代价不可取。",
-      "After declining async scheduling, test block-size 32 through runtime overrides and inspect metrics. The source conclusion is based on a small smoke sample.": "放弃异步调度后，通过运行时覆盖测试 block-size 32 并检查指标。源记录的结论基于很小的 smoke 样本。",
-      "Attempt FP8 KV cache. The agent reports the backend rejects it; no valid speedup or quality conclusion is available.": "尝试 FP8 KV cache。agent 报告后端拒绝了它；得不出有效的加速或质量结论。",
-      "Inspect a dry-run for SGLang 0.5.10; no SGLang serving candidate is launched. This is a considered alternative, not an executed engine comparison.": "检查 SGLang 0.5.10 的 dry-run；没有启动任何 SGLang 服务候选。这是考虑过的备选方案，并非实际执行的引擎对比。",
-      "Inspect/install attempts for the compatible 0.3.x package fail on metadata. The agent declines baking a fragile source install into the launcher.": "对兼容的 0.3.x 包的检查/安装尝试因元数据问题失败。agent 拒绝把脆弱的源码安装写进启动器。",
-      "Read GPU clock/power state after dependency options stall. This is environment diagnosis, not an optimization or new state.": "依赖方案受阻后，读取 GPU 时钟/功耗状态。这是环境诊断，既不是优化，也不是新状态。",
-      "Test a lower maximum model length intended to reduce profiling/scheduling overhead. The agent calls the result worse and attributes it tentatively to a different compile path.": "测试更低的最大模型长度，意在减少 profiling/调度开销。agent 认为结果更差，并初步归因于不同的编译路径。",
-      "Test disabling frontend multiprocessing after the 6400-context regression. The measured result does not justify retaining the override.": "在 6400 上下文出现退化后，测试关闭前端多进程。测得的结果不足以支持保留这个覆盖。",
-      "Restore originalV1 scheduler, block 16, context 8192, batch 32768 and usage patch; run a full evaluator before the next continuation. Saved metrics are then inspected again.": "恢复原有的 V1 调度器、block 16、上下文 8192、batch 32768 和 usage 补丁；在下一次续接前跑一次完整评测。随后再次检查保存的指标。",
-      "Reinspect current scripts, saved comparisons, GPU and process tree. The agent identifies old supervised wrappers burning CPU; it avoids killing the live endpoint.": "重新检查当前脚本、已保存的对比、GPU 和进程树。agent 发现旧的受监管包装进程在空耗 CPU；它避免杀掉在线 endpoint。",
-      "Terminate identified orphaned wrapper PIDs, check liveness and measure a quick run. Causal attribution to CPU pressure remains the agent interpretation; no repeated controlled experiment is supplied.": "终止已识别的孤儿包装进程 PID，检查存活状态并跑一次快速测试。归因于 CPU 压力只是 agent 的解读；没有提供重复的对照实验。",
-      "Run and inspect a full evaluation after wrapper cleanup. Development metrics show 0.249643 req/s, 130.4664 tok/s, TTFTp99.41783 s and 29% MMLU-Pro.": "清理包装进程后，运行并检查完整评测。开发指标显示 0.249643 req/s、130.4664 tok/s、TTFT p99 0.41783 s、MMLU-Pro 29%。",
-      "A bounded trial disables prefix caching via EXTRA_VLLM_ARGS. Fresh/cached conditions can confound quick comparisons; the observed no-prefix result is not retained.": "一次有界试验通过 EXTRA_VLLM_ARGS 关闭 prefix caching。全新与已缓存的条件可能干扰快速对比；观察到的无 prefix 结果未被保留。",
-      "Attempt max-num-partial-prefills 4 and observe the compatibility failure. The default startup path is restored next.": "尝试 max-num-partial-prefills 4，观察到兼容性失败。接下来恢复默认启动路径。",
-      "Restore defaults, run a fresh quick benchmark and compare against warmed full metrics. Four quick requests have TTFTp50~1.674 s while the full run hasp99~.418 s.": "恢复默认值，跑一次全新启动的快速基准，并与预热后的完整指标对比。四个快速请求的 TTFTp50 约 1.674 s，而完整运行的 p99 约 0.418 s。",
-      "Use the cold-start observation to inspect vLLM warmup paths and /v1/models handling. The agent explicitly ties the change to fresh container final evaluation.": "根据冷启动的观察，检查 vLLM 的 warmup 路径和 /v1/models 处理逻辑。agent 明确把这次改动与全新容器中的最终评测联系起来。",
       "Patch canonical startup and vLLM readiness route, validate shell syntax and relaunch. The warmup exception handler still writes readiness; the first long prompt fails later.": "修补规范启动流程和 vLLM 就绪路由，验证 shell 语法并重新启动。warmup 异常处理器仍会写入就绪状态；第一个长 prompt 稍后失败。",
-      "After continuation, search alternate FlashInfer wheel indexes. The plan is conditional: retain only if a real full measurement improves balanced performance.": "续接后，搜索其他 FlashInfer wheel 索引。计划是有条件的：只有真实的完整测量证明均衡性能提升，才予以保留。",
-      "Install the package from the CUDA 12.8/Torch 2.8 index and start the canonical server. Later logs confirm vLLM uses FlashInfer top-k/top-p sampling.": "从 CUDA 12.8/Torch 2.8 索引安装该包，并启动规范服务。后续日志确认 vLLM 使用了 FlashInfer 的 top-k/top-p 采样。",
-      "Quick generation throughput 130.7648 versus 130.5561 tok/s offers little separation; startup autotuning is visibly costly. Escalate to a full comparison.": "快速测试生成吞吐 130.7648 对 130.5561 tok/s，差距很小；启动时的 autotuning 开销明显。升级为完整对比。",
-      "The full run produces 130.88473 tok/s versus 130.75575, quality 30% versus 30.5% and both gates pass. This multi-metric evidence explains the subsequent rollback.": "完整运行得到 130.88473 tok/s 对 130.75575，质量 30% 对 30.5%，两个门槛都通过。这些多指标证据解释了随后的回退。",
       "Set VLLM_USE_FLASHINFER_SAMPLER=0, relaunch and validate endpoint/syntax. Compare saved full metrics once more; report the rejected package, startup cost and worse tails.": "设置 VLLM_USE_FLASHINFER_SAMPLER=0，重新启动并验证 endpoint/语法。再次对比保存的完整指标；报告被否决的包、启动开销和更差的尾延迟。",
-      "The late quick run never produces its own metrics. Process/GPU/port checks show the server is gone; this is a liveness failure, not a measured throughput regression.": "后期的快速运行始终没有产出自己的指标。进程/GPU/端口检查显示服务已不在；这是存活故障，不是测得的吞吐退化。",
-      "Stop the waiting evaluator and restart via test_server.sh. Verify process arguments, /v1/models, syntax, no FlashInfer and saved full metrics. The local timer says expired.": "停止仍在等待的评测器，并通过 test_server.sh 重启。验证进程参数、/v1/models、语法、无 FlashInfer 以及保存的完整指标。本地计时器显示已到期。",
-      "A continuation prompt offers five minutes while timer already expired. Process and endpoint checks fail, but file modes, syntax and saved metrics are unchanged.": "续接提示给了五分钟，而计时器已经到期。进程和 endpoint 检查失败，但文件权限、语法和保存的指标都没变。",
-      "Relaunch canonical supervised server, confirm intended process and endpoint, validate syntax and report timer expiry.": "重新启动受监管的规范服务，确认目标进程和 endpoint，验证语法并报告计时器到期。",
-      "The final continuation gives two minutes; process table and curl show the server absent. Metrics and without FlashInfer environment still match the selected recipe.": "最后一次续接给了两分钟；进程表和 curl 显示服务不在。指标和不含 FlashInfer 的环境仍与选定配置一致。",
-      "Start canonical supervised launcher once more; the agent final message says warmup complete and server running. External capture later reports no live agent server, so final success rests on the clean supervised restart. The final 17-second continuation prompt has no recorded subsequent assistant response.": "再次启动受监管的规范启动器；agent 的最后一条消息称 warmup 完成、服务运行中。外部采集后来报告没有在线的 agent 服务，因此最终成功依赖于那次干净的受监管重启。最后一条 17 秒的续接提示之后，没有记录到任何 assistant 回复。",
       "Final burst evaluation: 144.51 tok/s": "最终突发评测：144.51 tok/s",
-      "The published final evaluator records 96/96 speed requests and 200/200 quality request successes. Speed uses precomputed burst requests at concurrency 1, while development uses concurrency 4. Final generation throughput is 144.514328 tok/s, request throughput is 0.0699851 req/s, median TTFT is 0.116410 s and median inter-token latency is 6.9155 ms. MMLU-Pro accuracy is 32% versus a 25.5% baseline; the ratio of 1.2549 exceeds the 0.95 quality threshold. These are archived external results, not a rerun or a matched development speedup.": "公开的最终评测器记录速度请求 96/96、质量请求 200/200 全部成功。速度测试用并发 1 的预计算突发请求，而开发阶段用并发 4。最终生成吞吐为 144.514328 tok/s，请求吞吐 0.0699851 req/s，TTFT 中位数 0.116410 s，token 间延迟中位数 6.9155 ms。MMLU-Pro 准确率 32%，基线为 25.5%；比值 1.2549 超过 0.95 的质量门槛。这些是存档的外部结果，不是重新运行，也不是同条件下的开发加速。",
       "Published post-run evidence is read, not executed by this conversion.": "公开的运行后证据仅供阅读，本次转换没有执行它们。",
       "Run metadata and policy checks": "运行元数据与策略检查",
-      "run_meta namesgpt-5.5-high viaCodex, ScenarioD, 2 h budget and 02: 05: 00 elapsed. invalid_or_reward_hack isfalse, contamination saysno contamination detected and disallowed model saysonly allowed use detected. These are published judgments, not a new review or proof beyond their recorded scope.": "run_meta 记录了经 Codex 运行的 gpt-5.5-high、场景 D、2 h 预算和 02:05:00 的耗时。invalid_or_reward_hack 为 false，contamination 为 no contamination detected，disallowed model 为 only allowed use detected。这些是公开的判定，不是新的审查，也不能证明超出其记录范围的结论。",
       "Patch start_server.sh to select Mistral and port45091, context8192, sequences16, batch32768, block16, BF16, FlashAttention and prefix/chunked prefill. The file edit completes; subsequent startup fails before model load.": "修补 start_server.sh：选用 Mistral、端口 45091、上下文 8192、16 个序列、batch 32768、block 16、BF16、FlashAttention 以及 prefix/chunked prefill。文件编辑完成；随后的启动在加载模型前就失败了。",
       "Install Transformers4.55.4, remove tokenizer-mode mistral and relaunch. This is the documented compatibility recovery.": "安装 Transformers 4.55.4，移除 tokenizer-mode mistral 并重新启动。这是有记录的兼容性恢复。",
       "Add self-install checks for vLLM0.10.2 and Transformers4.55.4, validate syntax, endpoint and recorded metrics. The agent reports84.92 generationtokens/s, still with accounting limitations.": "加入 vLLM 0.10.2 和 Transformers 4.55.4 的自安装检查，验证语法、endpoint 和记录的指标。agent 报告生成吞吐 84.92 tokens/s，仍受计数口径限制。",
@@ -18959,7 +18878,120 @@
       "eval.log explicitly records a clean restart, readiness and final eval exit 0 after no live agent server was found.": "eval.log 明确记录：在未发现在线 agent 服务后，执行了干净重启并就绪，最终 eval 退出码为 0。",
       "No matched PyTorch baseline speed metric or aggregate speedup is supplied in this selected run. Changed concurrency prevents comparing final and development throughput as a speedup.": "本次选定的运行没有提供同条件的 PyTorch 基线速度指标，也没有汇总加速比。并发条件改变，因此不能把最终吞吐与开发吞吐的差异当作加速。",
       "No contamination and only allowed model use are the source judgments; there is no in-session reviewer agent.": "无污染、仅有允许的模型使用，这些是源数据中的判定；会话内没有 reviewer agent。",
-      "Serial alternative or hypothesis; branch placement does not imply parallel execution.": "串行的备选方案或假设；分支位置不代表并行执行。"
+      "Serial alternative or hypothesis; branch placement does not imply parallel execution.": "串行的备选方案或假设；分支位置不代表并行执行。",
+      "Codex uses GPT-5.5 with high reasoning effort to deploy Mistral-7B-Instruct-v0.3 for InferenceBench Scenario D. The task balances latency, throughput and answer quality on one H100 80GB HBM3 with 180GB RAM and a nominal two-hour budget. The starting start_server.sh contains no inference engine and exits with code 2. The final evaluator will restart this launcher in a fresh container, so the saved recipe must work without a surviving development process.": "Codex 使用 GPT-5.5 和 high 推理强度，为 InferenceBench Scenario D 部署 Mistral-7B-Instruct-v0.3。任务要求在一张 H100 80GB HBM3、180GB 内存和名义两小时预算下兼顾延迟、吞吐和回答质量。起始 start_server.sh 没有推理引擎，退出码为 2。最终评测会在全新容器中重启这个脚本，因此保存的配置必须能独立运行，不能依赖开发进程存活。",
+      "The agent replaced the empty launcher with vLLM 0.10.2 serving Mistral in BF16. It selected FlashAttention, an 8192-token context, 16 active sequences, 32768 batched tokens, block size 16 and 0.94 GPU memory utilization. The first launch failed during model inspection because the GPU identifier was a UUID. The file was saved, but this configuration had not yet served a request.": "Agent 用 vLLM 0.10.2 和 BF16 Mistral 替换了空启动器。配置采用 FlashAttention、8192 token 上下文、16 条活跃序列、32768 个批处理 token、16 的块大小和 0.94 的显存利用率。首次启动在模型检查时失败，因为 GPU 标识采用 UUID。文件已保存，但这套配置还没有成功处理请求。",
+      "The launcher now maps the single visible GPU to numeric device 0. Model inspection gets past the UUID parsing error. Startup then fails because the installed Transformers 5.x tokenizer lacks an attribute expected by vLLM. The GPU repair removes one blocker and exposes the next one.": "启动器现在把唯一可见 GPU 映射为数字设备 0。模型检查通过了原先的 UUID 解析错误。随后，启动又因 Transformers 5.x tokenizer 缺少 vLLM 预期的属性而失败。GPU 修复解决了一个阻碍，也暴露出下一个问题。",
+      "The agent tried the Mistral-specific tokenizer mode after the standard tokenizer failed. The server reached readiness, but the quick evaluator received special_token_policy errors from chat requests. This trial showed that a responding model endpoint did not establish working generation. The agent next chose to pin Transformers and restore the standard tokenizer path.": "标准 tokenizer 失败后，Agent 尝试了 Mistral 专用 tokenizer 模式。服务达到就绪状态，但快速评测的 chat 请求出现 special_token_policy 错误。这次试验说明，模型端点有响应不等于能够正常生成。Agent 随后选择固定 Transformers 版本，并恢复标准 tokenizer 路径。",
+      "Transformers is pinned to 4.55.4, and the launcher no longer requests Mistral tokenizer mode. With vLLM 0.10.2 unchanged, the quick evaluator now receives generated answers instead of API errors. Its first speed check runs four long requests serially. This establishes a working development environment; automatic dependency installation is added in a later state.": "Transformers 固定为 4.55.4，启动器不再指定 Mistral tokenizer 模式。vLLM 0.10.2 保持不变，快速评测现在收到生成答案，而不是 API 错误。首次速度检查串行运行四个长请求。这一步建立了可工作的开发环境；依赖自动安装要到后续状态才加入。",
+      "The launcher enables streamed usage reporting so the evaluator can count generated tokens. The agent also begins an early FlashInfer installation attempt. The usage flag alone is insufficient: requests without stream_options still receive no token count. Later inspection shows that the evaluator falls back to counting words, so the reported token throughput at this point uses an incomplete measurement path.": "启动器启用了流式 usage 返回，以便评测器统计生成 token。Agent 也开始了早期 FlashInfer 安装尝试。但 usage 开关本身不够：没有 stream_options 的请求仍然收不到 token 数。后续检查表明，评测器会回退到按词数计数，因此此时报告的 token 吞吐还存在统计问题。",
+      "The agent added concurrency=4 inside scenario.profile, which is the field the local evaluator reads. Earlier quick checks had run at concurrency 1 despite a top-level value of 4. The new four-request smoke run completes in about 18 seconds. A separate 200-question MMLU-Pro check records 29.5% accuracy against a 25.5% baseline. This state changes the development workload, not the model; the published final evaluator later uses concurrency 1.": "Agent 在 scenario.profile 内加入 concurrency=4，这是本地评测器实际读取的字段。此前虽有顶层并发值 4，快速检查仍按并发 1 运行。修改后的四请求 smoke 测试约 18 秒完成。另一次 200 题 MMLU-Pro 检查取得 29.5% 准确率，基线为 25.5%。这个状态改变的是开发负载，不是模型；公开的最终评测后来仍使用并发 1。",
+      "The agent kept 32768 batched tokens and 16 active sequences after smaller settings lost on quick probes. The first full development evaluation completed all 96 speed requests and 200 quality requests. It reported 31% MMLU-Pro accuracy and 84.92 generated tokens per second, although token accounting still used the earlier fallback. The launcher now checks for vLLM 0.10.2 and Transformers 4.55.4 and installs them when needed for a fresh restart.": "较小设置在快速试验中变差后，Agent 保留了 32768 个批处理 token 和 16 条活跃序列。首次完整开发评测完成了全部 96 个速度请求和 200 个质量请求。MMLU-Pro 准确率为 31%，生成吞吐报告为 84.92 token/s，但 token 统计仍采用此前的回退方式。启动器现在检查 vLLM 0.10.2 和 Transformers 4.55.4，并在全新启动缺少依赖时安装它们。",
+      "The launcher now patches vLLM chat and completion streaming so force_include_usage works even when the client omits stream_options. After restart, all four quick records contain output_tokens=2048. Reported generation throughput changes from 76.95 to 129.42 tok/s on the same seed, while request throughput changes from 0.2495 to 0.2468 req/s. The token metric now counts completion tokens instead of words; these numbers do not establish a serving speedup.": "启动器现在修补 vLLM 的 chat 和 completion 流式返回，使客户端不传 stream_options 时 force_include_usage 也能生效。重启后，四条快速测试记录都含有 output_tokens=2048。同一 seed 下，生成吞吐报告从 76.95 变为 129.42 tok/s，而请求吞吐从 0.2495 变为 0.2468 req/s。token 指标现在统计 completion token，而不是词数；这些数字不能证明服务加速。",
+      "The launcher gained CHUNKED_PREFILL_FLAG and EXTRA_VLLM_ARGS hooks for temporary trials. The agent tested scheduling, block size, context length, frontend multiprocessing and cache options. It retained the default scheduler, an 8192-token context, block size 16, 16 sequences and 32768 batched tokens after the alternatives lost on quick checks or failed to start. A full run after stale-wrapper cleanup recorded 130.47 tok/s and 29% MMLU-Pro accuracy. A later fresh restart still exposed a slow first batch, so the next change targets startup.": "启动器新增 CHUNKED_PREFILL_FLAG 和 EXTRA_VLLM_ARGS，以便临时试验。Agent 测试了调度方式、块大小、上下文长度、前端多进程和缓存选项。备选方案在快速检查中变差或无法启动后，它保留默认调度器、8192 token 上下文、块大小 16、16 条序列和 32768 个批处理 token。清理残留监管进程后的完整测试记录了 130.47 tok/s 和 29% MMLU-Pro 准确率。但随后全新重启仍暴露出首批请求较慢，所以下一步转向启动流程。",
+      "The launcher now delays /v1/models readiness until four warmup requests finish. The first warmup prompt repeats “Warmup token.” 2048 times and exceeds the 8192-token context, producing HTTP 400. The exception handler still writes the ready marker after a warmup error. The gate therefore delays readiness but does not guarantee successful warmup; the immediate repair is to shorten the prompt.": "启动器现在会等四个预热请求结束后，才让 /v1/models 返回就绪。首版预热 prompt 将“Warmup token.”重复 2048 次，超出 8192 token 上下文并产生 HTTP 400。异常处理逻辑在预热报错后仍写入就绪标记。因此，这个门控会推迟就绪，但不能保证预热成功；当前的修复是缩短 prompt。",
+      "The agent reduced the warmup prompt from 2048 repetitions to 700. After a fresh launch, quick-test median time to first token (TTFT) fell from 1.6737 s to 0.4399 s. The full development evaluation at concurrency 4 completed 96 speed requests and recorded 130.75575 tok/s. TTFT p99 was 0.41676 s, inter-token latency p99 was 9.96685 ms, and MMLU-Pro accuracy was 30.5% against a 25.5% baseline. This warmed configuration becomes the comparison point for FlashInfer.": "Agent 将预热 prompt 从重复 2048 次缩短为 700 次。全新启动后的快速测试中，首 token 延迟（TTFT）中位数从 1.6737 秒降到 0.4399 秒。并发 4 的完整开发评测完成了 96 个速度请求，记录生成吞吐 130.75575 tok/s。TTFT p99 为 0.41676 秒，token 间延迟 p99 为 9.96685 毫秒，MMLU-Pro 准确率为 30.5%，基线为 25.5%。这个预热配置成为随后比较 FlashInfer 的基准。",
+      "FlashInfer Python 0.6.9 installed, and the server log confirmed its top-k/top-p sampler was active. The full development comparison measured 130.88473 tok/s versus 130.75575 without FlashInfer. TTFT p99 increased from 0.41676 to 0.44888 s, and inter-token latency p99 increased from 9.97 to 14.97 ms. Quality passed at 30% versus 30.5% for the earlier configuration. The agent rejected the sampler because the small throughput gain came with worse latency tails and longer startup.": "FlashInfer Python 0.6.9 安装成功，服务日志确认启用了它的 top-k/top-p 采样器。完整开发对比测得 130.88473 tok/s，无 FlashInfer 时为 130.75575。TTFT p99 从 0.41676 升到 0.44888 秒，token 间延迟 p99 从 9.97 升到 14.97 毫秒。质量以 30% 准确率通过，先前配置为 30.5%。Agent 因为微小吞吐收益伴随更差尾延迟和更长启动时间，否决了该采样器。",
+      "The launcher now defaults VLLM_USE_FLASHINFER_SAMPLER to 0 and restarts without the rejected sampler. This restores the earlier sampling behavior while adding an explicit setting to the code. The selected 130.76 tok/s result still comes from the earlier full run; this edit did not repeat that measurement. Package removal is the next cleanup step.": "启动器现在默认将 VLLM_USE_FLASHINFER_SAMPLER 设为 0，并在不用该采样器的情况下重启。这样恢复了此前的采样行为，同时在代码中新增显式设置。保留的 130.76 tok/s 仍来自此前的完整测试；这次修改没有重测该结果。下一步清理是卸载软件包。",
+      "The agent removed FlashInfer and checked that it could no longer be imported. Later checks repeatedly found port 45091 closed, so the agent relaunched the same saved recipe without changing its selected metrics. The cause of the repeated exits is not recorded. The external harness also found no live server, then restarted start_server.sh successfully. Its final evaluation recorded 144.5143 tok/s and 32% MMLU-Pro accuracy at speed concurrency 1. Development used concurrency 4, so this final result is not a matched comparison with 130.76 tok/s.": "Agent 卸载了 FlashInfer，并确认无法再导入它。后续检查反复发现 45091 端口关闭，因此它重启了同一份已保存配置，没有更换所选指标。记录没有解释进程反复退出的原因。外部评测器也发现没有在线服务，随后成功重启了 start_server.sh。最终评测在速度并发 1 下记录 144.5143 tok/s 和 32% MMLU-Pro 准确率。开发阶段使用并发 4，因此最终结果不能与 130.76 tok/s 作同条件比较。",
+      "The task asks Codex to serve Mistral-7B-Instruct-v0.3 through an OpenAI-compatible streaming API. Scenario D balances latency, throughput and quality on one H100 80GB and 180GB RAM. The canonical entrypoint is start_server.sh; final evaluation restarts it in a fresh container. The task states two hours, while runner metadata permits 7500 seconds.": "任务要求 Codex 通过兼容 OpenAI 的流式 API 提供 Mistral-7B-Instruct-v0.3。Scenario D 要在一张 H100 80GB 和 180GB 内存上兼顾延迟、吞吐和质量。唯一规范入口为 start_server.sh；最终评测会在全新容器中重启它。任务规定两小时，runner 元数据则允许 7500 秒。",
+      "The agent inspected the launcher, evaluator, GPU and installed packages. Mistral weights were already cached, but the launcher had no serving engine. The environment contained Torch 2.8, CUDA 12.8 and Transformers 5.6.2. The local evaluator reads concurrency inside profile, a detail that later explains why the initial smoke tests ran serially.": "Agent 检查了启动器、评测器、GPU 和已安装依赖。Mistral 权重已缓存，但启动器没有服务引擎。环境包含 Torch 2.8、CUDA 12.8 和 Transformers 5.6.2。本地评测器读取 profile 内的并发字段，这一细节随后解释了首次 smoke 测试为何串行运行。",
+      "The agent installed vLLM 0.10.2 into the user environment and inspected its command-line options. The package command reported success. Cached Mistral weights avoided a download, allowing the agent to move directly to writing and launching the server.": "Agent 在用户环境中安装 vLLM 0.10.2，并检查了命令行选项。软件包命令报告安装成功。缓存的 Mistral 权重省去了下载步骤，使它可以直接编写并启动服务。",
+      "The agent wrote a foreground vLLM launcher for BF16 Mistral on port 45091. It set an 8192-token context, 16 sequences, 32768 batched tokens and block size 16, with prefix caching and chunked prefill enabled. The file edit succeeded. The supervised launch then failed before model loading, so this action establishes a saved configuration rather than a working server.": "Agent 编写了在 45091 端口提供 BF16 Mistral 的前台 vLLM 启动器。它设置了 8192 token 上下文、16 条序列、32768 个批处理 token 和块大小 16，并启用前缀缓存及分块 prefill。文件修改成功。但受监管启动在模型加载前失败，因此这一步得到的是已保存配置，而非可用服务。",
+      "The startup failure identified CUDA_VISIBLE_DEVICES as a GPU UUID where this vLLM path expected an integer. The agent mapped the one-GPU sandbox to device 0 and relaunched. Model inspection passed that point, but the next error came from the tokenizer.": "启动错误指出，CUDA_VISIBLE_DEVICES 使用 GPU UUID，而这条 vLLM 路径预期整数。Agent 将单 GPU 沙箱映射为设备 0 后重启。模型检查通过了这一处，但随后出现 tokenizer 错误。",
+      "After the Transformers tokenizer failed, the agent added --tokenizer-mode mistral. The supervised server became ready, and the agent ran the quick evaluator. Chat requests then failed with special_token_policy errors. Readiness alone had missed this API incompatibility.": "Transformers tokenizer 失败后，Agent 加入 --tokenizer-mode mistral。受监管服务达到就绪状态，Agent 随即运行快速评测器。但 chat 请求随后因 special_token_policy 报错失败。仅看就绪状态没有发现这个 API 兼容问题。",
+      "The agent responded to the chat errors by installing Transformers 4.55.4 and removing Mistral tokenizer mode. It restarted through the same supervised launcher. The next smoke evaluation produced generated answers, establishing that the standard tokenizer path worked with the pinned version.": "针对 chat 报错，Agent 安装了 Transformers 4.55.4，并移除 Mistral tokenizer 模式。它通过同一个受监管启动器重启。下一次 smoke 评测产生了生成答案，说明固定版本后的标准 tokenizer 路径可以工作。",
+      "The agent let the first usable smoke evaluation finish and inspected its output. All four speed requests succeeded. Quick mode still requested roughly 4096 input tokens and 2048 output tokens per request, with concurrency 1. The long serial workload explains why this small check took substantial time.": "Agent 等待首次可用的 smoke 评测结束，并检查输出。四个速度请求全部成功。快速模式仍让每个请求使用约 4096 个输入 token 和 2048 个输出 token，且并发为 1。长请求串行运行，解释了为何这次小测试仍耗时较长。",
+      "The agent enabled forced streamed usage reporting and added API defaults to the launcher. It also attempted to install the vLLM-compatible FlashInfer package. This did not yet establish a working sampler or correct token accounting: later records show missing package metadata and missing usage when stream_options is omitted.": "Agent 在启动器中启用强制流式 usage 返回，并加入 API 默认设置。它还尝试安装与 vLLM 匹配的 FlashInfer 软件包。这时尚未证明采样器可用或 token 统计正确：后续记录显示软件包元数据缺失，且省略 stream_options 时仍没有 usage。",
+      "The agent found that the evaluator ignored the top-level concurrency field and read scenario.profile instead. It added concurrency=4 there and reran the four-request smoke workload. The run completed in about 18 seconds with all requests successful. This is a workload correction and must be kept separate from engine speed improvements.": "Agent 发现评测器忽略顶层并发字段，实际读取 scenario.profile。它在该处加入 concurrency=4，重新运行四请求 smoke 负载。测试约 18 秒完成，全部请求成功。这是负载设置修正，需要与引擎提速分开。",
+      "The agent checked quality after changing the tokenizer. All 200 MMLU-Pro requests completed, and accuracy was 29.5% versus the 25.5% baseline. The ratio of 1.1569 exceeded the 0.95 threshold. It then used another quick-test seed to reduce prompt-cache reuse before scheduler comparisons; that run reported 76.95 tok/s with the old token-counting path.": "更换 tokenizer 后，Agent 检查了质量。200 个 MMLU-Pro 请求全部完成，准确率为 29.5%，基线为 25.5%。比值 1.1569 超过 0.95 门槛。随后它换用另一个快速测试 seed，以减少调度器比较中的 prompt 缓存复用；该次测试使用旧 token 统计路径，报告 76.95 tok/s。",
+      "The agent reduced the batched-token limit to 8192. A different-seed quick run had TTFT p99 of 2.994 s. On the same seed as the reference, TTFT p99 was 0.436 s versus 0.422 s, and request throughput was 0.2444 versus 0.2495 req/s. The four-request probes did not show a clear benefit, so the next trial used a 16384-token limit.": "Agent 将批处理 token 上限降到 8192。不同 seed 的快速测试出现 2.994 秒 TTFT p99。使用与参考相同的 seed 后，TTFT p99 为 0.436 秒，参考为 0.422 秒；请求吞吐为 0.2444 req/s，参考为 0.2495 req/s。这些四请求试验没有显示明确收益，因此下一次试验改用 16384 token 上限。",
+      "The agent tested a 16384-token batch limit. The quick result recorded 0.2282 req/s versus 0.2495 req/s for the reference and median TTFT near 1.705 s. The agent called this setting worse and returned to the 32768-token limit for the next trial. These small probes remain sensitive to startup and cache conditions.": "Agent 测试了 16384 token 的批处理上限。快速结果记录 0.2282 req/s，参考为 0.2495 req/s，TTFT 中位数约 1.705 秒。Agent 判断该设置更差，在下一次试验中恢复 32768 token 上限。这些小规模测试仍受启动和缓存状态影响。",
+      "The agent reduced MAX_NUM_SEQS from 16 to 4 while retaining 32768 batched tokens. The same-seed quick test fell to 0.2222 req/s and had worse time to first token. The agent rejected the lower sequence limit and kept capacity for 16 active sequences.": "Agent 在保留 32768 个批处理 token 的同时，将 MAX_NUM_SEQS 从 16 降到 4。同 seed 的快速测试下降到 0.2222 req/s，首 token 延迟也更差。Agent 否决较低序列上限，保留了 16 条活跃序列的容量。",
+      "The agent removed the trial environment overrides and restarted the canonical launcher. It explicitly retained 32768 batched tokens and 16 sequences after the smaller settings lost on quick checks. With the selected configuration live again, it proceeded to a full evaluation.": "Agent 移除了试验环境变量覆盖，并重启规范启动器。较小设置在快速测试中变差后，它明确保留了 32768 个批处理 token 和 16 条序列。选定配置重新运行后，它开始完整评测。",
+      "The full development run completed 96 speed requests and 200 quality requests. It recorded 0.231618 req/s, TTFT p99 of 1.7901 s and MMLU-Pro accuracy of 31%. The agent also checked GPU and process health while the long run progressed. The generated-token throughput still used the accounting path that would later be corrected.": "完整开发测试完成了 96 个速度请求和 200 个质量请求。记录为 0.231618 req/s、1.7901 秒 TTFT p99，以及 31% MMLU-Pro 准确率。在长测试运行期间，Agent 还检查了 GPU 和进程健康状态。生成 token 吞吐仍采用后续才会修正的统计路径。",
+      "After the full run passed, the agent added dependency checks to start_server.sh. A fresh container can now install vLLM 0.10.2 and Transformers 4.55.4 when needed. The agent checked shell syntax and endpoint readiness and retained the full-run metrics. The reported 84.92 tok/s still predates the streamed-usage repair.": "完整测试通过后，Agent 在 start_server.sh 中加入依赖检查。全新容器现在可以按需安装 vLLM 0.10.2 和 Transformers 4.55.4。Agent 检查了 shell 语法和端点就绪情况，并保留完整测试指标。报告的 84.92 tok/s 仍早于流式 usage 修复。",
+      "A continuation found no live server, so the agent restarted the selected configuration. It compared streaming requests with and without stream_options.include_usage. vLLM returned token usage only when the option was explicit, while the evaluator omitted it and counted words instead. The agent first considered a proxy, then inspected the serving code and chose a direct idempotent patch.": "一次继续执行时发现服务已不在线，Agent 因此重启选定配置。它对比了带和不带 stream_options.include_usage 的流式请求。vLLM 只在明确传入该选项时返回 token usage，而评测器不传这个选项，转而按词计数。Agent 最初考虑代理，随后检查服务代码，选择了可重复执行的直接补丁。",
+      "The agent patched both vLLM chat and completion serving from start_server.sh, then restarted. All four quick records now contained output_tokens=2048. Reported generation throughput rose from 76.95 to 129.42 tok/s, while request throughput slightly fell from 0.2495 to 0.2468 req/s. The patch corrects what the metric counts; the token-throughput jump is not evidence of faster generation.": "Agent 从 start_server.sh 修补 vLLM 的 chat 和 completion 服务后重启。四条快速测试记录现在都含有 output_tokens=2048。生成吞吐报告从 76.95 升到 129.42 tok/s，而请求吞吐从 0.2495 略降到 0.2468 req/s。补丁修正了指标统计对象；token 吞吐跃升不能证明生成变快。",
+      "The agent added CHUNKED_PREFILL_FLAG and tried disabling chunked prefill. The CLI accepted the flag, but the V1 engine still reported chunked prefill enabled. The quick test had median TTFT near 1.712 s versus 0.455 s for the reference. The agent kept the default; the log does not support treating this as a clean chunked-prefill comparison.": "Agent 加入 CHUNKED_PREFILL_FLAG，并尝试关闭分块 prefill。CLI 接受该参数，但 V1 引擎仍报告已启用分块 prefill。快速测试的 TTFT 中位数约 1.712 秒，参考为 0.455 秒。Agent 保留默认值；日志不能支持把它当作严格的分块 prefill 开关对照。",
+      "The agent added EXTRA_VLLM_ARGS so it could test settings without changing the saved defaults. Async scheduling improved quick decode throughput but raised time to first token to about 1.7 s per request. The agent considered that latency cost too high for Scenario D and moved to block-size tests.": "Agent 加入 EXTRA_VLLM_ARGS，以便不改已保存默认值就能测试设置。异步调度改善了快速测试中的解码吞吐，但把每个请求的首 token 延迟提高到约 1.7 秒。Agent 认为该延迟代价不适合 Scenario D，转而测试块大小。",
+      "The agent tried block size 32 through the temporary runtime arguments. It judged the quick benchmark worse than block size 16 and retained 16. This was a small smoke comparison, followed by a separate attempt to use FP8 for the KV cache.": "Agent 通过临时运行参数尝试块大小 32。它判断快速基准结果比块大小 16 更差，因而保留 16。这是一次小规模 smoke 对比，随后又单独尝试了 FP8 KV cache。",
+      "The agent attempted FP8 KV cache with the installed vLLM V1 engine. The configuration was rejected as unsupported in this build. No valid speed or quality result came from this trial, so the agent abandoned it and inspected another engine option.": "Agent 尝试在当前 vLLM V1 引擎中使用 FP8 KV cache。该配置因构建版本不支持而被拒绝。这次试验没有产生有效速度或质量结果，因此 Agent 放弃它，转去检查其他引擎选项。",
+      "A dependency dry run showed that SGLang 0.5.10 would replace Torch, Transformers and several kernel packages. The agent judged that change too disruptive for the remaining time and kept vLLM. No SGLang server was launched, so this is a rejected installation plan rather than an engine benchmark.": "依赖 dry run 显示，SGLang 0.5.10 会替换 Torch、Transformers 和多个 kernel 包。Agent 认为这对剩余时间来说改动过大，于是保留 vLLM。没有启动 SGLang 服务，因此这里否决的是安装方案，而不是完成了引擎基准比较。",
+      "The agent inspected compatible FlashInfer 0.3.x packages, but installation attempts encountered broken metadata in the index. It declined to add a fragile source installation to the reproducible launcher. A later attempt uses a different wheel index and package version.": "Agent 检查了兼容的 FlashInfer 0.3.x 软件包，但安装尝试遇到索引中的元数据问题。它没有在可复现启动器里加入不可靠的源码安装。后续尝试会改用另一个 wheel 索引和软件包版本。",
+      "The agent inspected GPU clock and power settings after dependency trials stalled. The H100 was already at the maximum application clocks with a 700 W power limit. It found no obvious clock-setting change to try and moved to the server context-length limit.": "依赖试验受阻后，Agent 检查了 GPU 频率和功率设置。H100 已使用最高应用频率，功率上限为 700 W。它没有找到明显可尝试的频率设置改动，转向服务上下文长度上限。",
+      "The agent reduced max_model_len from 8192 to 6400, hoping to reduce profiling or scheduling overhead while fitting the workload. The quick result was worse. It suggested a different compilation path as a possible cause, but did not isolate that cause. The final setting remained 8192.": "Agent 将 max_model_len 从 8192 降到 6400，希望在容纳负载的同时减少 profiling 或调度开销。快速结果更差。它推测可能与不同编译路径有关，但没有单独验证原因。最终设置仍为 8192。",
+      "The agent disabled frontend multiprocessing for one quick trial. The result did not improve the balanced objective, so it rejected the override. The next step restored the default runtime and measured a full workload with the corrected token accounting.": "Agent 在一次快速试验中关闭前端多进程。结果没有改善综合目标，因此它否决了该覆盖设置。下一步恢复默认运行配置，并使用修正后的 token 统计测量完整负载。",
+      "The agent restored the default V1 scheduler, block size 16, an 8192-token context and 32768 batched tokens. It retained the streamed-usage patch and ran a full evaluation. This measurement uses real completion-token counts, so its token throughput cannot be directly interpreted as a speedup over the earlier word-count result.": "Agent 恢复默认 V1 调度器、块大小 16、8192 token 上下文和 32768 个批处理 token。它保留流式 usage 补丁，并运行完整评测。这次测量使用真实 completion token 数，因此不能把 token 吞吐直接解释为相对旧词数统计结果的加速。",
+      "The agent checked the live server, saved comparisons and process tree. It found several old supervised wrappers but only one active vLLM API server. It later identified the stale wrappers as consuming CPU and planned to stop only those processes. The trace does not isolate their contribution to latency.": "Agent 检查了在线服务、已保存对比和进程树。它发现多个旧监管包装进程，但只有一个活跃的 vLLM API 服务。随后它判断残留包装进程正在占用 CPU，计划只停止这些进程。轨迹没有单独测出它们对延迟的影响。",
+      "The agent terminated the identified stale wrapper processes and confirmed that the live endpoint still responded. It then ran a quick benchmark and observed better token latency and throughput than the previous saved quick result. The agent attributed the change to reduced host contention, but there was no repeated controlled comparison.": "Agent 终止了已识别的残留包装进程，并确认在线端点仍有响应。随后快速基准的 token 延迟和吞吐优于此前保存的快速结果。Agent 将变化归因于主机竞争减少，但没有做重复受控对比。",
+      "The agent followed the improved quick result with a full development evaluation. All 96 speed requests succeeded, at 0.249643 req/s and 130.4664 tok/s. TTFT p99 was 0.41783 s, and MMLU-Pro accuracy was 29% against the 25.5% baseline. It saved these results before trying further runtime options.": "快速结果改善后，Agent 进行了完整开发评测。96 个速度请求全部成功，吞吐为 0.249643 req/s 和 130.4664 tok/s。TTFT p99 为 0.41783 秒，MMLU-Pro 准确率为 29%，基线为 25.5%。它在继续尝试运行选项之前保存了这些结果。",
+      "The agent tested --no-enable-prefix-caching through EXTRA_VLLM_ARGS. Quick-test TTFT rose above 1.6 s and request throughput fell. The agent rejected the option and kept prefix caching. Startup and cache conditions were not controlled across repeated trials, so the trace supports this local decision rather than a general claim about prefix caching.": "Agent 通过 EXTRA_VLLM_ARGS 测试 --no-enable-prefix-caching。快速测试的 TTFT 超过 1.6 秒，请求吞吐下降。它否决该选项，保留前缀缓存。没有在重复试验中控制启动和缓存状态，因此轨迹支持这次局部选择，而非关于前缀缓存的一般结论。",
+      "The agent requested max-num-partial-prefills=4. Startup returned NotImplementedError because concurrent partial prefill is unsupported with VLLM_USE_V1=1 in this build. This trial produced no benchmark result. The next action restored the default launcher settings.": "Agent 设置 max-num-partial-prefills=4。启动返回 NotImplementedError，因为这个构建在 VLLM_USE_V1=1 下不支持并发 partial prefill。这次试验没有产生基准结果。下一步恢复默认启动设置。",
+      "After restoring defaults, the agent restarted the server and ran four quick speed requests. Median TTFT was 1.6737 s, while the saved warm full run had TTFT p99 of 0.41783 s. These are different sample sizes and percentiles, but the fresh first batch was visibly slower. The agent then investigated warmup because the final evaluator also restarts the server.": "恢复默认值后，Agent 重启服务并运行四个快速速度请求。TTFT 中位数为 1.6737 秒，而保存的预热完整测试中 TTFT p99 为 0.41783 秒。两者样本量和分位数不同，但全新启动的首批请求明显更慢。由于最终评测同样会重启服务，Agent 随后调查预热方案。",
+      "The agent linked the slow first batch to the final harness requirement for a fresh restart. It inspected vLLM health and model-list routes, then chose to delay public model readiness until representative warmup requests finish. This moves the next change from scheduler tuning to startup behavior.": "Agent 将首批请求较慢的问题与最终评测要求全新重启联系起来。它检查 vLLM 健康检查和模型列表路由，随后选择等代表性预热请求结束后再公开模型就绪状态。接下来的改动因此从调度调参转向启动行为。",
+      "The agent patched /v1/models to wait for a ready marker and added four warmup requests to start_server.sh. Shell syntax passed, and it restarted through the supervised wrapper. The handler writes the ready marker even after a warmup exception. The first prompt later exceeded the context limit, so the saved gate still needed a prompt-length repair.": "Agent 修补 /v1/models，让它等待就绪标记，并在 start_server.sh 中加入四个预热请求。shell 语法检查通过后，它通过受监管包装器重启。异常处理逻辑即使在预热异常后也会写入就绪标记。首个 prompt 随后超出上下文限制，因此已保存的门控仍需修复 prompt 长度。",
+      "The first warmup prompt returned HTTP 400 because it exceeded 8192 tokens. The agent reduced repetitions from 2048 to 700 and relaunched. The fresh quick test then recorded median TTFT of 0.4399 s versus 1.6737 s before the repair. This local comparison supports keeping the shorter prompt.": "首个预热 prompt 因超过 8192 token 而返回 HTTP 400。Agent 将重复次数从 2048 降到 700，然后重启。全新快速测试的 TTFT 中位数随后为 0.4399 秒，修复前为 1.6737 秒。这个局部对比支持保留更短 prompt。",
+      "The agent measured the final warmup path with the full development workload at concurrency 4. All 96 speed requests succeeded, with 130.75575 tok/s, TTFT p99 of 0.41676 s and inter-token latency p99 of 9.96685 ms. The 200-question quality check reached 30.5% versus the 25.5% baseline and passed. These saved measurements become the reference for the next sampler trial.": "Agent 以并发 4 的完整开发负载测量最终预热路径。96 个速度请求全部成功，结果为 130.75575 tok/s、0.41676 秒 TTFT p99 和 9.96685 毫秒 token 间延迟 p99。200 题质量检查达到 30.5%，高于 25.5% 基线并通过门槛。保存的这些测量成为下一次采样器试验的参考。",
+      "With about 27 minutes shown in the continuation window, the agent revisited sampling overhead. It searched alternate FlashInfer wheel indexes for the installed Torch 2.8 and CUDA 12.8 stack. An index exposed an installable 0.6.9 package. The agent planned to keep it only if a real benchmark improved the balanced objective.": "继续执行窗口显示还剩约 27 分钟时，Agent 重新检查采样开销。它为已安装的 Torch 2.8 和 CUDA 12.8 查找其他 FlashInfer wheel 索引。一个索引提供了可安装的 0.6.9 包。Agent 计划只有真实基准改善综合目标时才保留它。",
+      "The agent installed FlashInfer Python 0.6.9 from the compatible wheel index and launched the canonical server. Installation succeeded. It then checked whether vLLM actually selected the sampler before making any performance claim.": "Agent 从兼容 wheel 索引安装 FlashInfer Python 0.6.9，并启动规范服务。安装成功。随后它先检查 vLLM 是否实际选用了该采样器，再判断性能。",
+      "The server log confirmed FlashInfer top-k/top-p sampling, with a long startup autotuning step. The quick comparison measured 130.7648 tok/s versus 130.5561 for the saved quick reference. The small difference did not settle the choice, so the agent required a full run before retaining the dependency.": "服务日志确认使用 FlashInfer top-k/top-p 采样，但启动增加了较长 autotuning 步骤。快速对比测得 130.7648 tok/s，已保存快速参考为 130.5561。微小差异不足以决定选择，因此 Agent 要求完整测试后才保留这个依赖。",
+      "The full FlashInfer run measured 130.88473 tok/s, compared with 130.75575 for the warmed configuration without it. TTFT p99 worsened from 0.41676 to 0.44888 s, and inter-token latency p99 rose from 9.97 to 14.97 ms. MMLU-Pro accuracy was 30% versus 30.5%, with both checks passing. This shows the tradeoff that the agent cited when choosing rollback.": "完整 FlashInfer 测试得到 130.88473 tok/s，无 FlashInfer 的预热配置为 130.75575。TTFT p99 从 0.41676 变差到 0.44888 秒，token 间延迟 p99 从 9.97 增至 14.97 毫秒。MMLU-Pro 准确率为 30%，参考为 30.5%，两次质量检查均通过。这些结果展示了 Agent 决定回退时引用的取舍。",
+      "The agent explicitly rejected FlashInfer because its roughly 0.1% throughput gain came with worse latency tails and longer startup. It set VLLM_USE_FLASHINFER_SAMPLER=0 in the launcher, restarted and checked endpoint readiness and shell syntax. The selected metrics remain the earlier full result at 130.76 tok/s; they were not remeasured by this rollback edit.": "Agent 明确否决了 FlashInfer，因为约 0.1% 的吞吐收益伴随更差尾延迟和更长启动时间。它在启动器中设置 VLLM_USE_FLASHINFER_SAMPLER=0，重启并检查端点就绪与 shell 语法。选定指标仍为此前完整测试的 130.76 tok/s；这次回退修改没有重新测量。",
+      "The agent uninstalled the rejected FlashInfer package so the live environment would match the intended fresh-launch recipe. It restarted, checked /v1/models and process arguments, and confirmed that importlib could no longer find flashinfer. Saved full-run metrics stayed unchanged.": "Agent 卸载了被否决的 FlashInfer 包，让在线环境与预期的全新启动配置一致。它重启后检查 /v1/models 和进程参数，并确认 importlib 已找不到 flashinfer。保存的完整测试指标保持不变。",
+      "A late smoke evaluator made no progress. GPU, process and port checks showed that the server had exited and port 45091 refused connections. This probe produced no new speed result. The next action stopped the waiting evaluator and restarted the server.": "临近结束的 smoke 评测没有进展。GPU、进程和端口检查显示服务已退出，45091 端口拒绝连接。这次探测没有产生新的速度结果。下一步停止等待中的评测器并重启服务。",
+      "The agent stopped the evaluator that was waiting on a closed port and relaunched test_server.sh. It checked the process arguments, /v1/models, launcher syntax and absence of FlashInfer. The selected full-run metrics remained intact. The local timer now reported that the budget had expired.": "Agent 停止了等待关闭端口的评测器，并重新运行 test_server.sh。它检查进程参数、/v1/models、启动器语法，以及 FlashInfer 确实不存在。选定完整测试指标未变。本地计时器此时报告预算已用尽。",
+      "Another continuation offered five minutes, although the local timer already showed expiry. The agent checked the process and endpoint and again found the server absent. Launcher syntax, file modes and selected metrics were intact. The failure concerned live process availability, not loss of the saved recipe.": "下一次继续执行提示给出五分钟，但本地计时器已显示超时。Agent 检查进程与端点，再次发现服务不在线。启动器语法、文件权限和选定指标均完整。失败涉及在线进程可用性，而非已保存配置丢失。",
+      "The agent relaunched the same canonical server through the supervised wrapper. It confirmed the intended vLLM process and a responding model endpoint, then checked shell syntax. No serving setting or selected metric changed. The record does not establish why the previous process had disappeared.": "Agent 通过受监管包装器重启了同一个规范服务。它确认了预期的 vLLM 进程和有响应的模型端点，然后检查 shell 语法。服务设置和选定指标均未改变。记录没有确定此前进程消失的原因。",
+      "In the final two-minute continuation, process and port checks again found no live server. The launcher, absence of FlashInfer and saved 130.76 tok/s result still matched the selected recipe. A historical benchmark file did not establish that the endpoint was currently available.": "在最后两分钟的继续执行中，进程和端口检查再次发现服务不在线。启动器、FlashInfer 未安装的状态，以及保存的 130.76 tok/s 结果仍与选定配置一致。历史基准文件不能证明端点当前可用。",
+      "The agent launched the canonical server once more and reported completed warmup and readiness. No new benchmark ran in this last window. The final 17-second continuation has no recorded assistant reply. The external capture later found no live server, so the final score depends on the harness restart recorded separately.": "Agent 再次启动规范服务，并报告预热完成、服务就绪。最后这个窗口没有运行新基准。最终 17 秒的继续执行提示没有记录到 assistant 回复。外部捕获随后发现没有在线服务，因此最终分数依赖另行记录的评测器重启。",
+      "The published evaluator found no live agent server, cleaned the environment and restarted start_server.sh. It completed all 96 precomputed speed requests at concurrency 1 and all 200 quality requests. Generation throughput was 144.514328 tok/s, request throughput was 0.0699851 req/s, median TTFT was 0.116410 s and median inter-token latency was 6.9155 ms. MMLU-Pro accuracy was 32% versus a 25.5% baseline, passing the 0.95 ratio threshold. Development used concurrency 4, so the final and development throughput values are not a matched speed comparison.": "公开评测器发现没有在线 agent 服务，清理环境后重启了 start_server.sh。它以并发 1 完成全部 96 个预生成速度请求，并完成全部 200 个质量请求。生成吞吐为 144.514328 tok/s，请求吞吐为 0.0699851 req/s，TTFT 中位数为 0.116410 秒，token 间延迟中位数为 6.9155 毫秒。MMLU-Pro 准确率为 32%，基线为 25.5%，通过 0.95 比值门槛。开发阶段使用并发 4，因此最终和开发吞吐不是同条件速度比较。",
+      "Published run_meta identifies Codex with gpt-5.5-high, Scenario D, a two-hour budget and 02:05:00 elapsed time. Its invalid_or_reward_hack flag is false. The recorded judgments say “no contamination detected” and “only allowed use detected.” These are the dataset authors’ archived checks, separate from the speed and quality measurements.": "公开 run_meta 标明使用 Codex 和 gpt-5.5-high，任务为 Scenario D，预算两小时，耗时 02:05:00。invalid_or_reward_hack 标记为 false。记录的判断为“no contamination detected”和“only allowed use detected”。这是数据集作者保存的检查，与速度和质量测量分开。",
+      "The agent read the task and inspected the launcher, benchmark scripts, GPU and Python stack. The task requires a reproducible Mistral server on one H100 within two hours. Weights were cached, but start_server.sh was empty. After checking the evaluator and available packages, the agent installed vLLM 0.10.2 as its first serving engine.": "Agent 阅读任务并检查启动器、基准脚本、GPU 和 Python 环境。任务要求两小时内在一张 H100 上构建可复现的 Mistral 服务。权重已缓存，但 start_server.sh 还是空的。检查评测器和可用软件包后，Agent 安装 vLLM 0.10.2 作为首个服务引擎。",
+      "The agent tested smaller batch-token limits and fewer active sequences, one setting at a time. The 8192-token trial gave no clear benefit; 16384 tokens and four sequences lost request throughput or first-token latency on quick probes. It restored 32768 batched tokens and 16 sequences before a full evaluation. Each quick trial used only four requests, with startup and cache conditions limiting the comparison.": "Agent 一次改变一个设置，测试较小批处理 token 上限和更少活跃序列。8192 token 试验没有明确收益；16384 token 和四序列设置在快速试验中损失请求吞吐或首 token 延迟。完整评测前，它恢复 32768 个批处理 token 和 16 条序列。每次快速试验仅有四个请求，启动和缓存状态限制了可比性。",
+      "The restored defaults completed a full development evaluation: 96 speed requests, 200 quality requests and 31% MMLU-Pro accuracy. The agent then made the launcher install its pinned runtime dependencies when necessary. This created a working restart recipe, but the reported 84.92 tok/s still used token accounting that was later found incomplete.": "恢复默认值后完成了一次完整开发评测：96 个速度请求、200 个质量请求，以及 31% MMLU-Pro 准确率。Agent 随后让启动器可以按需安装固定版本的运行依赖。这样得到可工作的重启配置，但 84.92 tok/s 报告值仍使用后续被发现有问题的 token 统计。",
+      "The agent investigated why generated outputs lacked token counts. Plain streaming requests omitted stream_options, which bypassed vLLM’s forced-usage flag. A launcher-applied patch fixed both serving paths and made all four quick records report 2048 completion tokens. Reported tok/s rose while request throughput barely changed. The change repairs the metric definition rather than demonstrating faster serving.": "Agent 调查了生成输出为何缺少 token 数。普通流式请求省略 stream_options，绕过了 vLLM 的强制 usage 开关。启动器应用的补丁修复两个服务路径，让四条快速记录都返回 2048 个 completion token。报告的 tok/s 上升，但请求吞吐几乎未变。该变化修复的是指标定义，而不是证明服务加速。",
+      "The agent added launcher hooks for temporary chunked-prefill and scheduling trials. The chunked-prefill-off flag did not cleanly disable the V1 engine behavior, and its quick latency worsened. Async scheduling improved decode throughput but raised first-token latency to about 1.7 s. The agent retained the default behavior for the balanced task.": "Agent 在启动器中加入钩子，以临时测试分块 prefill 和调度方式。关闭分块 prefill 的参数没有真正关闭 V1 引擎行为，快速测试延迟也变差。异步调度改善了解码吞吐，却将首 token 延迟提高到约 1.7 秒。对于综合任务，Agent 保留默认行为。",
+      "The agent explored several alternatives without changing the saved default recipe. Block size 32, a 6400-token context and disabled frontend multiprocessing lost on quick checks. FP8 KV cache failed compatibility checks; an SGLang dependency dry run and FlashInfer package errors prevented those early installations. GPU clock settings offered no obvious change. The agent returned to the default vLLM configuration and measured a full run with corrected token counts.": "Agent 在不更改已保存默认配置的情况下探索了多个备选方案。块大小 32、6400 token 上下文和关闭前端多进程都在快速检查中变差。FP8 KV cache 未通过兼容检查；SGLang 依赖 dry run 和 FlashInfer 软件包错误阻止了早期安装。GPU 频率设置也没有明显可改之处。Agent 返回默认 vLLM 配置，用修正后的 token 数进行完整测试。",
+      "Process inspection found stale supervised wrappers beside the active vLLM server. The agent stopped only the stale processes and verified that the endpoint stayed available. The next quick result improved, and a full evaluation recorded 130.47 tok/s with TTFT p99 below 0.42 s. Reduced CPU contention is the agent’s explanation; the trace contains no repeated experiment that isolates this cause.": "进程检查发现，活跃 vLLM 服务旁还有残留监管包装进程。Agent 只停止残留进程，并确认端点仍可用。下一次快速结果改善，完整评测记录 130.47 tok/s，TTFT p99 低于 0.42 秒。CPU 竞争减少是 Agent 的解释；轨迹没有通过重复实验单独验证该原因。",
+      "Disabling prefix caching worsened the quick latency, and concurrent partial prefill failed to start in the V1 engine. The agent restored defaults. A fresh quick test then had median TTFT of 1.6737 s despite the stronger saved warm full result. That discrepancy shifted attention from cache flags to warming the server before final evaluation.": "关闭前缀缓存让快速测试延迟变差，并发 partial prefill 则在 V1 引擎中无法启动。Agent 恢复默认值。虽然保存的预热完整结果较好，全新快速测试的 TTFT 中位数仍达到 1.6737 秒。这个差异让注意力从缓存参数转向最终评测之前的服务预热。",
+      "The agent connected the slow first batch with the final evaluator’s fresh restart. It chose to hold /v1/models readiness until four warmup requests completed and implemented that path in start_server.sh. The first prompt exceeded the context limit. The exception handler still opened readiness, so prompt length and the limits of the gate needed explicit attention.": "Agent 将首批请求缓慢与最终评测器全新重启联系起来。它选择等四个预热请求完成后才让 /v1/models 就绪，并在 start_server.sh 中实现这一流程。首个 prompt 超出上下文限制。异常处理逻辑仍会开放就绪状态，因此需要明确修复 prompt 长度并理解门控的局限。",
+      "The agent revisited FlashInfer after finding a wheel index compatible with Torch 2.8 and CUDA 12.8. Version 0.6.9 installed successfully, unlike the earlier metadata-blocked attempts. It launched the canonical server to verify sampler selection, with retention conditional on a full performance comparison.": "找到兼容 Torch 2.8 和 CUDA 12.8 的 wheel 索引后，Agent 重新尝试 FlashInfer。0.6.9 版本成功安装，与此前因元数据受阻的尝试不同。它启动规范服务来验证采样器选择，是否保留仍取决于完整性能对比。",
+      "FlashInfer activated successfully, but its quick throughput gain was small and startup autotuning was long. The full run improved throughput by about 0.1% while worsening TTFT p99 and inter-token latency p99. Both quality checks passed. The agent cited the latency and startup costs, disabled FlashInfer in the launcher and kept the earlier full development result.": "FlashInfer 成功启用，但快速吞吐收益较小，启动 autotuning 也较长。完整测试将吞吐提高约 0.1%，却使 TTFT p99 和 token 间延迟 p99 变差。两次质量检查均通过。Agent 根据延迟与启动成本，在启动器中禁用了 FlashInfer，并保留此前的完整开发结果。",
+      "Late checks repeatedly found that the selected server process had disappeared. One smoke evaluator waited on a closed port and produced no new metrics. The agent stopped that probe and repeatedly restarted the unchanged canonical recipe, reporting readiness after each recovery. The cause of the exits remains unknown. The final archived metrics still refer to the earlier full run, not to these restarts.": "末期检查反复发现所选服务进程已经消失。一次 smoke 评测器等待关闭的端口，没有产生新指标。Agent 停止该探测，并多次重启未改动的规范配置，每次恢复后都报告就绪。进程退出原因仍然未知。最终保存的指标仍指向此前完整测试，而非这些重启。",
+      "The external harness found no surviving agent server, then restarted the canonical launcher in a clean environment. It completed 96 speed requests at concurrency 1 and 200 MMLU-Pro requests, recording 144.51 tok/s and 32% accuracy. Development had used concurrency 4. The separate published policy checks were unflagged; they do not turn these two protocols into a matched performance comparison.": "外部评测器发现没有存活的 agent 服务，随后在干净环境中重启规范启动器。它以并发 1 完成 96 个速度请求，并完成 200 个 MMLU-Pro 请求，记录 144.51 tok/s 和 32% 准确率。开发阶段使用并发 4。另行公开的策略检查没有标记问题；这并不会让两种协议成为同条件性能比较。",
+      "Stub launcher has no engine for the required Mistral server.": "占位启动器没有所需 Mistral 服务的推理引擎。",
+      "Codex must build a restartable server on one H100 and balance latency, throughput and quality.": "Codex 要在一张 H100 上构建可重启服务，并兼顾延迟、吞吐和质量。",
+      "Development concurrency": "开发并发",
+      "Development concurrency changes from one to four after a profile repair.": "修复 profile 后，开发并发从 1 改为 4。",
+      "The local evaluator ignored the top-level field. The final evaluator later uses concurrency one.": "本地评测器忽略顶层字段。最终评测器后来使用并发 1。",
+      "Dependency pins": "依赖固定",
+      "Dependency pins make the working launcher install its required runtime.": "依赖固定让可用启动器能够安装所需运行环境。",
+      "The first full run passed quality at 31%, but its token count still used a fallback.": "首次完整测试以 31% 准确率通过质量门槛，但 token 计数仍用回退方式。",
+      "Token accounting changes reported throughput from 77 to 129 tok/s.": "Token 计数使报告吞吐从 77 变为 129 tok/s。",
+      "Completion counts replace word counts. Request throughput barely changes, so this is not a speedup.": "Completion token 替代词数。请求吞吐几乎不变，因此这不是加速。",
+      "Runtime trials": "运行试验",
+      "Runtime trials retain defaults, but a fresh restart exposes slow first tokens.": "运行试验保留默认值，但全新重启暴露出首 token 较慢。",
+      "Quick alternatives lose or fail. The next change targets startup rather than another scheduler setting.": "快速备选方案变差或失败。下一步针对启动流程，而不是再换调度设置。",
+      "Warmup gate opens even when its oversized prompt fails.": "预热门控在过长 prompt 失败后仍会开放。",
+      "The first prompt returns HTTP 400. The exception path still writes the ready marker.": "首次 prompt 返回 HTTP 400，异常路径仍写入就绪标记。",
+      "Shorter warmup reduces fresh launch median TTFT from 1.67 to 0.44 seconds.": "缩短预热使全新启动 TTFT 中位数从 1.67 降至 0.44 秒。",
+      "The full development run then records 130.76 tok/s and 30.5% quality at concurrency four.": "随后完整开发测试在并发 4 下记录 130.76 tok/s 和 30.5% 准确率。",
+      "Sampler rollback restores earlier behavior while retaining historical full metrics.": "采样回退恢复先前行为，同时保留历史完整指标。",
+      "The launcher explicitly disables FlashInfer. The selected 130.76 tok/s is not remeasured here.": "启动器显式禁用 FlashInfer。这里没有重测选定的 130.76 tok/s。",
+      "Restarted evaluation": "重启评测",
+      "Restarted evaluation passes despite repeated endpoint loss during handoff.": "重启评测通过，尽管交接时端点反复消失。",
+      "The external harness records 144.51 tok/s at concurrency one, unlike development concurrency four.": "外部评测器在并发 1 下记录 144.51 tok/s；开发并发为 4。",
+      "Wrapper cleanup precedes a better full result, but causality remains unisolated.": "包装器清理后完整结果更好，但尚未单独验证因果。",
+      "The agent removes stale supervisors while keeping the live server. A full run reaches 130.47 tok/s.": "Agent 移除残留监管进程并保留在线服务。完整测试达到 130.47 tok/s。",
+      "Chunking flag": "分块参数",
+      "Chunking flag is accepted, but the engine still reports chunked prefill enabled.": "分块参数被接受，但引擎仍报告启用分块 prefill。",
+      "Quick median TTFT worsens to 1.71 s. This is not a clean on versus off comparison.": "快速 TTFT 中位数变差到 1.71 秒。这不是严格的开关对比。",
+      "Fresh startup records 1.67 seconds median TTFT, revealing a slow first batch.": "全新启动的 TTFT 中位数为 1.67 秒，暴露出首批较慢。",
+      "The saved warm full run has 0.42 s p99. Different sample sizes and percentiles limit comparison.": "保存的预热完整测试 p99 为 0.42 秒。样本量与分位数不同，限制了比较。",
+      "Published checks are unflagged; recorded elapsed time is 02:05:00.": "公开检查未标记问题；记录耗时为 02:05:00。",
+      "The task budget is two hours. Runner metadata allows 7500 seconds.": "任务预算两小时。Runner 元数据允许 7500 秒。",
+      "Codex with GPT-5.5 High builds a Mistral-7B-Instruct-v0.3 server for InferenceBench Scenario D on one H100 80GB, 180GB RAM and a two-hour budget. It repairs GPU and tokenizer compatibility, fixes token accounting, and warms the server before readiness. FlashInfer adds little throughput and worsens latency tails, so the agent disables it. The selected development run reaches 130.76 tok/s at concurrency four. Repeated endpoint loss remains unexplained. The external harness restarts the saved launcher and records 144.51 tok/s with 32% MMLU-Pro accuracy at concurrency one. The two throughput results use different protocols.": "Codex 使用 GPT-5.5 High，在一张 H100 80GB、180GB 内存和两小时预算下，为 InferenceBench Scenario D 构建 Mistral-7B-Instruct-v0.3 服务。它修复 GPU 与 tokenizer 兼容性、token 计数，并在就绪前预热。FlashInfer 几乎不提高吞吐却恶化尾延迟，因此被禁用。选定开发测试在并发 4 下达到 130.76 tok/s。端点反复消失的原因未明。外部评测器重启保存的启动器，在并发 1 下记录 144.51 tok/s 和 32% MMLU-Pro 准确率。两个吞吐结果采用不同协议。"
     }
   }
 }

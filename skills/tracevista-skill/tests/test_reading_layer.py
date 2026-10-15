@@ -73,6 +73,25 @@ class ReadingLayerTest(unittest.TestCase):
         self.assertEqual(graph['actions'][0]['move'], 'insight')
         self.assertEqual(len(graph['links']), 1)
 
+    def test_summary_revision_preserves_evidence_and_structure(self):
+        graph = compile_graph(*with_layer())
+        before = copy.deepcopy(graph)
+        summary = ('The agent applied the patch. The recorded hash changed from A to B. '
+                   'No correctness result is present in these records.')
+        apply_patch(graph, {'entities': {'a': {'summary': summary}}})
+        self.assertEqual(graph['actions'][0]['summary'], summary)
+        before['actions'][0]['summary'] = summary
+        self.assertEqual(graph, before)
+
+    def test_summary_revision_rejects_empty_or_nontext_values(self):
+        for value in ('', '  ', None, 42, {'text': 'nested'}):
+            with self.subTest(value=value):
+                graph = compile_graph(*with_layer())
+                before = copy.deepcopy(graph)
+                with self.assertRaisesRegex(SystemExit, 'summary must be nonempty text'):
+                    apply_patch(graph, {'entities': {'a': {'summary': value}}})
+                self.assertEqual(graph, before)
+
 
 if __name__ == '__main__':
     unittest.main()

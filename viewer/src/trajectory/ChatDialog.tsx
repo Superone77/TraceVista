@@ -1,6 +1,8 @@
 import { evidenceSelectionNodes } from './storyDisclosure';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { moveColors, type Entity, type Graph } from './model';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Entity, Graph } from './model';
+import ChatAnswer, { ChatText } from './ChatAnswer';
+import { explanationReferences } from './explanations';
 import { buildChat, citations, contextLabels, type ChatTurn, type ContextOptions } from './chat';
 import { useLang } from './i18n';
 import ProviderPicker from './ProviderPicker';
@@ -15,11 +17,6 @@ const store = {
   set(key: string, value: unknown) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable; the dialog still works for this page */ } },
 };
 const newId = () => Math.random().toString(36).slice(2, 10);
-
-/** Inline **bold** only; everything else stays literal text. */
-function Rich({ text }: { text: string }) {
-  return <>{text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => part.startsWith('**') && part.endsWith('**') ? <b key={i}>{part.slice(2, -2)}</b> : part)}</>;
-}
 
 export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, onCited, close }: {
   graph: Graph; focus: Entity | null; clearFocus: () => void; jump: (id: string) => void; evidence: (eventId: string) => void;
@@ -102,7 +99,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const ids = useMemo(() => new Set([...graph.states, ...graph.branches, ...graph.actions].map(e => e.id)), [graph]);
   const eventIds = useMemo(() => new Set(graph.timeline.timeline.map(e => e.id)), [graph]);
   const moves = useMemo(() => new Map([...graph.branches, ...graph.actions].filter(e => e.move).map(e => [e.id, e.move!])), [graph]);
-  const known = (id: string) => ids.has(id) ? 'node' as const : eventIds.has(id) ? 'event' as const : null;
+  const known = useCallback((id: string) => ids.has(id) ? 'node' as const : eventIds.has(id) ? 'event' as const : null, [ids, eventIds]);
 
   useEffect(() => { store.set(BUDGETS_KEY, restoreInputBudgets(inputBudgets)); }, [inputBudgets]);
   useEffect(() => { store.set(historyKey, turns.map(t => ({ ...t }))); }, [turns, historyKey]);
@@ -171,7 +168,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       } else {
         await streamChat(settings, system, messages, receive, controller.signal, setStatus, budget.outputTokens);
       }
-      const cites = [...new Set(citations(text, known).flatMap(p => 'id' in p && p.kind !== 'unknown' ? [p.id] : []))];
+      const cites = [...new Set([...citations(text, known).flatMap(p => 'id' in p && p.kind !== 'unknown' ? [p.id] : []), ...explanationReferences(text, known)])];
       update({ text, cites });
     } catch (e) {
       update({ text, error: controller.signal.aborted ? typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped' : safeError(e, settings) });
@@ -231,10 +228,9 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
         {['Why was the final version chosen?', 'Which evidence changed the agent’s direction?', 'Which conclusions are supported by independent checks?'].map(q => tr(q)).map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
       {turns.map(t => <div key={t.id} className={`chat-turn ${t.role}`}>
         {t.role === 'user' && t.focus && <small>Focus <button className="cite node" onClick={() => jump(t.focus!)}>{t.focus}</button></small>}
-        <div className="chat-text">{citations(t.text, known).map((p, i) => 'text' in p ? <Rich key={i} text={p.text} />
-          : p.kind === 'node' ? <button key={i} className="cite node" style={moves.has(p.id) ? { '--move': moveColors[moves.get(p.id)!] } as CSSProperties : undefined} onClick={() => jump(p.id)}>{p.id}</button>
-          : p.kind === 'event' ? <button key={i} className="cite event" onClick={() => evidence(p.id)}>{p.id.split(':').pop()}</button>
-          : <span key={i} className="cite unknown" title="This ID is not present in the records">{p.id}?</span>)}
+        <div className="chat-text">{t.role === 'assistant'
+          ? <ChatAnswer text={t.text} streaming={!!busy && t.id === turns.at(-1)?.id} known={known} jump={jump} evidence={evidence} moves={moves} />
+          : <ChatText text={t.text} known={known} jump={jump} evidence={evidence} moves={moves} />}
           {t.role === 'assistant' && !t.text && !t.error && <span className="chat-wait" role="status" aria-live="polite">{progressText} {waitSeconds}s</span>}</div>
         {t.error && <div className="chat-error">{t.error}</div>}
         {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextStrategy === 'smart' ? 'Smart context · ' : ''}{t.contextMode ? contextLabels[t.contextMode] : 'Legacy context'} · {t.context.filter(c => c.event).length} original records sent{t.compression === 'excerpts' ? ' (historical excerpts)' : ''}{t.cites?.length ? ` · ${t.cites.length} citations` : ''}</small>}

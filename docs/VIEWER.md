@@ -10,7 +10,9 @@
 
 本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
 
-打开轨迹后仅显示顶部工具栏，品牌、任务标题和副标题不占用画布空间（标签页仍保留任务名称）。顶部保留四层快捷按钮、Details 和 Chat；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。界面使用深浅灰色，轨迹内部的行为、状态和连线保留语义色；详情里的卡片与标签沿用语义色，追问区的警告与错误用红色提示。画布不再显示状态统计与手势提示条。
+打开轨迹后仅显示顶部工具栏，品牌、任务标题和副标题不占用画布空间（标签页仍保留任务名称）。顶部保留四层快捷按钮、Story、Play 和 Chat；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。点卡片或 Chat 引用时，Story 与 Map 同步定位。界面使用深浅灰色，轨迹内部保留语义色，追问区的警告与错误用红色提示。
+
+**Play** 按状态、工作阶段和关键动作带读，支持暂停、前后跳转、调速和打开原文；退出恢复原来的视图。Chat 根据问题优先生成带证据链接的流程图或对比表。转换 skill 的说明文字采用操作、观察、决定的清晰表达，展开 Story 后可读完整解释。用法和格式见 [Explanations and playback](EXPLANATIONS-AND-PLAYBACK.md)。
 
 内置示例：`?example=pi-agent-lora`；由 `viewer/public/examples/index.json` 登记。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。

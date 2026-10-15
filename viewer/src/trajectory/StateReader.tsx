@@ -13,6 +13,9 @@ import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import StoryRail, { type Depth } from './StoryRail';
+import PlaybackControls from './PlaybackControls';
+import { playbackSteps, playbackAnchor, type PlaybackDepth } from './playback';
+import { usePlayback } from './usePlayback';
 import { eventDestination, revealStoryEvidence, expandStoryToTier, revealStoryPath } from './storyDisclosure';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
@@ -121,9 +124,10 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   }, [chatOpen, journeyOpen, measureChat, resizeChat]);
   const [cited, setCited] = useState<Set<string>>(() => new Set());
   const pendingJump = useRef<{ id: string; desired?: Tier; revealInStory: boolean } | null>(null);
+  const pausePlayback = useRef<() => void>(() => {});
   const revealStory = useCallback((id: string) => setStoryExpanded(previous => revealStoryPath(original, previous, id)), [original]);
-  const inspect = useCallback((id: string) => { overviewPinned.current = false; setFocusEvent(null); revealStory(id); setSelected(id); journeyTucked.current = false; setJourneyOpen(true); }, [revealStory]);
-  const expand = useCallback((foldId: string) => setOpenFolds(s => new Set(s).add(foldId)), []);
+  const inspect = useCallback((id: string) => { pausePlayback.current(); overviewPinned.current = false; setFocusEvent(null); revealStory(id); setSelected(id); journeyTucked.current = false; setJourneyOpen(true); }, [revealStory]);
+  const expand = useCallback((foldId: string) => { pausePlayback.current(); setOpenFolds(s => new Set(s).add(foldId)); }, []);
   const layouts = useMemo(() => Object.fromEntries((['states', 'branches', 'actions', 'raw'] as Tier[]).map(t => [t, layoutGraph(graph, t, stateMode, { fold: decisionsOnly, openFolds })])) as Record<Tier, ReturnType<typeof layoutGraph>>, [graph, stateMode, decisionsOnly, openFolds]);
   const layout = layouts[tier];
   const decisions = useMemo(() => keyDecisions(graph), [graph]);
@@ -307,7 +311,9 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     }
     flyTo(next, view);
   }, [layouts, flyTo, revealStory]);
+  const enter = useCallback((id: string, desired?: Tier) => { pausePlayback.current(); moveTo(id, desired); }, [moveTo]);
   const jump = useCallback((id: string) => {
+    pausePlayback.current();
     setFocusEvent(null);
     journeyTucked.current = false; setJourneyOpen(true);
     moveTo(id, graph.actions.some(action => action.id === id) ? 'actions' : undefined);
@@ -315,6 +321,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   const evidence = useCallback((eventId: string) => {
     const target = eventDestination(original, eventId, selected);
     if (!target) return;
+    pausePlayback.current();
     journeyTucked.current = false; setJourneyOpen(true);
     setFocusEvent(eventId); setFocusRevision(revision => revision + 1);
     if (target.node) moveTo(target.node, target.action ? 'raw' : undefined);
@@ -331,7 +338,67 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     flyTo('states', { x: box.width / 2 - (n.x + n.width / 2) * zoom, y: 58 - n.y * zoom, zoom });
   }, [layouts, flyTo, rf, revealStory]);
   // The story's depth decides the map's: the outcome on the overview, a step at its phases, a phase at its actions, an action at its records.
-  const fly = useCallback((id: string, depth: Depth) => { if (depth === 'states') flyToState(id); else moveTo(id, depth); }, [flyToState, moveTo]);
+  const fly = useCallback((id: string, depth: Depth) => { pausePlayback.current(); if (depth === 'states') flyToState(id); else moveTo(id, depth); }, [flyToState, moveTo]);
+  const playbackSnapshot = useRef<{
+    viewport: Viewport; tier: Tier; selected: string | null; expanded: Set<string>; folds: Set<string>;
+    journeyOpen: boolean; focusEvent: string | null; proposed: boolean; pinned: boolean; scrollTop: number; stateMode: StateMode; decisionsOnly: boolean;
+  } | null>(null);
+  const restorePlayback = useRef(false);
+  const [storyRestore, setStoryRestore] = useState<{ top: number; revision: number } | null>(null);
+  const [playbackDepth, setPlaybackDepth] = useState<PlaybackDepth>('states');
+  const steps = useMemo(() => playbackSteps(graph, phaseFlow(graph), playbackDepth), [graph, playbackDepth]);
+  const clearStoryRestore = useCallback(() => setStoryRestore(null), []);
+  const playback = usePlayback(steps, {
+    begin: () => {
+      playbackSnapshot.current = { viewport: rf.getViewport(), tier, selected, expanded: new Set(storyExpanded), folds: new Set(openFolds),
+        journeyOpen, focusEvent, proposed, stateMode, decisionsOnly, pinned: overviewPinned.current,
+        scrollTop: canvasRef.current?.parentElement?.querySelector('.story-body')?.scrollTop ?? 0 };
+      journeyTucked.current = false; setJourneyOpen(true);
+    },
+    visit: step => {
+      pendingJump.current = null;
+      setFocusEvent(null);
+      // Keep the current path readable without accumulating every expanded raw record.
+      const expanded = step.kind === 'state' ? new Set<string>() : revealStoryPath(original, new Set(), step.node);
+      if (step.kind === 'branch') expanded.delete(step.node);
+      if (step.kind === 'action' && playbackDepth === 'raw') expanded.add(step.node);
+      if (step.kind === 'state') flyToState(step.node);
+      else moveTo(step.node, step.kind === 'branch' ? 'branches' : playbackDepth === 'raw' ? 'raw' : 'actions', false);
+      setStoryExpanded(expanded);
+    },
+    end: () => {
+      const saved = playbackSnapshot.current;
+      if (!saved) return;
+      restorePlayback.current = true;
+      pendingJump.current = null; pendingFlight.current = null; pendingViewport.current = null;
+      window.clearTimeout(flightTimer.current); flying.current = false;
+      overviewPinned.current = false;
+      journeyTucked.current = false;
+      setOpenFolds(saved.folds); setStoryExpanded(saved.expanded); setSelected(saved.selected);
+      setFocusEvent(saved.focusEvent); setProposed(saved.proposed); setJourneyOpen(saved.journeyOpen);
+      setStateMode(saved.stateMode); setDecisionsOnly(saved.decisionsOnly);
+      tierRef.current = saved.tier; setTier(saved.tier);
+      setStoryRestore(previous => saved.journeyOpen ? { top: saved.scrollTop, revision: (previous?.revision ?? 0) + 1 } : null);
+    },
+  });
+  const changePlaybackDepth = (depth: PlaybackDepth) => {
+    if (depth === playbackDepth) return;
+    const next = playbackSteps(graph, phaseFlow(graph), depth);
+    if (playback.active) playback.seek(playbackAnchor(next, playback.step), next.length);
+    setPlaybackDepth(depth);
+  };
+  pausePlayback.current = playback.pause;
+  useLayoutEffect(() => {
+    if (!restorePlayback.current || playback.active) return;
+    const saved = playbackSnapshot.current;
+    if (!saved) return;
+    // Wait for the restored panels/layout to settle before putting the camera back.
+    const frame = requestAnimationFrame(() => {
+      void rf.setViewport(saved.viewport); overviewPinned.current = saved.pinned;
+      restorePlayback.current = false; playbackSnapshot.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [playback.active, layouts, tier, rf]);
   // Cards that appear with a new tier fade in where they land, so a tier change reads as the same map opening up.
   useEffect(() => {
     const el = canvasRef.current; if (!el) return;
@@ -374,14 +441,14 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       position: { x: p.x - (parent?.x ?? 0), y: p.y - (parent?.y ?? 0) }, selected: p.id === selected,
       width: p.width, height: p.height, zIndex: p.kind === 'state' ? 0 : 3,
       data: { p, tier, observations: observationsFor(graph, p.id), actions: related, branches: graph.branches.filter(b => b.state === p.id).length,
-        records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter: moveTo, inspect,
+        records: p.kind === 'action' ? recordsForAction(graph, p.item as Action) : [], ordinal: ordinals.get(p.id) ?? 0, tools: [...new Set(p.item.events.map(id => eventMap.get(id)?.tool).filter((t): t is string => !!t))].slice(0, 2), enter, inspect,
         ladder: entity ? ladders.get(entity.id) ?? null : null, quotes: entity?.ladder?.abstract ?? [], landmarks: landmarks.get(p.id) ?? [],
         offMain: sideLine && !main.has(p.kind === 'state' ? p.id : (p.item as Branch | Action | FoldItem).state), delivered: p.id === delivered, decisionNo: decisionNo.get(p.id), mix: p.kind === 'state' ? workMix(related) : [], multiActor,
         flowNo: p.kind === 'branch' ? flow.get(p.id)?.n : undefined, why: why.get(p.id), dim: !!focus && p.kind !== 'state' && !focus.has(p.id),
         fingerprint: toolFingerprint(group.flatMap(a => recordsForAction(graph, a))), routine: hasReading && p.kind === 'branch' && !(p.item as Branch).move, expand, evidence, focusEvent, focusRevision, cited: cited.has(p.id) },
       style: { width: p.width, height: p.height }, draggable: false,
     };
-  }), [projected, layout, graph, selected, tier, eventMap, moveTo, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus, focusEvent, focusRevision]);
+  }), [projected, layout, graph, selected, tier, eventMap, enter, inspect, ladders, landmarks, hasReading, expand, evidence, cited, sideLine, main, delivered, decisionNo, ordinals, multiActor, flow, why, focus, focusEvent, focusRevision]);
   const edges = useMemo<Edge[]>(() => {
     const rects = new Map<string, Rect>(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, width: n.width, height: n.height }]));
     const cards = projected.nodes.filter(n => n.kind !== 'state').map(n => n.id);
@@ -453,6 +520,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     return out;
   }, [projected, layout, tier, selected, hovered, focus, sideLine, main, t]);
   function showTier(next: Tier) {
+    playback.pause();
     setStoryExpanded(expandStoryToTier(graph, next));
     if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
@@ -481,27 +549,30 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
           <button onClick={onHome}>{t('Home')}</button>
         </div>
         <div className="viewer-menu-section">
-          <button onClick={() => { overview(true); dismiss(); }}><span>{t('Fit view')}</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
-          <label className="viewer-menu-field">{t('State relationships')}<select aria-label={t('State relationships')} value={stateMode} onChange={e => { overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">{t('Version tree')}</option><option value="chronology">{t('Execution order')}</option></select></label>
+          <button onClick={() => { playback.pause(); overview(true); dismiss(); }}><span>{t('Fit view')}</span><span ref={zoomReadout} className="zoom-readout">44%</span></button>
+          <label className="viewer-menu-field">{t('State relationships')}<select aria-label={t('State relationships')} value={stateMode} onChange={e => { playback.pause(); overviewPinned.current = true; setStateMode(e.target.value as StateMode); }}><option value="lineage">{t('Version tree')}</option><option value="chronology">{t('Execution order')}</option></select></label>
           <label className="viewer-menu-field">{t('Canvas input')}<select aria-label={t('Canvas input mode')} value={wheelPans ? 'trackpad' : 'mouse'} onChange={e => setWheelPans(e.target.value === 'trackpad')}><option value="trackpad">{t('Trackpad')}</option><option value="mouse">{t('Mouse')}</option></select></label>
         </div>
         <div className="viewer-menu-section">
-          {hasReading && <label className="viewer-menu-check" title={t('Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions')}><input type="checkbox" checked={decisionsOnly} onChange={e => { setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />{t('Decisions only')}</label>}
+          {hasReading && <label className="viewer-menu-check" title={t('Fold runs of three or more routine actions; keep decisions, supporting observations, and state-changing actions')}><input type="checkbox" checked={decisionsOnly} onChange={e => { playback.pause(); setDecisionsOnly(e.target.checked); setOpenFolds(new Set()); }} />{t('Decisions only')}</label>}
           <label className="viewer-menu-check"><input type="checkbox" checked={showLinks} onChange={e => setShowLinks(e.target.checked)} />{t('Cross-branch links')}</label>
           <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />{t('Untried ideas')}</label>
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
       </>}</ViewerMenu>
-      <button aria-pressed={journeyOpen} onClick={() => { journeyTucked.current = false; setJourneyOpen(open => !open); }}>{t('Story')}</button></div>
+      <button aria-pressed={journeyOpen} onClick={() => { playback.pause(); journeyTucked.current = false; setJourneyOpen(open => !open); }}>{t('Story')}</button>
+      <button aria-label={t(playback.playing ? 'Pause playback' : 'Play story')} aria-pressed={playback.active} onClick={playback.playing ? playback.pause : playback.play} disabled={!steps.length}>{playback.playing ? 'Ⅱ' : '▶'} {t(playback.playing ? 'Pause' : 'Play')}</button></div>
       <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
       <div className="view-options"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><LangToggle /></div>
     </div>
-    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={setStoryExpanded} onFly={fly}
-      onCite={id => graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id)} onEvidence={evidence}
+    <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={update => { playback.pause(); setStoryExpanded(update); }} onFly={fly}
+      playbackNode={playback.step?.node} restoreScroll={storyRestore} onScrollRestored={clearStoryRestore}
+      onCite={id => { playback.pause(); graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id); }} onEvidence={evidence}
       width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
-      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => moveTo(n.id)} onPaneClick={() => setSelected(null)} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
+      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { playback.pause(); overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => { playback.pause(); moveTo(n.id); }} onPaneClick={() => { playback.pause(); setSelected(null); }} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
+      <PlaybackControls playback={playback} depth={playbackDepth} onDepthChange={changePlaybackDepth} onEvidence={evidence} onOpen={jump} />
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
         <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />

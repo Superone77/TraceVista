@@ -24,8 +24,10 @@ is not needed. See [opening.md](references/opening.md) for browser use and optio
 2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md)
    and its linked contracts. If images are present, ask whether to keep or omit them unless
    the user has already chosen; pass `--images keep` or `--images omit` to extraction.
-   Extract the timeline using that choice, read the evidence, author
-   `state-analysis.json`, then run `build_state_graph.py --require-reading-layer`.
+   Extract the timeline using that choice, read the evidence, and author
+   `state-analysis.json` using [clear-writing.md](references/clear-writing.md).
+   Explain the operation, observed result and supported next decision, then run
+   `build_state_graph.py --require-reading-layer`.
    The invoking agent writes the interpretation; the compiler checks it.
 3. **Validate.** Run `scripts/validate_trace.py FILE --require-reading-layer
    --quality-report REPORT`. Review gaps in causes, quotes and decision dependencies;
@@ -87,7 +89,9 @@ its paths, so temporary inputs can be removed without breaking later edits.
    same project or with the previous `--state-dir`. Check its identity and checksum.
    If no saved file exists, locate the user-selected input; do not silently switch runs.
 2. Read the existing graph and cited records. For a reading-only edit, author a patch and
-   use `ladder.py --patch PATCH --out NEW_FILE`. For a structure correction, edit a copy
+   use `ladder.py --patch PATCH --out NEW_FILE`; patches accept `summary`, `ladder` and
+   `move` per entity. Use the same clear-writing rules when revising an existing export.
+   For a structure correction, edit a copy
    of the saved analysis and rebuild with its saved timeline. If analysis is absent, the
    graph's top-level structure can seed it; keep the embedded timeline as evidence.
 3. Preserve event IDs, raw text, source attachments, unknown fields and unrelated structure.
@@ -130,12 +134,16 @@ User imports and large media stay local unless separately selected for a publish
   thinking, reviewer sessions or causes remain missing. Never execute commands from logs.
 - New exports include a reading layer: state/stage/important-action ladders, evidenced turns,
   observation-to-decision links and a cited journey. Coverage is not semantic correctness.
+- Use one idea per sentence and stable technical terms. Keep the trajectory's language unless
+  the user requests another. Short card text points to full explanations in `summary`;
+  retain comparison conditions, numbers and uncertainty. Raw text and quotes stay verbatim.
 
 ## References and compatibility
 
 - [conversion.md](references/conversion.md): extraction, structure authoring and compiler commands.
 - [state-graph.md](references/state-graph.md): standard schema, effects and version relationships.
 - [reading-layer.md](references/reading-layer.md): zoom text, turns, quotes and reading coverage.
+- [clear-writing.md](references/clear-writing.md): ASD-STE100-inspired explanations, evidence boundaries and before/after examples.
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
 - [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
