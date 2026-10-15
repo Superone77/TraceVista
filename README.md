@@ -2,18 +2,72 @@
 
 # TraceVista
 
-**See how coding agents solve problems.**
+**Understand Your Agents.**
 
-Turn agent logs into an interactive map of states, decisions, and evidence.<br/>
-Zoom out to follow the story. Zoom in to read the original work. Ask questions along the way.
+Turn agent logs into interactive maps and stories.<br/>
+Explore decisions, replay the work, and get answers linked to the original evidence.
+
+For coding, research, and creative workflows.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Verify](https://github.com/Superone77/TraceVista/actions/workflows/verify.yml/badge.svg)](https://github.com/Superone77/TraceVista/actions/workflows/verify.yml)
+[![Live demo](https://img.shields.io/badge/demo-tracevista.pages.dev-black.svg)](https://tracevista.pages.dev/)
 
 [**Open TraceVista**](https://tracevista.pages.dev/) · [**Explore examples**](#explore-real-agent-runs) · [**Convert your trajectory**](#bring-your-own-trajectory) · [Docs](docs/VIEWER.md)
 
+**English** · [简体中文](README.zh-CN.md)
+
+[![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
 </div>
+
+**You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
+
+TraceVista helps you follow the work behind the result. See what changed, which attempts failed, and where the agent changed direction. Explore the map, read the story, or press Play to walk through the run. When something needs a closer look, ask a question and jump from the answer to the original messages, tool calls, and results.
+
+## Explore real agent runs
+
+Open an example and follow its decisions from the overview down to the original records. No sign-up or model key needed.
+
+| Example | Inside the run |
+|---|---|
+| [**Pi Agent · Kernel Optimization**](https://tracevista.pages.dev/?example=pi-agent-lora) | DeepSeek Flash optimizes vLLM's multi-LoRA kernels on an A100. Follow grouped Triton kernels, direct launch, an identity-cache regression, and a return to an earlier candidate. |
+| [**Claude Code · Post Training**](https://tracevista.pages.dev/?example=posttrainbench-fable5-aime) | Fable 5 Max trains Qwen3-4B for AIME 2025 on an H100. Explore fine-tuning, checkpoint averaging, evaluation, and the choice of the final model. |
+| [**Codex · Model Serving**](https://tracevista.pages.dev/?example=inferencebench-serving-recovery) | GPT-5.5 High tunes a Mistral-7B server on an H100. Follow scheduler experiments, startup recovery, and a rejected sampling change. |
+| [**OpenHands · Bug Fixing**](https://tracevista.pages.dev/?example=swe-rebench-kafka-retry) | Qwen3-Coder investigates a Kafka connection retry loop. Trace source edits, revised tests, and the gap between local checks and the benchmark outcome. |
+| [**Tongyi DeepResearch · Literature Research**](https://tracevista.pages.dev/?example=literesearcher-affiliations) | A teacher trajectory from LiteResearcher SFT data compares two journal articles to identify the authors’ shared institution. Follow an empty PDF, a switch to journal author blocks, and a broader search after zero results. |
+| [**Codex · Garden Animation**](https://tracevista.pages.dev/?example=codex-garden-animation) | GPT-6 Astra turns a ruined hall into a Three.js garden of flowers that sway in the breeze. Follow screenshot checks, a recording timeout and a different save path, and the check of a ten-second MP4. A short excerpt of a longer session. |
+
+## Bring your own trajectory
+
+**Two prompts. A complete map.** Copy these into your coding agent.
+
+### 1. Install the skill
+
+```text
+Install skills/tracevista-skill from https://github.com/Superone77/TraceVista
+```
+
+### 2. Convert and open
+
+```text
+Use tracevista-skill to convert [trajectory file or folder] into a complete .agent-state.json,
+then open https://tracevista.pages.dev/ in my browser and import it.
+```
+
+Use `$tracevista-skill` in Codex or `/tracevista-skill` in Claude Code. The skill reads the logs, builds the state map and summaries, validates the export, and opens it in the viewer. You can ask the agent to refine the same map as you explore.
+
+Its [writing guide](skills/tracevista-skill/references/clear-writing.md) borrows from ASD-STE100: concrete verbs, consistent terms, and one idea per sentence. Explanations connect what the agent did, what the evidence showed, and what it chose next, with the technical conditions intact.
+
+Works with **Claude Code, Codex, and Pi** session logs, **InferenceBench** traces, and **SWE-rebench OpenHands** trajectories. Combine main-agent and reviewer sessions in a single export.
+
+The map, annotations, original records, and source attachments travel together in one `.agent-state.json`. Reopen it with **Import trajectory**, send it to a collaborator, or keep refining it with your agent. The conversion scripts use Python 3.10+ and its standard library.
+
+[Skill guide](skills/tracevista-skill/SKILL.md) · [Conversion workflow](skills/tracevista-skill/references/conversion.md) · [Multiple agents](skills/tracevista-skill/references/multi-agent.md)
 
 ## One run. Four levels of detail.
 
-A coding session can contain hundreds of messages, edits, and tool calls. TraceVista gives that work a structure you can explore:
+Explore the same run at four connected levels:
 
 **System states → Work phases → Actions → Raw records**
 
@@ -25,8 +79,6 @@ A coding session can contain hundreds of messages, edits, and tool calls. TraceV
 | **Raw records** | Original messages, recorded reasoning, tool inputs and outputs, and reviewer feedback. |
 
 Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its path in **Story** and follow its evidence.
-
-[![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## Follow the decisions
 
@@ -60,45 +112,6 @@ Ask how a decision happened to get a linked flow diagram, or compare attempts in
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
 
-## Explore real agent runs
-
-Open an example and follow its decisions from the overview down to the original records.
-
-| Example | Inside the run |
-|---|---|
-| [**Pi Agent · Kernel Optimization**](https://tracevista.pages.dev/?example=pi-agent-lora) | DeepSeek Flash optimizes vLLM's multi-LoRA kernels on an A100. Follow grouped Triton kernels, direct launch, an identity-cache regression, and a return to an earlier candidate. |
-| [**Claude Code · Post Training**](https://tracevista.pages.dev/?example=posttrainbench-fable5-aime) | Fable 5 Max trains Qwen3-4B for AIME 2025 on an H100. Explore fine-tuning, checkpoint averaging, evaluation, and the choice of the final model. |
-| [**Codex · Model Serving**](https://tracevista.pages.dev/?example=inferencebench-serving-recovery) | GPT-5.5 High tunes a Mistral-7B server on an H100. Follow scheduler experiments, startup recovery, and a rejected sampling change. |
-| [**OpenHands · Bug Fixing**](https://tracevista.pages.dev/?example=swe-rebench-kafka-retry) | Qwen3-Coder investigates a Kafka connection retry loop. Trace source edits, revised tests, and the gap between local checks and the benchmark outcome. |
-| [**Tongyi DeepResearch · Literature Research**](https://tracevista.pages.dev/?example=literesearcher-affiliations) | A teacher trajectory from LiteResearcher SFT data compares two journal articles to identify the authors’ shared institution. Follow an empty PDF, a switch to journal author blocks, and a broader search after zero results. |
-
-## Bring your own trajectory
-
-**Two prompts. A complete map.** Copy these into your coding agent.
-
-### 1. Install the skill
-
-```text
-Install skills/tracevista-skill from https://github.com/Superone77/TraceVista
-```
-
-### 2. Convert and open
-
-```text
-Use tracevista-skill to convert [trajectory file or folder] into a complete .agent-state.json,
-then open https://tracevista.pages.dev/ in my browser and import it.
-```
-
-Use `$tracevista-skill` in Codex or `/tracevista-skill` in Claude Code. The skill reads the logs, builds the state map and summaries, validates the export, and opens it in the viewer. You can ask the agent to refine the same map as you explore.
-
-Its [writing guide](skills/tracevista-skill/references/clear-writing.md) borrows from ASD-STE100: concrete verbs, consistent terms, and one idea per sentence. Explanations connect what the agent did, what the evidence showed, and what it chose next, with the technical conditions intact.
-
-Works with **Claude Code, Codex, and Pi** session logs, **InferenceBench** traces, and **SWE-rebench OpenHands** trajectories. Combine main-agent and reviewer sessions in a single export.
-
-The map, annotations, original records, and source attachments travel together in one `.agent-state.json`. Reopen it with **Import trajectory**, send it to a collaborator, or keep refining it with your agent. The conversion scripts use Python 3.10+ and its standard library.
-
-[Skill guide](skills/tracevista-skill/SKILL.md) · [Conversion workflow](skills/tracevista-skill/references/conversion.md) · [Multiple agents](skills/tracevista-skill/references/multi-agent.md)
-
 ## Run locally
 
 Requires **Node.js 24.x** and **pnpm 11.19.0**.
@@ -120,9 +133,13 @@ TraceVista pairs a **React Flow viewer** with a **trajectory conversion skill**.
 - [Viewer guide](docs/VIEWER.md) — navigation, details, chat, and model connections.
 - [State graph format](skills/tracevista-skill/references/state-graph.md) — states, actions, transitions, and evidence.
 - [Reading layer](skills/tracevista-skill/references/reading-layer.md) — summaries, turning points, and decision links.
-- [Contributing](docs/BRANCHES.md) — work on a branch and send a pull request.
+- [Contributing](CONTRIBUTING.md) — set up, run the checks, add an adapter or example, and send a pull request.
 
 Have an interesting trajectory or an idea for the viewer? [Open an issue](https://github.com/Superone77/TraceVista/issues).
+
+## License
+
+TraceVista's code is released under the [MIT License](LICENSE). Bundled example trajectories keep the licenses of their sources, such as Apache-2.0 and CC-BY-4.0. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for each source and its terms.
 
 ## Acknowledgements
 

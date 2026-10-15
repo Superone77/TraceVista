@@ -17,7 +17,7 @@ assert.equal(datasetRequest('?data=my-run',catalog),'./local-data/my-run.json');
 assert.equal(datasetRequest('',catalog),null);
 assert.equal(datasetRequest('?example=1',catalog),'./examples/pi-agent-lora.agent-state.json');
 assert.throws(()=>datasetRequest('?example=1',[]));
-assert.deepEqual(catalog.map(d => d.id), ['pi-agent-lora','posttrainbench-fable5-aime','inferencebench-serving-recovery','swe-rebench-kafka-retry','literesearcher-affiliations'], 'Only the five approved examples ship, with Pi Agent first');
+assert.deepEqual(catalog.map(d => d.id), ['pi-agent-lora','posttrainbench-fable5-aime','inferencebench-serving-recovery','swe-rebench-kafka-retry','literesearcher-affiliations','codex-garden-animation'], 'Only the six approved examples ship, with Pi Agent first');
 assert.deepEqual(readdirSync(new URL('../viewer/public/examples/',import.meta.url)).sort(),
  ['index.json',...catalog.map(d=>d.file)].sort(), 'No unlisted files may ship with the public examples');
 assert.throws(()=>datasetRequest('?example=kda-w8a16-r1',catalog), 'The replaced KDA example is not served');

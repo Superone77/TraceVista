@@ -38,5 +38,14 @@
     "description": "Cross-paper affiliation research with empty-PDF recovery, author-block comparison and query refinement.",
     "agent": "Tongyi DeepResearch teacher",
     "task": "Two journal articles · Shared author affiliation"
+  },
+  {
+    "id": "codex-garden-animation",
+    "title": "Codex · Garden Animation",
+    "file": "codex-garden-animation.agent-state.json",
+    "thumbnail": "codex-garden-animation.webp",
+    "description": "A focused excerpt: dress a ruined hall with flowers, add breeze animation, recover video recording and verify a ten-second MP4.",
+    "agent": "GPT-6 Astra · Ultra thinking",
+    "task": "Three.js · Breeze animation"
   }
 ]

@@ -30,7 +30,7 @@ function CopyBlock({ text, label }: { text: string; label: string }) {
 export default function Instructions() {
   const { t } = useLang();
   return <section className="instructions" aria-labelledby="instructions-title">
-    <h2 id="instructions-title">{t('Copy to Your Agent')}</h2>
+    <h2 id="instructions-title">{t('Get Started: Copy To Your Agent')}</h2>
     <div className="instruction-steps">
       <section className="instruction-step" aria-labelledby="instruction-install">
         <div className="instruction-step-title"><span>01</span><h3 id="instruction-install">{t('Install the skill')}</h3></div>

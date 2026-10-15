@@ -1,7 +1,9 @@
-## 改了什么
+## What changed
 
-## 如何验证
+## How I checked it
 
-## 等待审批
+- [ ] `pnpm test`
+- [ ] `pnpm build`
+- [ ] Opened the affected view or example in the browser
 
-请仓库维护者确认后再合入 main。
+## Notes for review
