@@ -17,7 +17,7 @@
 
 [English](README.md) · **简体中文**
 
-[![从系统状态逐层切换到工作阶段、动作和原始记录](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![地图从系统状态切换到工作阶段和动作，故事线同步展开到相同位置](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 </div>
 
@@ -88,13 +88,13 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 
 按 **播放** 进入导览：故事线展开当前步骤，地图同步移动到相同位置。你可以暂停、前进、后退、调整速度，或者打开原始证据。退出后会回到之前的视图。
 
-[![对比版本树和执行顺序，并查看一个性能回退的候选版本](docs/images/version-history.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![按下播放：故事线逐步高亮，地图同步移动到对应的状态](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## 直达证据
 
 在 **故事线** 中展开一张卡片的句子，就能读到它背后的原始消息、代码、工具调用和结果。展开后，简短标签下方会显示完整解释。agent 的每一句说法都可以一直追溯到记录下来的实际工作。
 
-[![打开动作详情，阅读原始工具调用并核对其结果](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![在故事线中把一个状态逐层展开到工作阶段、动作和背后的原始记录](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 主 agent 和 reviewer 可以放进同一张地图。你可以跟着一次评审请求，看反馈、修改和下一轮检查。在 **结构与证据** 中可以查看 skill 使用、知识复用、TODO 和测量结果。
 
@@ -108,7 +108,7 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 
 问一个决策是怎么发生的，会得到带链接的流程图；也可以让它用表格比较几次尝试。点击回答中的结论或证据，就能在故事线和地图中定位到它。回答会区分记录下来的事实、推断和尚未解决的问题。
 
-[![一次真实的模型回答：查看智能上下文选中的记录，点击引用的动作跳转过去，并从回答中打开原始测量结果](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![询问 agent 为什么放弃 identity caching：真实的模型回答附带关联流程图，点击引用的动作后在故事线和地图中定位到它](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 支持连接 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax、OpenRouter，或你自己的兼容接口。本地模型可以通过 Ollama 和 LM Studio 使用。
 
