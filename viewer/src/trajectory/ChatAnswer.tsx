@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { citations } from './chat';
+import { inlineMarkdown, type Inline } from './chat';
 import { moveColors, type Move } from './model';
 import { parseAnswer, type EvidenceBasis, type Explanation, type ExplanationRef, type ReferenceKind } from './explanations';
 import { useLang } from './i18n';
@@ -22,11 +22,18 @@ function Reference({ id, kind, links }: ExplanationRef & { links: Links }) {
     onClick={() => kind === 'node' ? links.jump(id) : links.evidence(id)}>{kind === 'event' ? id.split(':').pop() : id}</button>;
 }
 
-/** Model text stays literal apart from bold text and validated source links. */
-export function ChatText({ text, ...links }: { text: string } & Links) {
-  return <>{citations(text, links.known).map((part, i) => 'text' in part
-    ? <span key={i}>{part.text.split(/(\*\*[^*]+\*\*)/g).map((p, j) => p.startsWith('**') && p.endsWith('**') ? <b key={j}>{p.slice(2, -2)}</b> : p)}</span>
+function InlineParts({ parts, links, nested = false }: { parts: Inline[]; links: Links; nested?: boolean }) {
+  return <>{parts.map((part, i) => 'text' in part ? nested ? part.text : <span key={i}>{part.text}</span>
+    : 'code' in part ? <code key={i}>{part.code}</code>
+    : 'strong' in part ? <b key={i}><InlineParts parts={part.strong} links={links} nested /></b>
+    : 'em' in part ? <em key={i}><InlineParts parts={part.em} links={links} nested /></em>
     : <Reference key={i} id={part.id} kind={part.kind === 'unknown' ? null : part.kind} links={links} />)}</>;
+}
+
+/** Model text stays literal apart from inline code, emphasis and validated source links.
+ *  `open` marks text that is still streaming, so a marker without its closing half yet already applies. */
+export function ChatText({ text, open = false, ...links }: { text: string; open?: boolean } & Links) {
+  return <InlineParts parts={inlineMarkdown(text, links.known, open)} links={links} />;
 }
 
 function Basis({ basis }: { basis: EvidenceBasis }) {
@@ -92,10 +99,11 @@ export default function ChatAnswer({ text, streaming = false, ...links }: { text
   const { t } = useLang();
   const parts = useMemo(() => parseAnswer(text, links.known, streaming), [text, links.known, streaming]);
   return <>{parts.map((part, index) => {
-    if (part.type === 'text') return <ChatText key={index} text={part.text} {...links} />;
+    const open = streaming && index === parts.length - 1;
+    if (part.type === 'text') return <ChatText key={index} text={part.text} open={open} {...links} />;
     if (part.type === 'heading') {
       const Heading = `h${part.level}` as const;
-      return <Heading key={index} className="chat-markdown-heading"><ChatText text={part.text} {...links} /></Heading>;
+      return <Heading key={index} className="chat-markdown-heading"><ChatText text={part.text} open={open} {...links} /></Heading>;
     }
     if (part.type === 'pending') return <div key={index} className="explanation-pending" role="status">{t('Building the explanation…')}</div>;
     if (part.type === 'fallback') return <div key={index} className="explanation-fallback"><small>{t('This explanation could not be drawn. The original response is shown below.')}</small><pre><ChatText text={part.text} {...links} /></pre></div>;
