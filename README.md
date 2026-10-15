@@ -23,7 +23,7 @@ For coding, research, and creative workflows.
 
 **You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
 
-TraceVista helps you follow the work behind the result. See what changed, which attempts failed, and where the agent changed direction. Explore the map, read the story, or press **Play** to walk through the run. When something needs a closer look, ask a question and jump from the answer to the original messages, tool calls, and results.
+TraceVista helps you follow the work behind the result. See what changed, which attempts failed, and where the agent changed direction. Explore the map, read the story, or press Play to walk through the run. When something needs a closer look, ask a question and jump from the answer to the original messages, tool calls, and results.
 
 ## Explore real agent runs
 
