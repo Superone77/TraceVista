@@ -10,6 +10,7 @@ import ChatDialog from './ChatDialog';
 import PanelResizeHandle from './PanelResizeHandle';
 import { chatBounds, clampChatWidth } from './panelSizing';
 import Instructions from './Instructions';
+import HeaderLinks from './HeaderLinks';
 import ViewerMenu from './ViewerMenu';
 import ExampleGallery from './ExampleGallery';
 import StoryRail, { type Depth } from './StoryRail';
@@ -19,7 +20,7 @@ import { usePlayback } from './usePlayback';
 import { eventDestination, revealStoryEvidence, expandStoryToTier, revealStoryPath } from './storyDisclosure';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
 import './story.css';
-import { LangProvider, LangToggle, useLang } from './i18n';
+import { LangProvider, useLang } from './i18n';
 import { localizeGraph } from './localize';
 import './trajectory.css';
 import './interface.css';
@@ -563,7 +564,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       <button aria-pressed={journeyOpen} onClick={() => { playback.pause(); journeyTucked.current = false; setJourneyOpen(open => !open); }}>{t('Story')}</button>
       <button aria-label={t(playback.playing ? 'Pause playback' : 'Play story')} aria-pressed={playback.active} onClick={playback.playing ? playback.pause : playback.play} disabled={!steps.length}>{playback.playing ? 'Ⅱ' : '▶'} {t(playback.playing ? 'Pause' : 'Play')}</button></div>
       <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
-      <div className="view-options"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><LangToggle /></div>
+      <div className="view-options header-controls"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><HeaderLinks /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={update => { playback.pause(); setStoryExpanded(update); }} onFly={fly}
       playbackNode={playback.step?.node} restoreScroll={storyRestore} onScrollRestored={clearStoryRestore}
@@ -629,14 +630,16 @@ function App() {
     {graph ? <ReactFlowProvider key={revision}>
       <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} />
     </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
-      <div className="welcome-lang"><LangToggle /></div>
+      <div className="welcome-links"><HeaderLinks /></div>
       <div className="welcome-layout">
         <section className="welcome-hero" aria-labelledby="welcome-title">
           <h1 id="welcome-title">TraceVista</h1>
           <p className="welcome-tagline">
-            <span style={{ color: lang === 'en' ? colors.Explore : undefined }}>{t('Understand')}</span>{' '}
-            <span style={{ color: lang === 'en' ? colors.Plan : undefined }}>{t('Your')}</span>{' '}
-            <span style={{ color: lang === 'en' ? colors.Edit : undefined }}>{t('Agents')}</span>
+            {lang === 'en' ? <>
+              <span style={{ color: colors.Explore }}>{t('Understand')}</span>{' '}
+              <span style={{ color: colors.Plan }}>{t('Your')}</span>{' '}
+              <span style={{ color: colors.Edit }}>{t('Agents')}</span>
+            </> : `${t('Understand')}${t('Your')} ${t('Agents')}`}
           </p>
           <div className="welcome-actions"><FilePicker label={t('Import Trajectory')} onImport={loadFile} /></div>
           {loading && <p className="welcome-loading" role="status">{t('Loading…')}</p>}

@@ -131,7 +131,11 @@
 .lang-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
 .reader .toolbar .lang-toggle button, .lang-toggle button { border: 0; border-radius: 0; background: transparent; color: var(--text-2); padding: .3rem .6rem; font-size: var(--ui-caption, .75rem); min-height: 0; }
 .reader .toolbar .lang-toggle button[aria-pressed=true], .lang-toggle button[aria-pressed=true] { background: var(--ink, #1d1d1d); color: var(--surface, #fff); }
-.welcome-lang { position: fixed; top: 1rem; right: 1rem; z-index: 5; }
+.welcome-links { position: fixed; top: .75rem; right: .5rem; z-index: 5; }
+.header-links { display: inline-flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.github-link { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; flex-shrink: 0; border-radius: .5rem; color: var(--text-2); text-decoration: none; }
+.github-link:hover { background: var(--surface-3); color: var(--ink); }
+.github-link svg { display: block; }
 
 /* Compact overview: the card is filled with the takeaway, its reason and, when there is room, the decision chips. */
 .canvas[data-compact-overview=true] .state-map-summary { justify-content: flex-start; padding-top: calc(8px / var(--map-zoom)); }
