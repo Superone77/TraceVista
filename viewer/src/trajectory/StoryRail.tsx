@@ -20,8 +20,6 @@ const doing: Record<string, string> = { Explore: 'Looked into', Plan: 'Planned',
 // A sentence ends in the story's language: a Chinese story ends a Latin-only topic with 。 too.
 let storyZh = false;
 const sentence = (t: string) => { const s = t.trim(); return !s || /[.!?。！？]$/.test(s) ? s : s + (storyZh || /[\u3400-\u9fff]/.test(s) ? '。' : '.'); };
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function Sentence({ id, open, onToggle, count, active, className = '', children }: { id: string; open: boolean; onToggle: () => void; count?: string; active?: boolean; className?: string; children: ReactNode }) {
   return <span className={`story-s ${className}`} role="button" tabIndex={0} aria-expanded={open} aria-current={active ? 'step' : undefined} data-story={id} onClick={onToggle}
@@ -143,11 +141,13 @@ export default function StoryRail({ graph, main, delivered, decisionNo, selected
     const side = sideLine && !main.has(s.id);
     // The same order in time, and the same numbers, as the phase cards on the map.
     const phases = graph.branches.filter(b => b.state === s.id).sort((a, b) => (flow.get(a.id)?.n ?? 0) - (flow.get(b.id)?.n ?? 0));
-    const lead = s.ladder?.topic ?? shortName(s);
-    const takeaway = (s.ladder?.takeaway ?? s.title).replace(new RegExp(`^${escapeRe(lead)}\\s*[:,：，]?\\s*`, 'i'), '');
+    const takeaway = sentence(s.ladder?.takeaway ?? s.title);
+    // Emphasize the authored topic in place; it is part of the sentence, not a separate heading.
+    const topic = s.ladder?.topic?.trim() ?? '';
+    const topicAt = topic ? takeaway.indexOf(topic) : -1;
     return <li key={s.id} className={`story-step${side ? ' side' : ''}${s.id === delivered ? ' end' : ''}${selected === s.id ? ' current' : ''}`}>
       <Sentence id={s.id} active={playbackNode === s.id} open={open.has(s.id)} onToggle={() => toggle(s.id, 'branches')} count={phases.length ? t(phases.length > 1 ? '{n} phases' : '{n} phase', { n: phases.length }) : undefined}>
-        {side && <span className="story-side">{t('A side attempt.')} </span>}<b>{sentence(lead)}</b>{takeaway && <> {sentence(cap(takeaway))}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
+        {side && <span className="story-side">{t('A side attempt.')} </span>}{topicAt < 0 ? takeaway : <>{takeaway.slice(0, topicAt)}<b>{topic}</b>{takeaway.slice(topicAt + topic.length)}</>}{s.ladder?.reason && <> <span className="story-reason">{sentence(s.ladder.reason)}</span></>}
       </Sentence>
       {mounted.has(s.id) && <Stretch open={open.has(s.id)}><div className="story-layer">
         {explanation(s)}

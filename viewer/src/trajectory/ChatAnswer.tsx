@@ -93,6 +93,10 @@ export default function ChatAnswer({ text, streaming = false, ...links }: { text
   const parts = useMemo(() => parseAnswer(text, links.known, streaming), [text, links.known, streaming]);
   return <>{parts.map((part, index) => {
     if (part.type === 'text') return <ChatText key={index} text={part.text} {...links} />;
+    if (part.type === 'heading') {
+      const Heading = `h${part.level}` as const;
+      return <Heading key={index} className="chat-markdown-heading"><ChatText text={part.text} {...links} /></Heading>;
+    }
     if (part.type === 'pending') return <div key={index} className="explanation-pending" role="status">{t('Building the explanation…')}</div>;
     if (part.type === 'fallback') return <div key={index} className="explanation-fallback"><small>{t('This explanation could not be drawn. The original response is shown below.')}</small><pre><ChatText text={part.text} {...links} /></pre></div>;
     const value = part.value;

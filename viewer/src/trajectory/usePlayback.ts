@@ -5,7 +5,7 @@ export function usePlayback(steps: PlaybackStep[], callbacks: {
   begin: () => void; visit: (step: PlaybackStep) => void; end: () => void;
 }) {
   const [position, dispatch] = useReducer(playbackReducer, playbackInitial);
-  const [seconds, setSeconds] = useState(8);
+  const [seconds, setSeconds] = useState(4);
   const latest = useRef(callbacks); latest.current = callbacks;
   const positionRef = useRef(position); positionRef.current = position;
   const active = position.status !== 'idle';
@@ -20,7 +20,8 @@ export function usePlayback(steps: PlaybackStep[], callbacks: {
     if (positionRef.current.status === 'idle') return;
     dispatch({ type: 'exit', count: steps.length }); latest.current.end();
   }, [steps.length]);
-  const seek = useCallback((index: number) => dispatch({ type: 'seek', count: steps.length, index }), [steps.length]);
+  // A depth change supplies the new count in the same React batch as its new step list.
+  const seek = useCallback((index: number, count = steps.length) => dispatch({ type: 'seek', count, index }), [steps.length]);
   useEffect(() => {
     if (active && steps[position.index]) latest.current.visit(steps[position.index]);
   }, [active, position.index, position.revision, steps]);

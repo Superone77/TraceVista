@@ -1,9 +1,11 @@
 import { useLang } from './i18n';
 import type { usePlayback } from './usePlayback';
+import type { PlaybackDepth } from './playback';
 import './playback.css';
 
-export default function PlaybackControls({ playback, onEvidence, onOpen }: {
+export default function PlaybackControls({ playback, depth, onDepthChange, onEvidence, onOpen }: {
   playback: ReturnType<typeof usePlayback>; onEvidence: (id: string) => void; onOpen: (id: string) => void;
+  depth: PlaybackDepth; onDepthChange: (depth: PlaybackDepth) => void;
 }) {
   const { t } = useLang();
   const step = playback.step;
@@ -20,14 +22,22 @@ export default function PlaybackControls({ playback, onEvidence, onOpen }: {
       <button className="playback-title" onClick={() => { playback.pause(); onOpen(step.node); }}>{step.title}</button>
       {step.description && step.description !== step.title && <p>{step.description}</p>}
     </div>
+    <div className="playback-settings">
+      <label>{t('Playback depth')}<select aria-label={t('Playback depth')} value={depth} onChange={e => onDepthChange(e.target.value as PlaybackDepth)}>
+        <option value="states">{t('System states')}</option>
+        <option value="branches">{t('Work phases')}</option>
+        <option value="actions">{t('Actions')}</option>
+        <option value="raw">{t('Raw records')}</option>
+      </select></label>
+      <label>{t('Time per step')}<select aria-label={t('Time per step')} value={playback.seconds} onChange={e => playback.setSeconds(Number(e.target.value))}>
+        {[4, 8, 15].map(seconds => <option key={seconds} value={seconds}>{seconds}s</option>)}
+      </select></label>
+    </div>
     <div className="playback-transport">
       <button aria-label={t('Previous step')} title={t('Previous step')} disabled={playback.index === 0} onClick={() => playback.seek(playback.index - 1)}>←</button>
       <button className="playback-toggle" onClick={playback.playing ? playback.pause : playback.play}>{t(playback.playing ? 'Pause' : playback.status === 'finished' ? 'Replay' : 'Play')}</button>
       <button aria-label={t('Next step')} title={t('Next step')} disabled={playback.index >= playback.count - 1} onClick={() => playback.seek(playback.index + 1)}>→</button>
       <input aria-label={t('Playback position')} type="range" min={0} max={Math.max(0, playback.count - 1)} value={playback.index} onChange={e => playback.seek(Number(e.target.value))} />
-      <select aria-label={t('Time per step')} value={playback.seconds} onChange={e => playback.setSeconds(Number(e.target.value))}>
-        {[4, 8, 15].map(seconds => <option key={seconds} value={seconds}>{seconds}s</option>)}
-      </select>
     </div>
     {step.events.length > 0 && <div className="playback-evidence">{step.events.slice(0, 3).map(id => <button key={id} onClick={() => { playback.pause(); onEvidence(id); }} title={t('Open original record')}>{id}</button>)}</div>}
   </section>;

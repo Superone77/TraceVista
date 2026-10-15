@@ -6,9 +6,11 @@
 .reader .playback-title { display: block; text-align: left; font: 600 .9375rem/1.5 var(--font-sans); padding: 0; min-height: 0; border: 0; background: transparent; white-space: normal; }
 .playback-title:hover { text-decoration: underline; }
 .playback-caption p { margin: .25rem 0 0; color: var(--text-2); overflow-wrap: anywhere; }
-.playback-transport { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: center; gap: .375rem; }
+.playback-settings { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .375rem .75rem; margin-bottom: .625rem; }
+.playback-settings label { display: flex; align-items: center; gap: .375rem; font-size: var(--ui-caption); color: var(--text-2); }
+.playback-transport { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); align-items: center; gap: .375rem; }
 .playback-transport input { min-width: 0; width: 100%; margin: 0; accent-color: var(--text); }
-.reader .playback-transport button, .playback-transport select { min-height: 2rem; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: .375rem; font: var(--ui-caption)/1.4 var(--font-sans); background: var(--surface); color: var(--text); }
+.reader .playback-transport button, .playback-settings select { min-height: 2rem; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: .375rem; font: var(--ui-caption)/1.4 var(--font-sans); background: var(--surface); color: var(--text); }
 .reader .playback-transport .playback-toggle { background: var(--text); color: var(--surface); min-width: 3.5rem; }
 .playback-evidence { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .5rem; }
 .reader .playback-evidence button { padding: .125rem .375rem; min-height: 0; font: var(--ui-caption)/1.5 var(--font-mono); border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2); border-radius: .25rem; overflow-wrap: anywhere; }
@@ -16,7 +18,7 @@
 .canvas { container-type: inline-size; }
 @container (max-width: 360px) {
   .playback { padding: .5rem; }
-  .playback-transport { grid-template-columns: auto 1fr auto auto; }
+  .playback-transport { grid-template-columns: auto 1fr auto; }
   .playback-transport input { grid-column: 1 / -1; grid-row: 2; }
 }
 @media (max-width: 680px) { .playback { bottom: 3rem; padding: .5rem .625rem; } .playback-caption { max-height: 8rem; } }

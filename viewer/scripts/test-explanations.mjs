@@ -8,6 +8,13 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const requirePackage = createRequire(import.meta.url), modules = new Map();
+// SSR removes event attributes; retain the actual rendered button props to exercise navigation.
+const renderedButtons = [];
+const jsxRuntime = requirePackage('react/jsx-runtime');
+const captureButtons = create => (type, props, key) => {
+  if (type === 'button') renderedButtons.push(props);
+  return create(type, props, key);
+};
 function load(filename) {
   if (filename.endsWith('.json')) return JSON.parse(readFileSync(filename, 'utf8'));
   if (modules.has(filename)) return modules.get(filename).exports;
@@ -16,6 +23,7 @@ function load(filename) {
     module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText;
   const requireLocal = spec => {
+    if (spec === 'react/jsx-runtime') return { ...jsxRuntime, jsx: captureButtons(jsxRuntime.jsx), jsxs: captureButtons(jsxRuntime.jsxs) };
     if (!spec.startsWith('.')) return requirePackage(spec);
     if (spec.endsWith('.css')) return {};
     const base = resolve(dirname(filename), spec), path = ['', '.ts', '.tsx', '.json'].map(ext => base + ext).find(existsSync);
@@ -100,6 +108,41 @@ assert(!escaped.includes('<script>') && !escaped.includes('<img ') && escaped.in
 assert(render(partial, true).includes('Building the explanation…') && !render(partial, true).includes('&quot;version&quot;'));
 assert(render(partial).includes('original response') && render(partial).includes('&quot;version&quot;'));
 assert(render('Answer **supported** by [[a1]] and [[main:1]].').includes('<b>supported</b>'), 'legacy plain replies and citations still render');
+const headings = Array.from({ length: 6 }, (_, i) => '#'.repeat(i + 1) + ` Level ${i + 1}`).join('\n');
+const renderedHeadings = render(headings);
+for (let level = 1; level <= 6; level++) assert(renderedHeadings.includes(`<h${level} class="chat-markdown-heading"><span>Level ${level}</span></h${level}>`), `level ${level} becomes a semantic heading`);
+const title = '各候选的测量对照（全部为开发集、同一 30 题）';
+const headingAndViews = render(`## ${title}\n\n${block(table)}\n### 决策路径\n${block(flow)}`);
+assert(headingAndViews.includes(`<h2 class="chat-markdown-heading"><span>${title}</span></h2>`) && headingAndViews.includes('<table>') && headingAndViews.includes('class="explanation-flow"'), 'Markdown headings coexist with both structured explanation views');
+assert(!headingAndViews.includes('## 各候选') && !headingAndViews.includes('```tracevista'));
+const headingCalls = [];
+renderedButtons.length = 0;
+const linkedHeading = renderToStaticMarkup(React.createElement(ChatAnswer, {
+  text: '## **Evidence** [[a1]] [[main:1]] [[missing]]', known,
+  jump: id => headingCalls.push(['node', id]), evidence: id => headingCalls.push(['event', id]),
+}));
+assert(linkedHeading.includes('<h2 ') && linkedHeading.includes('<b>Evidence</b>') && linkedHeading.includes('missing?'));
+const headingButtons = renderedButtons.filter(button => button['data-source-id']);
+assert.deepEqual(headingButtons.map(button => button['data-source-id']), ['a1', 'main:1'], 'only known heading references become buttons');
+headingButtons.forEach(button => button.onClick());
+assert.deepEqual(headingCalls, [['node', 'a1'], ['event', 'main:1']], 'heading references retain node and raw-record navigation');
+const literalLines = ['#hashtag', '####### Too many markers', '    ## Indented code', 'Text ## inline', '\\## Escaped'];
+assert(!render(literalLines.join('\n')).includes('chat-markdown-heading'), 'only valid ATX headings are interpreted');
+assert.deepEqual(parseAnswer('   ## Padded title ###  \r\n### C#\n##', known).map(part => [part.type, part.text]), [
+  ['heading', 'Padded title'], ['heading', 'C#'], ['heading', ''],
+], 'indentation, CRLF, closing markers and empty headings follow Markdown heading syntax');
+for (const [open, close] of [['```python', '```'], ['~~~text', '~~~'], ['````text', '````']]) {
+  const code = `${open}\n## Literal code title\n${open.startsWith('````') ? block(table) + '\n' : ''}${close}`;
+  const codeReply = render(code + '\n## Outside the code');
+  assert(codeReply.includes('## Literal code title') && !codeReply.includes('<table>'), 'code contents, including a nested explanation example, remain literal');
+  assert.equal((codeReply.match(/class="chat-markdown-heading"/g) ?? []).length, 1, 'only the heading after the matching closing fence is rendered');
+}
+assert(!render('```text\n## Still inside code', true).includes('chat-markdown-heading'), 'an unfinished ordinary code fence also protects its headings');
+assert(!render('~~~~\n## Inside\n~~~\n## Still inside').includes('chat-markdown-heading'), 'a shorter fence cannot close a longer one');
+const maliciousHeading = render('## <script>alert(1)</script><img src="https://bad.invalid/steal">');
+assert(maliciousHeading.includes('&lt;script&gt;') && !maliciousHeading.includes('<script>') && !maliciousHeading.includes('<img '), 'heading HTML remains escaped text');
+assert(render('## Partial heading', true).includes('<h2 '), 'streaming prose headings render without waiting for completion');
+console.log('PASS: real chat renderer supports six heading levels, safe text, clickable citations, structured views and fenced-code boundaries');
 assert(SYSTEM.includes('fenced block labelled tracevista'));
 assert(!EVIDENCE_SYSTEM.includes('fenced block labelled tracevista'), 'retrieval is not asked to draw a diagram');
 const graph = {

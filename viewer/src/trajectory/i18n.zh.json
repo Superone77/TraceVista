@@ -259,6 +259,7 @@
  "This ID is not present in the records": "记录中不存在此 ID",
  "This explanation could not be drawn. The original response is shown below.": "此解释暂时无法绘制，下面显示原始回复。",
  "Time per step": "每步停留时间",
+ "Playback depth": "播放层级",
  "Evidence": "证据",
  "Rejected": "已否决",
  "System state": "系统状态"

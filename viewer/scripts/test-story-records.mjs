@@ -65,6 +65,23 @@ assert(!storyIntro.includes('Delivered.'), 'The final-state label describes an o
 assert(storyIntro.includes('Summary') && storyIntro.includes('Outcome'), 'Summary and outcome remain clearly labeled');
 assert(storyIntro.indexOf('Summary of the task.') < storyIntro.indexOf('class="story-outcome"'), 'The final outcome follows the run summary');
 assert(!storyIntro.includes('Hide the story'), 'Panel visibility is controlled by the toolbar rather than a second rail button');
+// Topics remain inside the authored sentence, without inserting stops or rewriting the next word.
+for (const [topic, takeaway, expected, language = 'en'] of [
+  ['Direct launch', 'Direct launch and raw stream raise development speedup to 33.37×.', '<b>Direct launch</b> and raw stream raise development speedup to 33.37×.'],
+  ['Grouped kernels', 'Grouped kernels pass correctness.', '<b>Grouped kernels</b> pass correctness.'],
+  ['cache', 'The cache passes once; the cache needs another check.', 'The <b>cache</b> passes once; the cache needs another check.'],
+  ['Direct launch', 'Direct launch: keep the raw stream.', '<b>Direct launch</b>: keep the raw stream.'],
+  ['直接启动', '直接启动和原始流提高了开发测试速度。', '<b>直接启动</b>和原始流提高了开发测试速度。', 'zh'],
+  ['Different topic', 'The complete sentence stays intact.', 'The complete sentence stays intact.'],
+  ['', 'An empty topic does not add a heading.', 'An empty topic does not add a heading.'],
+]) {
+  const state = { ...graph.states[0], ladder: { topic, takeaway } };
+  const html = render(new Set(), { graph: { ...graph, language, states: [state] }, delivered: null });
+  const content = html.match(/data-story="s0"[^>]*>([\s\S]*?)<span class="story-count">/)[1];
+  assert.equal(content, expected, `Story must preserve the sentence around topic ${topic}`);
+}
+const titleOnly = render(new Set(), { delivered: null });
+assert(titleOnly.includes('data-story="s0">Baseline.<span'), 'A state without a ladder shows its title once');
 assert(full.includes('CALL_TAIL_&lt;tag&gt;'), 'Expanded Story retains tool input beyond 600 characters and escapes literal markup');
 assert(full.includes('RESULT_TAIL_✓'), 'Expanded Story retains the complete tool result, not only the first excerpt');
 assert(full.includes('CUSTOM_RECORD_完整原文'), 'Unknown record types remain visible as original text');

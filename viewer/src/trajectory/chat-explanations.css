@@ -1,3 +1,8 @@
+.chat-text .chat-markdown-heading{margin:1em 0 .35em;font-size:1em;font-weight:650;line-height:1.45;color:var(--text);white-space:normal;overflow-wrap:anywhere}
+.chat-text .chat-markdown-heading:first-child{margin-top:0}
+.chat-text h1.chat-markdown-heading{font-size:1.3em}
+.chat-text h2.chat-markdown-heading{font-size:1.18em}
+.chat-text h3.chat-markdown-heading{font-size:1.08em}
 .chat-explanation{white-space:normal;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden;min-width:0}
 .chat-dialog .chat-explanation>header{display:block;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface-2)}
 .chat-explanation h3{font-size:var(--ui-text,.875rem);font-weight:650;line-height:1.4;margin:0;color:var(--text);overflow-wrap:anywhere}

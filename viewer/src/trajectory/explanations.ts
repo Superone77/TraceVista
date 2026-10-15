@@ -9,6 +9,7 @@ export interface ExplanationRow extends Supported { cells: string[] }
 export type Explanation = { version: 1; type: 'flow'; title: string; nodes: ExplanationNode[]; edges: ExplanationEdge[]; levels: string[][] }
   | { version: 1; type: 'table'; title: string; columns: string[]; rows: ExplanationRow[] };
 export type AnswerPart = { type: 'text'; text: string }
+  | { type: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
   | { type: 'explanation'; value: Explanation }
   | { type: 'fallback'; text: string }
   | { type: 'pending'; text: string };
@@ -79,26 +80,47 @@ export function parseExplanation(raw: string, known: (id: string) => ReferenceKi
   return { version: 1, type: 'flow', title: value.title, nodes, edges, levels };
 }
 
-/** Preserve invalid and unfinished output instead of dropping the model's answer. */
+/** Parse headings and explanation blocks outside ordinary code fences, preserving all other text. */
 export function parseAnswer(text: string, known: (id: string) => ReferenceKind, streaming = false): AnswerPart[] {
   const parts: AnswerPart[] = [];
-  const opening = /^```tracevista[\t ]*\r?\n/gmi;
   let cursor = 0; let count = 0;
-  for (let match = opening.exec(text); match; match = opening.exec(text)) {
-    if (match.index > cursor) parts.push({ type: 'text', text: text.slice(cursor, match.index) });
-    const from = match.index + match[0].length;
-    const tail = text.slice(from);
-    const closing = /^```[\t ]*\r?$/m.exec(tail);
-    if (!closing) {
-      parts.push({ type: streaming ? 'pending' : 'fallback', text: text.slice(match.index) });
-      cursor = text.length; break;
+  let fence: { marker: string; length: number; start: number; bodyStart: number; explanation: boolean } | null = null;
+  const appendText = (end: number) => { if (end > cursor) parts.push({ type: 'text', text: text.slice(cursor, end) }); };
+  for (let start = 0; start < text.length;) {
+    const newline = text.indexOf('\n', start);
+    const end = newline === -1 ? text.length : newline;
+    const next = newline === -1 ? text.length : newline + 1;
+    const line = text.slice(start, end).replace(/\r$/, '');
+    const boundary = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (boundary && boundary[1][0] === fence.marker && boundary[1].length >= fence.length && !boundary[2].trim()) {
+        if (fence.explanation) {
+          const value = ++count <= 2 ? parseExplanation(text.slice(fence.bodyStart, start), known) : null;
+          parts.push(value ? { type: 'explanation', value } : { type: 'fallback', text: text.slice(fence.start, end) });
+          cursor = end;
+        }
+        fence = null;
+      }
+    } else if (boundary && (boundary[1][0] !== '`' || !boundary[2].includes('`'))) {
+      const explanation = boundary[1][0] === '`' && boundary[2].trim().toLowerCase() === 'tracevista';
+      if (explanation) appendText(start);
+      fence = { marker: boundary[1][0], length: boundary[1].length, start, bodyStart: next, explanation };
+    } else {
+      const heading = /^ {0,3}(#{1,6})(?:[\t ]+(.*)|$)/.exec(line);
+      if (heading) {
+        appendText(start);
+        parts.push({ type: 'heading', level: heading[1].length as 1 | 2 | 3 | 4 | 5 | 6,
+          text: (heading[2] ?? '').replace(/(?:^|[\t ]+)#+[\t ]*$/, '').trim() });
+        cursor = next;
+      }
     }
-    const end = from + closing.index + closing[0].length;
-    const value = ++count <= 2 ? parseExplanation(text.slice(from, from + closing.index), known) : null;
-    parts.push(value ? { type: 'explanation', value } : { type: 'fallback', text: text.slice(match.index, end) });
-    cursor = end; opening.lastIndex = end;
+    start = next;
   }
-  if (cursor < text.length) parts.push({ type: 'text', text: text.slice(cursor) });
+  if (fence?.explanation) {
+    parts.push({ type: streaming ? 'pending' : 'fallback', text: text.slice(fence.start) });
+    cursor = text.length;
+  }
+  appendText(text.length);
   return parts;
 }
 

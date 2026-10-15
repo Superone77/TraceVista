@@ -14,7 +14,7 @@ import ViewerMenu from './ViewerMenu';
 import ExampleMenu from './ExampleMenu';
 import StoryRail, { type Depth } from './StoryRail';
 import PlaybackControls from './PlaybackControls';
-import { playbackSteps } from './playback';
+import { playbackSteps, playbackAnchor, type PlaybackDepth } from './playback';
 import { usePlayback } from './usePlayback';
 import { eventDestination, revealStoryEvidence, expandStoryToTier, revealStoryPath } from './storyDisclosure';
 import { deliveredState, keyDecisions, mainLine, workMix } from './story';
@@ -345,7 +345,8 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
   } | null>(null);
   const restorePlayback = useRef(false);
   const [storyRestore, setStoryRestore] = useState<{ top: number; revision: number } | null>(null);
-  const steps = useMemo(() => playbackSteps(graph, phaseFlow(graph)), [graph]);
+  const [playbackDepth, setPlaybackDepth] = useState<PlaybackDepth>('states');
+  const steps = useMemo(() => playbackSteps(graph, phaseFlow(graph), playbackDepth), [graph, playbackDepth]);
   const clearStoryRestore = useCallback(() => setStoryRestore(null), []);
   const playback = usePlayback(steps, {
     begin: () => {
@@ -355,11 +356,15 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       journeyTucked.current = false; setJourneyOpen(true);
     },
     visit: step => {
+      pendingJump.current = null;
       setFocusEvent(null);
       // Keep the current path readable without accumulating every expanded raw record.
-      setStoryExpanded(step.kind === 'state' ? new Set() : revealStoryPath(original, new Set(), step.node));
+      const expanded = step.kind === 'state' ? new Set<string>() : revealStoryPath(original, new Set(), step.node);
+      if (step.kind === 'branch') expanded.delete(step.node);
+      if (step.kind === 'action' && playbackDepth === 'raw') expanded.add(step.node);
       if (step.kind === 'state') flyToState(step.node);
-      else moveTo(step.node, step.kind === 'branch' ? 'branches' : 'actions', false);
+      else moveTo(step.node, step.kind === 'branch' ? 'branches' : playbackDepth === 'raw' ? 'raw' : 'actions', false);
+      setStoryExpanded(expanded);
     },
     end: () => {
       const saved = playbackSnapshot.current;
@@ -376,6 +381,12 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       setStoryRestore(previous => saved.journeyOpen ? { top: saved.scrollTop, revision: (previous?.revision ?? 0) + 1 } : null);
     },
   });
+  const changePlaybackDepth = (depth: PlaybackDepth) => {
+    if (depth === playbackDepth) return;
+    const next = playbackSteps(graph, phaseFlow(graph), depth);
+    if (playback.active) playback.seek(playbackAnchor(next, playback.step), next.length);
+    setPlaybackDepth(depth);
+  };
   pausePlayback.current = playback.pause;
   useLayoutEffect(() => {
     if (!restorePlayback.current || playback.active) return;
@@ -561,7 +572,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { playback.pause(); overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => { playback.pause(); moveTo(n.id); }} onPaneClick={() => { playback.pause(); setSelected(null); }} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
-      <PlaybackControls playback={playback} onEvidence={evidence} onOpen={jump} />
+      <PlaybackControls playback={playback} depth={playbackDepth} onDepthChange={changePlaybackDepth} onEvidence={evidence} onOpen={jump} />
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
         <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />

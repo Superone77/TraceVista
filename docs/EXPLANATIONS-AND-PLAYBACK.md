@@ -21,6 +21,8 @@ adjacent cards do not imply a causal link. The React renderer supports branching
 scrollable tables. Titles and evidence buttons use the same Story/Map navigation as text
 citations. Unresolved IDs are shown without navigation. Invalid or interrupted blocks keep
 their original text, and complete answer text remains in exported Chat history.
+Markdown headings (`#` through `######`) render at chat-sized heading levels. References
+inside headings remain clickable. Heading syntax inside code fences stays literal.
 
 Flow limits: 2–8 nodes, at most 12 edges, no cycles. Table limits: 2–6 columns, 1–12 rows.
 These limits keep explanations readable inside Chat. A graph with a rollback can describe
@@ -28,13 +30,16 @@ the restoration as a later step that references the earlier version.
 
 ## Play
 
-**Play** visits each state and work phase, then the phase's annotated observations,
-decisions, and state-changing actions. Phase order matches the numbering in Story and Map.
+**Play** starts at the system-state level. The **Playback depth** selector can include work
+phases, all actions, or raw records. Raw depth stops once per action and opens its complete
+original records together, including tool calls and their results. Phase order matches the numbering in Story and Map.
 Rejected branches and proposed ideas stay visible; a proposal remains labelled as such.
 The sequence is a reading walkthrough of the export, not a replay of program execution
 or a reconstruction of concurrent session timing.
 
-The player offers pause/resume, previous/next, a position slider, and 4/8/15 seconds per step.
+The player offers pause/resume, previous/next, a position slider, and 4/8/15 seconds per step
+(4 seconds by default). Changing depth pauses at the current node, or its closest visible
+ancestor when that node is outside the new depth.
 Source buttons open original records. Manual navigation and switching away from the tab
 pause playback. Exit (or Escape outside Chat) restores the camera, selected node, Story
 expansion and scroll position, Story visibility, state relationship mode, and folds from before playback. Playback
