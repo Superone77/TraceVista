@@ -73,7 +73,7 @@ export default function ExampleMenu({ examples, loading = false }: { examples: E
       }}>
       {t(loading ? 'Loading…' : 'View examples')} <span aria-hidden="true">▾</span>
     </button>
-    <nav ref={panel} id={panelId} className="example-menu-panel" aria-label={t('Example trajectories')} hidden={!open}>
+    <nav ref={panel} id={panelId} className="example-menu-panel" aria-label={t('Example Trajectories')} hidden={!open}>
       <ul className="example-menu-list">{examples.map(example => {
         const metadata = [example.agent, example.task].filter(Boolean).join(' · ');
         return <li key={example.id}><a href={`?example=${encodeURIComponent(example.id)}`}>

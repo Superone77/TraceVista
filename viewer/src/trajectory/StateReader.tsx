@@ -11,7 +11,7 @@ import PanelResizeHandle from './PanelResizeHandle';
 import { chatBounds, clampChatWidth } from './panelSizing';
 import Instructions from './Instructions';
 import ViewerMenu from './ViewerMenu';
-import ExampleMenu from './ExampleMenu';
+import ExampleGallery from './ExampleGallery';
 import StoryRail, { type Depth } from './StoryRail';
 import PlaybackControls from './PlaybackControls';
 import { playbackSteps, playbackAnchor, type PlaybackDepth } from './playback';
@@ -544,7 +544,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
     <div className="toolbar">
       <div className="view-options story-controls"><ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
-          <FilePicker label={t('Import trajectory')} onImport={onImport} />
+          <FilePicker label={t('Import Trajectory')} onImport={onImport} />
           <button onClick={() => { download(); dismiss(); }}>{t('Export complete trace')}</button>
           <button onClick={onHome}>{t('Home')}</button>
         </div>
@@ -624,7 +624,28 @@ function App() {
   // Everything an analyst or a model wrote follows the interface language when the file carries a translation.
   const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
   useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
-  return <>{error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}{graph ? <ReactFlowProvider key={revision}><Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} /></ReactFlowProvider> : <div className="welcome welcome-with-instructions"><div className="welcome-layout"><div className="welcome-hero"><div className="welcome-lang"><LangToggle /></div><h1>TraceVista</h1><div className="welcome-actions"><FilePicker label={t('Import trajectory')} onImport={loadFile} /><ExampleMenu examples={exampleCatalog} loading={loading} /></div></div><Instructions /></div></div>}</>;
+  return <>
+    {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
+    {graph ? <ReactFlowProvider key={revision}>
+      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} />
+    </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
+      <div className="welcome-lang"><LangToggle /></div>
+      <div className="welcome-layout">
+        <section className="welcome-hero" aria-labelledby="welcome-title">
+          <h1 id="welcome-title">TraceVista</h1>
+          <p className="welcome-tagline">
+            <span style={{ color: lang === 'en' ? colors.Explore : undefined }}>{t('Understand')}</span>{' '}
+            <span style={{ color: lang === 'en' ? colors.Plan : undefined }}>{t('Your')}</span>{' '}
+            <span style={{ color: lang === 'en' ? colors.Edit : undefined }}>{t('Agents')}</span>
+          </p>
+          <div className="welcome-actions"><FilePicker label={t('Import Trajectory')} onImport={loadFile} /></div>
+          {loading && <p className="welcome-loading" role="status">{t('Loading…')}</p>}
+        </section>
+        <Instructions />
+        <ExampleGallery examples={exampleCatalog} />
+      </div>
+    </div>}
+  </>;
 }
 
 export default function StateReader() {

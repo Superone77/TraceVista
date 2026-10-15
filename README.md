@@ -2,18 +2,24 @@
 
 # TraceVista
 
-**See how coding agents solve problems.**
+**Understand Your Agents.**
 
-Turn agent logs into an interactive map of states, decisions, and evidence.<br/>
-Zoom out to follow the story. Zoom in to read the original work. Ask questions along the way.
+Turn agent logs into interactive maps and stories.<br/>
+Explore decisions, replay the work, and get answers linked to the original evidence.
+
+For coding, research, and creative workflows.
 
 [**Open TraceVista**](https://tracevista.pages.dev/) · [**Explore examples**](#explore-real-agent-runs) · [**Convert your trajectory**](#bring-your-own-trajectory) · [Docs](docs/VIEWER.md)
 
 </div>
 
+**You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
+
+TraceVista helps you follow the work behind the result. See what changed, which attempts failed, and where the agent changed direction. Explore the map, read the story, or press **Play** to walk through the run. When something needs a closer look, ask a question and jump from the answer to the original messages, tool calls, and results.
+
 ## One run. Four levels of detail.
 
-A coding session can contain hundreds of messages, edits, and tool calls. TraceVista gives that work a structure you can explore:
+Explore the same run at four connected levels:
 
 **System states → Work phases → Actions → Raw records**
 
