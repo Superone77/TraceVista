@@ -17,9 +17,9 @@ For coding, research, and creative workflows.
 
 **English** · [简体中文](README.zh-CN.md)
 
-[![Switching from system states to work phases, actions, and raw records](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
 </div>
+
+https://github.com/user-attachments/assets/2a7f474b-ba02-4f01-85b6-4652edecaf76
 
 **You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
 
@@ -80,6 +80,8 @@ Explore the same run at four connected levels:
 
 Pan and zoom through the same canvas, or jump between levels with the toolbar. Select any card to open its path in **Story** and follow its evidence.
 
+[![Switching the map from system states to work phases and actions while Story expands to the same place](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
 ## Follow the decisions
 
 See what the agent tried, what it learned, and what happened next. Decision markers highlight discoveries, rejected ideas, pivots, and open questions. **Decisions only** folds routine steps so the important turns stand out.
@@ -88,13 +90,13 @@ Switch between **Version tree** and **Execution order** to follow both code ance
 
 Press **Play** for a guided walkthrough. Story opens the current step while Map moves to the same place. Pause, move backward or forward, change the pace, or open the original evidence. Exit returns to your previous view.
 
-[![Comparing the version tree with execution order and inspecting a regressed candidate](docs/images/version-history.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![Pressing Play: Story highlights each step while the map moves to the same state](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 ## Go straight to the evidence
 
 Expand a card's sentence in **Story**, then read the original messages, code, tool calls, and results behind it. Full explanations appear beneath the short labels as you expand. Follow the agent's explanation all the way to the recorded work.
 
-[![Opening action details, reading the original tool call, and checking its result](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![Expanding a state in Story to its work phases, an action, and the original records behind it](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Bring the main agent and its reviewers into one map. Follow a review request through feedback, revisions, and another round of checks. Inspect skill use, knowledge reuse, TODOs, and measurements in **Structure & evidence**.
 
@@ -108,7 +110,7 @@ Select a node, open **Chat**, and ask about that step or the run around it:
 
 Ask how a decision happened to get a linked flow diagram, or compare attempts in a table. Click a claim or its evidence to locate it in Story and Map. The answer distinguishes recorded observations, interpretations, and open questions.
 
-[![A real model answer with Smart context: inspect the selected records, click a cited action to jump to it, and open an original measurement from the answer](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+[![Asking why identity caching was abandoned: a real model answer with a linked flow diagram, then a cited action opens in Story and Map](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
 
