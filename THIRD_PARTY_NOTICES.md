@@ -41,4 +41,5 @@ license does not replace those terms.
 The default viewer build includes no example trajectories. A showcase build includes the
 pinned library notices at `examples/THIRD_PARTY_NOTICES.md` and its license copies under
 `examples/LICENSES/`. See [docs/EXAMPLES.md](docs/EXAMPLES.md) for the local library layout,
-pinned version, and build commands. Publication of the separate data repository is pending.
+pinned version, and build commands. The library is available at
+[Superone77/TraceVista-examples](https://github.com/Superone77/TraceVista-examples).

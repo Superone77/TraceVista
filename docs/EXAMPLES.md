@@ -72,6 +72,8 @@ Keep the data and viewer changes reviewable as separate commits:
 
 Example tests validate the pinned files, so refresh the lock before testing changed data. These checks do not rerun the original model or benchmark.
 
+Push the data commit before merging a viewer lock that references it. If a squash or rebase merge changes the data commit, refresh the lock to the retained commit before releasing the showcase.
+
 Keep Pi Agent first in the catalog. Preserve the original messages, IDs, call/result pairing, source attachments, and license text. Analyst annotations must remain distinct from recorded evidence.
 
 The Garden Animation case is a fixed excerpt, from `continued:E853` through `continued:E1098`, packaged as a complete export for that scope. Its full session export and later videos stay out of both repositories. Adding, replacing, or extending a public case follows the maintainer approval rule in [AGENTS.md](../AGENTS.md).
