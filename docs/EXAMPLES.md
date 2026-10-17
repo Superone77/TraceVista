@@ -2,7 +2,7 @@
 
 TraceVista's viewer and conversion skill work without a dataset checkout. The six public cases on the [website](https://tracevista.pages.dev/) live in a separate `TraceVista-examples` repository. The JSON format and `tracevista-skill` workflow are unchanged: import a complete `.agent-state.json` into either viewer.
 
-The data repository has been prepared locally. Publishing it as `Superone77/TraceVista-examples` is pending; the commands below assume you already have a local copy.
+The public library lives at [Superone77/TraceVista-examples](https://github.com/Superone77/TraceVista-examples). Each showcase build uses the data revision recorded in this repository's `examples.lock.json`.
 
 ## One codebase, two builds
 
@@ -27,10 +27,13 @@ parent/
     └── LICENSES/
 ```
 
-From the viewer repository, check out the data revision recorded in its lock file:
+From the viewer repository, clone the library and check out the data revision recorded in its lock file. Skip the clone command if you already have the sibling checkout:
 
 ```bash
-git -C ../TraceVista-examples checkout "$(node -p "require('./examples.lock.json').revision")"
+git clone --no-checkout https://github.com/Superone77/TraceVista-examples.git ../TraceVista-examples
+example_revision="$(node -p "require('./examples.lock.json').revision")"
+git -C ../TraceVista-examples fetch origin "$example_revision"
+git -C ../TraceVista-examples checkout --detach "$example_revision"
 pnpm test:examples
 pnpm dev:site
 ```
