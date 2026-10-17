@@ -155,7 +155,7 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 需要 **Node.js 24.x** 和 **pnpm 11.19.0**。
 
 ```bash
-git clone https://github.com/Superone77/TraceVista.git
+git clone --depth 1 --branch main https://github.com/Superone77/TraceVista.git
 cd TraceVista
 npm install -g pnpm@11.19.0
 pnpm install --frozen-lockfile --ignore-scripts
@@ -163,6 +163,8 @@ pnpm dev
 ```
 
 打开 [localhost:8875](http://127.0.0.1:8875/)，导入 `.agent-state.json`。默认的查看器、构建和测试都无需示例库。
+
+浅克隆只下载最新的 `main` 快照。独立查看器和官网共用本仓库的引擎与界面代码；官网构建时加入单独管理版本的案例数据。
 
 | 命令 | 用途 |
 |---|---|

@@ -4,6 +4,12 @@ TraceVista's viewer and conversion skill work without a dataset checkout. The si
 
 The data repository has been prepared locally. Publishing it as `Superone77/TraceVista-examples` is pending; the commands below assume you already have a local copy.
 
+## One codebase, two builds
+
+Both variants compile the same `viewer/` source, including the example-gallery UI. The default build uses an empty catalog and shows a link to the website. The showcase build supplies the pinned catalog and copies its approved assets into `dist-site/`. `TraceVista-examples` contains data and attribution, while viewer features and fixes stay in the main code repository.
+
+Deploy `dist-site/` to Cloudflare Pages for the website. Build it from a reviewed viewer commit and the data revision in `examples.lock.json`; no separate website code branch is needed.
+
 ## Run the showcase
 
 Use this layout, or set `TRACEVISTA_EXAMPLES_DIR` to the example repository root:

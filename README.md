@@ -155,7 +155,7 @@ The records are never translated. Summaries written by a model tend to sound mor
 Requires **Node.js 24.x** and **pnpm 11.19.0**.
 
 ```bash
-git clone https://github.com/Superone77/TraceVista.git
+git clone --depth 1 --branch main https://github.com/Superone77/TraceVista.git
 cd TraceVista
 npm install -g pnpm@11.19.0
 pnpm install --frozen-lockfile --ignore-scripts
@@ -163,6 +163,8 @@ pnpm dev
 ```
 
 Open [localhost:8875](http://127.0.0.1:8875/) and import a `.agent-state.json`. The default viewer, build, and tests work without the example library.
+
+The shallow clone downloads the latest `main` snapshot. Both the standalone viewer and the website use the same viewer and UI source in this repository; the website build adds the separately versioned example data.
 
 | Command | Result |
 |---|---|
