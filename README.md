@@ -4,8 +4,8 @@
 
 **Understand Your Agents.**
 
-Turn agent logs into interactive maps and stories.<br/>
-Explore decisions, replay the work, and get answers linked to the original evidence.
+Understand complex agent trajectories.<br/>
+Start with the big picture, unfold the details, and check the original evidence.
 
 For coding, research, and creative workflows.
 
@@ -21,9 +21,30 @@ For coding, research, and creative workflows.
 
 https://github.com/user-attachments/assets/2a7f474b-ba02-4f01-85b6-4652edecaf76
 
-**You let an agent run overnight. It says “Done” and leaves thousands of lines of logs. How did it get there?**
+## Don't let agent work become cognitive debt
 
-TraceVista helps you follow the work behind the result. See what changed, which attempts failed, and where the agent changed direction. Explore the map, read the story, or press Play to walk through the run. When something needs a closer look, ask a question and jump from the answer to the original messages, tool calls, and results.
+**Cognitive debt may be more dangerous than technical debt in the age of AI.**
+
+Your agent finishes an overnight run. You're ready to ship, but its reasoning, tool calls, edits, and outputs are scattered across thousands of records.
+
+Andrej Karpathy argues that we'll spend more time understanding model outputs. Yet under pressure to ship, we have limited time to understand what our agents did and the code they leave behind:
+
+- What approaches did the agent explore?
+- Why did it abandon one direction?
+- What evidence supports the final version?
+
+Those unanswered questions accumulate as **cognitive debt**, making the project harder to maintain.
+
+**That's why we built TraceVista.** Start with the big picture, explore the details, and check the evidence wherever something doesn't add up.
+
+- 🗺️ [**See the decision map.**](#see-the-decision-map) Follow approaches, failures, pivots, and version history.
+- 🔍 [**Unfold the details.**](#unfold-the-details) Move from system states to work phases, actions, and original records—then step back without losing your place.
+- 💬 [**Ask questions in context.**](#ask-questions-in-context) Ask about a node and follow citations back to the evidence.
+- 📄 [**Inspect the originals.**](#inspect-the-originals) Read the source records alongside the summaries.
+
+Understanding an agent's work shouldn't depend on trusting another AI-generated summary.
+
+TraceVista is open source. [Explore a real session](https://tracevista.pages.dev/#examples), [bring your own](#bring-your-own-trajectory), and [tell us what's still hard to understand](https://github.com/Superone77/TraceVista/issues).
 
 ## Explore real agent runs
 
@@ -65,7 +86,17 @@ The map, annotations, original records, and source attachments travel together i
 
 [Skill guide](skills/tracevista-skill/SKILL.md) · [Conversion workflow](skills/tracevista-skill/references/conversion.md) · [Multiple agents](skills/tracevista-skill/references/multi-agent.md)
 
-## One run. Four levels of detail.
+## See the decision map
+
+See what the agent tried, what it learned, and what happened next. Decision markers highlight discoveries, rejected ideas, pivots, and open questions. **Decisions only** folds routine steps so the important turns stand out.
+
+Switch between **Version tree** and **Execution order** to follow both code ancestry and the sequence of work. Restored versions, abandoned candidates, and final selections stay visible. Measurements sit alongside the states they describe.
+
+Press **Play** for a guided walkthrough. Story opens the current step while Map moves to the same place. Pause, move backward or forward, change the pace, or open the original evidence. Exit returns to your previous view.
+
+[![Pressing Play: Story highlights each step while the map moves to the same state](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+## Unfold the details
 
 Explore the same run at four connected levels:
 
@@ -82,25 +113,7 @@ Pan and zoom through the same canvas, or jump between levels with the toolbar. S
 
 [![Switching the map from system states to work phases and actions while Story expands to the same place](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
-## Follow the decisions
-
-See what the agent tried, what it learned, and what happened next. Decision markers highlight discoveries, rejected ideas, pivots, and open questions. **Decisions only** folds routine steps so the important turns stand out.
-
-Switch between **Version tree** and **Execution order** to follow both code ancestry and the sequence of work. Restored versions, abandoned candidates, and final selections stay visible. Measurements sit alongside the states they describe.
-
-Press **Play** for a guided walkthrough. Story opens the current step while Map moves to the same place. Pause, move backward or forward, change the pace, or open the original evidence. Exit returns to your previous view.
-
-[![Pressing Play: Story highlights each step while the map moves to the same state](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
-## Go straight to the evidence
-
-Expand a card's sentence in **Story**, then read the original messages, code, tool calls, and results behind it. Full explanations appear beneath the short labels as you expand. Follow the agent's explanation all the way to the recorded work.
-
-[![Expanding a state in Story to its work phases, an action, and the original records behind it](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
-Bring the main agent and its reviewers into one map. Follow a review request through feedback, revisions, and another round of checks. Inspect skill use, knowledge reuse, TODOs, and measurements in **Structure & evidence**.
-
-## Chat with your trajectory
+## Ask questions in context
 
 Select a node, open **Chat**, and ask about that step or the run around it:
 
@@ -113,6 +126,14 @@ Ask how a decision happened to get a linked flow diagram, or compare attempts in
 [![Asking why identity caching was abandoned: a real model answer with a linked flow diagram, then a cited action opens in Story and Map](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 Connect Claude, OpenAI, Gemini, DeepSeek, Kimi, GLM, Qwen, MiniMax, OpenRouter, or your own compatible endpoint. Local models work through Ollama and LM Studio.
+
+## Inspect the originals
+
+Expand a card in **Story** to read the original messages, code, tool calls, and results behind it. The records stay accessible alongside the summaries, so you can check an explanation against its sources and form your own view of what happened.
+
+[![Expanding a state in Story to its work phases, an action, and the original records behind it](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+Bring the main agent and its reviewers into one map. Follow a review request through feedback, revisions, and another round of checks. Inspect skill use, knowledge reuse, TODOs, and measurements in **Structure & evidence**.
 
 ## Designed for informed decisions
 
@@ -144,7 +165,7 @@ Click it and its work phases open underneath; click a phase for its actions, and
 </details>
 
 <details>
-<summary>TraceVista keeps <strong>the agent's own records word for word</strong>, and every sentence about them opens down to those records.</summary>
+<summary>TraceVista keeps <strong>the agent's own records word for word</strong>, so you can unfold summaries and check their sources.</summary>
 
 The records are never translated. Summaries written by a model tend to sound more certain than their sources. In our checks of [TextFold](https://github.com/chenxiachan/textfold)'s paper summaries, one had turned *potentially harmful* into *harmful*. Because the records are always there to check, readers can match their trust to the evidence (Lee & See, 2004).
 

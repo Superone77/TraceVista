@@ -4,8 +4,8 @@
 
 **看懂你的 Agent。**
 
-把 agent 日志变成可交互的地图和故事线。<br/>
-查看决策，回放过程，答案都链接回原始证据。
+看懂复杂的 agent 轨迹。<br/>
+先看全貌，再展开细节，遇到疑点就核对原始证据。
 
 适用于编程、研究和创作类任务。
 
@@ -21,9 +21,30 @@
 
 https://github.com/user-attachments/assets/2a7f474b-ba02-4f01-85b6-4652edecaf76
 
-**你让 agent 跑了一整夜。它说"完成了"，留下几千行日志。它到底是怎么做到的？**
+## 别让 agent 的工作变成认知债务
 
-TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败了，agent 在哪里换了方向。你可以浏览地图、阅读故事线，或者一键播放，从头走一遍。遇到需要细看的地方，直接提问，再从回答跳到原始的消息、工具调用和结果。
+**在 AI 时代，认知债务可能比技术债务更危险。**
+
+agent 跑了一整夜，任务完成，你准备交付。但它的推理记录、工具调用、代码修改和输出散落在几千条日志里。
+
+Andrej Karpathy 提出，我们会花更多时间理解模型的输出。但在交付压力下，我们很难抽出足够的时间，弄清 agent 做过什么，以及它留下的代码：
+
+- agent 探索过哪些方案？
+- 它为什么放弃某个方向？
+- 最终版本有哪些证据支持？
+
+这些没有得到回答的问题不断积累，变成**认知债务**，让项目越来越难审查、修改和维护。
+
+**这就是我们做 TraceVista 的原因。** 先看全貌，再展开细节，遇到说不通的地方，就回到证据里核对。
+
+- 🗺️ [**看清决策地图。**](#看清决策地图) 追踪探索过的方案、失败、转向和版本历史。
+- 🔍 [**逐层展开细节。**](#逐层展开细节) 从系统状态深入到工作阶段、动作和原始记录，再返回上层，保留阅读位置。
+- 💬 [**结合上下文提问。**](#结合上下文提问) 围绕一个节点提问，沿着回答中的引用回到证据。
+- 📄 [**核对原始记录。**](#核对原始记录) 把摘要和它背后的原始记录放在一起看。
+
+理解 agent 的工作，不应该只能依赖另一份 AI 生成的摘要。
+
+TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#examples)、[导入自己的轨迹](#导入你自己的轨迹)，并[告诉我们还有什么难以理解](https://github.com/Superone77/TraceVista/issues)。
 
 ## 浏览真实的 agent 运行
 
@@ -65,7 +86,17 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 
 [Skill 指南](skills/tracevista-skill/SKILL.md) · [转换流程](skills/tracevista-skill/references/conversion.md) · [多 agent](skills/tracevista-skill/references/multi-agent.md)
 
-## 一次运行，四层细节
+## 看清决策地图
+
+看 agent 尝试了什么、发现了什么、接下来做了什么。决策标记会标出新发现、被否决的想法、方向转变和悬而未决的问题。**只看决策** 会折叠常规步骤，让关键转折更突出。
+
+在 **版本树** 和 **执行顺序** 之间切换，既能看代码的继承关系，也能看工作的先后顺序。恢复的版本、放弃的候选和最终选择都会保留在图上。测量结果显示在对应的状态旁边。
+
+按 **播放** 进入导览：故事线展开当前步骤，地图同步移动到相同位置。你可以暂停、前进、后退、调整速度，或者打开原始证据。退出后会回到之前的视图。
+
+[![按下播放：故事线逐步高亮，地图同步移动到对应的状态](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+## 逐层展开细节
 
 同一次运行可以在四个相互关联的层级上查看：
 
@@ -82,25 +113,7 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 
 [![地图从系统状态切换到工作阶段和动作，故事线同步展开到相同位置](docs/images/semantic-zoom.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
-## 跟着决策走
-
-看 agent 尝试了什么、发现了什么、接下来做了什么。决策标记会标出新发现、被否决的想法、方向转变和悬而未决的问题。**只看决策** 会折叠常规步骤，让关键转折更突出。
-
-在 **版本树** 和 **执行顺序** 之间切换，既能看代码的继承关系，也能看工作的先后顺序。恢复的版本、放弃的候选和最终选择都会保留在图上。测量结果显示在对应的状态旁边。
-
-按 **播放** 进入导览：故事线展开当前步骤，地图同步移动到相同位置。你可以暂停、前进、后退、调整速度，或者打开原始证据。退出后会回到之前的视图。
-
-[![按下播放：故事线逐步高亮，地图同步移动到对应的状态](docs/images/story-playback.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
-## 直达证据
-
-在 **故事线** 中展开一张卡片的句子，就能读到它背后的原始消息、代码、工具调用和结果。展开后，简短标签下方会显示完整解释。agent 的每一句说法都可以一直追溯到记录下来的实际工作。
-
-[![在故事线中把一个状态逐层展开到工作阶段、动作和背后的原始记录](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
-
-主 agent 和 reviewer 可以放进同一张地图。你可以跟着一次评审请求，看反馈、修改和下一轮检查。在 **结构与证据** 中可以查看 skill 使用、知识复用、TODO 和测量结果。
-
-## 和轨迹对话
+## 结合上下文提问
 
 选中一个节点，打开 **对话**，就这一步或它周围的过程提问：
 
@@ -113,6 +126,14 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 [![询问 agent 为什么放弃 identity caching：真实的模型回答附带关联流程图，点击引用的动作后在故事线和地图中定位到它](docs/images/node-chat.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
 
 支持连接 Claude、OpenAI、Gemini、DeepSeek、Kimi、GLM、Qwen、MiniMax、OpenRouter，或你自己的兼容接口。本地模型可以通过 Ollama 和 LM Studio 使用。
+
+## 核对原始记录
+
+在 **故事线** 中展开一张卡片，就能读到它背后的原始消息、代码、工具调用和结果。原始记录始终可以在摘要旁查看，你可以对照来源核查解释，自己判断发生了什么。
+
+[![在故事线中把一个状态逐层展开到工作阶段、动作和背后的原始记录](docs/images/raw-evidence.gif)](https://tracevista.pages.dev/?example=pi-agent-lora)
+
+主 agent 和 reviewer 可以放进同一张地图。你可以跟着一次评审请求，看反馈、修改和下一轮检查。在 **结构与证据** 中可以查看 skill 使用、知识复用、TODO 和测量结果。
 
 ## 为知情决策而设计
 
@@ -144,7 +165,7 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 </details>
 
 <details>
-<summary>TraceVista <strong>逐字保留 agent 自己的记录</strong>，关于这些记录的每一句话都能一路展开到记录本身。</summary>
+<summary>TraceVista <strong>逐字保留 agent 自己的记录</strong>，你可以展开摘要，核对它的来源。</summary>
 
 这些记录不做翻译。模型写的摘要往往比原文说得更肯定。我们核对 [TextFold](https://github.com/chenxiachan/textfold) 的论文摘要时，发现有一处把 potentially harmful（可能有害）写成了 harmful（有害）。原始记录随时可查，读者就能按证据调整自己的信任（Lee & See, 2004）。
 
