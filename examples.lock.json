@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "repository": "https://github.com/Superone77/TraceVista-examples.git",
+  "revision": "9c535704f5ac4a08072376dd835f9ea46f9174b9",
+  "files": {
+    "LICENSES/PostTrainBench-Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "THIRD_PARTY_NOTICES.md": "55c5fbaafb42ed14d019d37878147566f9bdffe3430d2a999ad99f3afaa934d5",
+    "example-thumbnails/codex-garden-animation.webp": "755f04a3f9778c357c4cacbd5e814893ff2b624e342157f7d4bd9b768cf0348b",
+    "example-thumbnails/inferencebench-serving-recovery.png": "313efdacbf3f5154a57b4f8a011e0b9a35c7c67737ab787d63fe31f9cc1356ae",
+    "example-thumbnails/literesearcher-affiliations.png": "e3ab451065ac9661ace9ae608534a1c9f2be77a958888ef0724147a30face63b",
+    "example-thumbnails/pi-agent-lora.png": "3095348af77505e5f3929a9da1cd62226722c0d2013a16cf4fd30f1af4e779b4",
+    "example-thumbnails/posttrainbench-fable5-aime.png": "2afd02415e5957026338da7b814cab5ffc15108635ac49265c1325069855076d",
+    "example-thumbnails/swe-rebench-kafka-retry.png": "05dcb91e1b1f1cd161523a37a89b5b927cf510978e7f8978cc74a6020c8a9451",
+    "examples/codex-garden-animation.agent-state.json": "0b040c9179978b238705c5e04017846006ce269f9074054acc959d4a1c075d05",
+    "examples/index.json": "b3196a92e2ef9e410bb0c4367efb836d220886eef863f912fb8f74282ab813e9",
+    "examples/inferencebench-serving-recovery.agent-state.json": "3eb94f6e5ed613bdc29b346bac29f055f4f74ffa7bccbbe3963e98bbbca2f3eb",
+    "examples/literesearcher-affiliations.agent-state.json": "8f781129db4114c7cdf7c7090e874f932789f735c2241fb0b7a111afeff15c96",
+    "examples/pi-agent-lora.agent-state.json": "81e53150c23116f88e0291f68a3a236017e45efd6ab5b3e6438db569799df5b2",
+    "examples/posttrainbench-fable5-aime.agent-state.json": "1bfcd5ced3b3e506e152de0b8147e8da7051f8b1fe83db400a813c0c513877ef",
+    "examples/swe-rebench-kafka-retry.agent-state.json": "1f022811948b0bd13d972eb8d17419de9f145ee88eabb2452cf9ae593efc4249"
+  }
+}

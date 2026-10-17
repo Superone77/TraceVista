@@ -60,6 +60,8 @@
  "Enter the API key for this provider": "填写这个服务商的 API Key",
  "Enter the model ID from your provider console": "填写服务商控制台里的模型 ID",
  "Example Trajectories": "示例轨迹",
+ "Explore examples on TraceVista": "在 TraceVista 浏览示例",
+ "This example is unavailable here. Explore examples on TraceVista or import a local JSON file.": "这里无法打开这个示例。请在 TraceVista 浏览示例，或导入本地 JSON 文件。",
  "Execute": "执行",
  "Execution order": "执行顺序",
  "Execution status": "执行状态",

@@ -157,14 +157,27 @@ TraceVista 帮你看清结果背后的过程：改了什么，哪些尝试失败
 需要 **Node.js 24.x** 和 **pnpm 11.19.0**。
 
 ```bash
-git clone https://github.com/Superone77/TraceVista.git
+git clone --depth 1 --branch main https://github.com/Superone77/TraceVista.git
 cd TraceVista
 npm install -g pnpm@11.19.0
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
 
-打开 [localhost:8875](http://127.0.0.1:8875/)。运行 `pnpm build` 会在 `dist/` 中生成静态网站，可以部署到 Cloudflare Pages 或其他静态托管服务。运行 `pnpm test` 会检查查看器、skill 和内置示例。
+打开 [localhost:8875](http://127.0.0.1:8875/)，导入 `.agent-state.json`。默认的查看器、构建和测试都无需示例库。
+
+浅克隆只下载最新的 `main` 快照。独立查看器和官网共用本仓库的引擎与界面代码；官网构建时加入单独管理版本的案例数据。
+
+| 命令 | 用途 |
+|---|---|
+| `pnpm dev` | 启动独立查看器。 |
+| `pnpm test` | 用小型测试数据检查查看器和转换 skill。 |
+| `pnpm build` | 将独立查看器构建到 `dist/`。 |
+| `pnpm dev:site` | 加载锁定版本的外部示例库，启动展示站。 |
+| `pnpm test:examples` | 检查完整示例导出及其来源证据。 |
+| `pnpm build:site` | 将展示站构建到 `dist-site/`。 |
+
+六个案例可以直接在[网站](https://tracevista.pages.dev/)浏览。本地运行展示站时，把独立的 `TraceVista-examples` 仓库放在当前仓库旁边，或设置 `TRACEVISTA_EXAMPLES_DIR`。查看器通过 `examples.lock.json` 固定数据提交和文件哈希。获取数据、验证和发布方法见[示例库说明](docs/EXAMPLES.md)。两种构建产物都可以部署到静态托管服务。
 
 ## 基于 TraceVista 开发
 
@@ -179,7 +192,7 @@ TraceVista 由一个 **React Flow 查看器** 和一个 **轨迹转换 skill** �
 
 ## 许可证
 
-TraceVista 的代码以 [MIT 许可证](LICENSE) 发布。内置的示例轨迹沿用各自来源的许可证，例如 Apache-2.0 和 CC-BY-4.0。每个来源及其条款见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+TraceVista 的代码以 [MIT 许可证](LICENSE) 发布。外部示例库沿用各自来源的许可证，例如 Apache-2.0 和 CC-BY-4.0，并保留独立的来源声明。代码署名与示例声明的位置见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 致谢
 

@@ -20,14 +20,13 @@ const commands=[
  [process.execPath,['viewer/scripts/test-providers.mjs']],
  [process.execPath,['viewer/scripts/test-handoff.mjs']],
  [process.execPath,['scripts/test-datasets.mjs']],
- [process.execPath,['scripts/test-pi-example.mjs']],
- [process.execPath,['scripts/test-posttrainbench-example.mjs']],
- [process.execPath,['scripts/test-benchmark-examples.mjs']],
- ['python3',['scripts/check-example-secrets.py']],
+ [process.execPath,['scripts/test-example-paths.mjs']],
+ [process.execPath,['scripts/test-example-build.mjs']],
+ [process.execPath,['scripts/test-example-lock.mjs']],
 ];
 for(const [command,args] of commands){
  const p=spawnSync(command,args,{cwd:root,stdio:'inherit'});
  if(p.error)throw p.error;
  if(p.status!==0)process.exit(p.status??1);
 }
-console.log('PASS: skill, viewer, bundled datasets, self-contained benchmark exports and example scan');
+console.log('PASS: core skill, viewer, dataset routing and example-library path checks');

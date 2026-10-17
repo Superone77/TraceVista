@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {exampleCatalog,exampleFile} from './example-library.mjs';
 
 const root=new URL('../',import.meta.url);
 const hash=text=>createHash('sha256').update(text).digest('hex');
@@ -13,9 +14,7 @@ async function mod(path){
 }
 const {parseGraph}=await mod('viewer/src/trajectory/model.ts');
 const {layoutGraph,semanticProjection}=await mod('viewer/src/trajectory/semantic.ts');
-const catalog=JSON.parse(readFileSync(new URL('viewer/public/examples/index.json',root),'utf8'));
-const examples=Array.isArray(catalog)?catalog:catalog.examples;
-assert(Array.isArray(examples),'The example catalog contains a list');
+const examples=exampleCatalog();
 
 function extractNative(source){
  const result=spawnSync('python3',['-c',
@@ -98,7 +97,7 @@ for(const id of selected)assert(configs.some(c=>c.id===id),`Unknown example: ${i
 for(const config of configs.filter(c=>!selected.size||selected.has(c.id))){
  const entry=examples.find(e=>e.id===config.id);
  assert(entry,`${config.id}: example is discoverable in the catalog`);
- const original=JSON.parse(readFileSync(new URL(`viewer/public/examples/${entry.file}`,root),'utf8'));
+ const original=JSON.parse(readFileSync(exampleFile(entry.file),'utf8'));
  const g=parseGraph(original);
  assert.equal(g.language,'en');
  for(const [pattern,field] of config.overview)assert.match(g.journey?.text??'',pattern,`${config.id}: Run overview explains ${field}`);

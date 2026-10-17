@@ -2,15 +2,17 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {stripTypeScriptTypes} from 'node:module';
 import {readFileSync} from 'node:fs';
+import {exampleFile} from './example-library.mjs';
 
 const root=new URL('../',import.meta.url);
 async function mod(path){
  const code=stripTypeScriptTypes(readFileSync(new URL(path,root),'utf8'));
  return import('data:text/javascript;base64,'+Buffer.from(code+`\n//# sourceURL=${path}\n`).toString('base64'));
 }
-const {parseGraph,stateVisual,observationsFor}=await mod('viewer/src/trajectory/model.ts');
+const {parseGraph,stateVisual,observationsFor,landmarkMoves}=await mod('viewer/src/trajectory/model.ts');
+const {readingCoverage}=await mod('viewer/src/trajectory/ladder.ts');
 const {layoutGraph,semanticProjection}=await mod('viewer/src/trajectory/semantic.ts');
-const original=JSON.parse(readFileSync(new URL('viewer/public/examples/pi-agent-lora.agent-state.json',root),'utf8'));
+const original=JSON.parse(readFileSync(exampleFile('pi-agent-lora.agent-state.json'),'utf8'));
 const hash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');
 
 // These hashes predate the name/configuration update. Editorial changes must not
@@ -96,4 +98,19 @@ for(const mode of ['lineage','chronology'])for(const tier of ['states','branches
  else assert(layout.nodes.find(n=>n.id==='s4').y>layout.nodes.find(n=>n.id==='s3').y,'Chronology preserves the order of submissions');
  projections.push({mode,tier,nodes:projected.nodes.length,edges:projected.edges.length});
 }
-console.log(JSON.stringify({passed:true,englishAnnotations:true,rawEventsPreserved:556,configurationInOverview:true,projections}));
+// Full-library assertions stay here; the core reading tests use an authored fixture.
+assert.equal(readingCoverage(g).ready,true,'The Pi Agent export has a complete reading layer');
+const branchOf=new Map(g.branches.map(b=>[b.id,b]));
+const squash=s=>s.replace(/[\s，。；、,.;]/g,'');
+for(const a of g.actions.filter(a=>a.ladder)){
+ const b=branchOf.get(a.branch);
+ assert(!squash(a.ladder.takeaway+(a.ladder.reason??'')).includes(squash(b.summary))&&a.ladder.takeaway!==b.ladder.takeaway,`${a.id} repeats its branch`);
+}
+const landmarks=[...g.branches,...g.actions].filter(e=>landmarkMoves.includes(e.move));
+assert(landmarks.length>=10,'The run has visible turns');
+const times=new Map(g.actions.map(a=>[a.id,a.t_min]));
+for(const l of g.links.filter(l=>l.kind==='informs'))assert(times.get(l.source)<=times.get(l.target),`${l.source} informs a later step`);
+const folded=layoutGraph(g,'actions','lineage',{fold:true});
+assert(folded.nodes.filter(n=>n.kind==='action').length<g.actions.length,'Decision view hides routine runs');
+assert(g.journey.cites.every(id=>[...g.states,...g.branches,...g.actions].some(e=>e.id===id)));
+console.log(JSON.stringify({passed:true,englishAnnotations:true,rawEventsPreserved:556,configurationInOverview:true,readingLayerTurns:landmarks.length,projections}));

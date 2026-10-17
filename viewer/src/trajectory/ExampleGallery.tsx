@@ -9,18 +9,8 @@ interface ExampleEntry {
   agent?: string;
   task?: string;
   thumbnail?: string;
+  thumbnailCrop?: [number, number, number, number];
 }
-
-// Frame each screenshot around its graph without including the viewer controls.
-// The wide PostTrainBench graph needs a wider crop to retain both outer branches.
-const thumbnailCrops: Record<string, [number, number, number, number]> = {
-  'pi-agent-lora': [136, 68, 1088, 612],
-  'posttrainbench-fable5-aime': [16, 72, 1248, 552],
-  'inferencebench-serving-recovery': [136, 68, 1088, 612],
-  'swe-rebench-kafka-retry': [136, 68, 1088, 612],
-  'literesearcher-affiliations': [112, 54, 1088, 612],
-  'codex-garden-animation': [16, 16, 1248, 702],
-};
 
 export default function ExampleGallery({ examples }: { examples: ExampleEntry[] }) {
   const { t } = useLang();
@@ -95,11 +85,18 @@ export default function ExampleGallery({ examples }: { examples: ExampleEntry[] 
     paused.current.until = performance.now() + 1800;
   };
 
-  if (!examples.length) return null;
+  if (!examples.length) return <section className="example-gallery" id="examples" aria-labelledby={headingId}>
+    <div className="example-gallery-header">
+      <h2 className="example-gallery-heading" id={headingId}>{t('Example Trajectories')}</h2>
+    </div>
+    <a className="example-gallery-explore" href="https://tracevista.pages.dev/#examples" target="_blank" rel="noopener noreferrer">
+      {t('Explore examples on TraceVista')}<span aria-hidden="true">↗</span>
+    </a>
+  </section>;
 
   const cards = (duplicate: boolean) => examples.map(example => {
       const metadata = [example.agent, example.task].filter(Boolean).join(' · ');
-      const [x, y, width, height] = thumbnailCrops[example.id] ?? [0, 0, 1280, 720];
+      const [x, y, width, height] = example.thumbnailCrop ?? [0, 0, 1280, 720];
 
       return <li key={example.id}>
         <a className="example-gallery-card" href={`?example=${encodeURIComponent(example.id)}`}
@@ -123,7 +120,7 @@ export default function ExampleGallery({ examples }: { examples: ExampleEntry[] 
       </li>;
     });
 
-  return <section className="example-gallery" aria-labelledby={headingId}>
+  return <section className="example-gallery" id="examples" aria-labelledby={headingId}>
     <div className="example-gallery-header">
       <h2 className="example-gallery-heading" id={headingId}>{t('Example Trajectories')}</h2>
     </div>

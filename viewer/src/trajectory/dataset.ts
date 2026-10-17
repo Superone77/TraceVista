@@ -1,12 +1,28 @@
-/** Resolve bundled examples and opt-in local data without accepting external URLs. */
-export interface Dataset { id: string; title: string; file: string; description: string }
+/** Resolve configured examples and opt-in local data without accepting external URLs. */
+export interface Dataset {
+  id: string;
+  title: string;
+  file: string;
+  description: string;
+  agent?: string;
+  task?: string;
+  thumbnail?: string;
+  thumbnailCrop?: [number, number, number, number];
+}
+
+export class ExampleUnavailableError extends Error {
+  constructor() {
+    super('This example is unavailable here. Explore examples on TraceVista or import a local JSON file.');
+  }
+}
+
 export function datasetRequest(search: string, catalog: Dataset[], base = './'): string | null {
   const p = new URLSearchParams(search), requested = p.get('example'), data = p.get('data');
   const example = requested === '1' ? catalog[0]?.id : requested; // Legacy shortcut opens the first listed example.
-  if (requested === '1' && !example) throw new Error('Bundled example not found.');
+  if (requested === '1' && !example) throw new ExampleUnavailableError();
   if (example) {
     const item = catalog.find(d => d.id === example);
-    if (!item || !/^[a-zA-Z0-9_-]+\.agent-state\.json$/.test(item.file)) throw new Error('Bundled example not found.');
+    if (!item || !/^[a-zA-Z0-9_-]+\.agent-state\.json$/.test(item.file)) throw new ExampleUnavailableError();
     return `${base}examples/${item.file}`;
   }
   if (data != null) {

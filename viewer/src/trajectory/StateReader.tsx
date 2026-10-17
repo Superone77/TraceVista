@@ -24,8 +24,8 @@ import { LangProvider, useLang } from './i18n';
 import { localizeGraph } from './localize';
 import './trajectory.css';
 import './interface.css';
-import exampleCatalog from '../../public/examples/index.json';
-import { datasetRequest } from './dataset';
+import exampleCatalog from 'virtual:tracevista-examples';
+import { datasetRequest, ExampleUnavailableError } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 
 const nodeTypes = { trajectory: MapCard };
@@ -612,7 +612,12 @@ function App() {
     if (handoff.request || handoff.invalid) return;
     let path: string | null;
     try { path = datasetRequest(location.search, exampleCatalog, import.meta.env.BASE_URL); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); setLoading(false); return; }
+    catch (e) {
+      setError(e instanceof ExampleUnavailableError
+        ? t('This example is unavailable here. Explore examples on TraceVista or import a local JSON file.')
+        : e instanceof Error ? e.message : String(e));
+      setLoading(false); return;
+    }
     if (!path) return;
     const controller = new AbortController();
     const request = fetch(path, { signal: controller.signal });

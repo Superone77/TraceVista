@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { readingTrajectory } from './fixtures/reading-trajectory.mjs';
 const moduleUrls = new Map();
 function moduleUrl(name) {
   if (moduleUrls.has(name)) return moduleUrls.get(name);
@@ -12,7 +13,7 @@ function moduleUrl(name) {
 const moduleAt = path => import(moduleUrl(path.split('/').at(-1).replace('.ts', '')));
 const { parseGraph } = await moduleAt('../src/trajectory/model.ts');
 const { outline, buildChat, retrieve, citations, inlineMarkdown, readSSE, SYSTEM, parseModels, canListModels } = await moduleAt('../src/trajectory/chat.ts');
-const g = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-agent-lora.agent-state.json', import.meta.url), 'utf8')));
+const g = parseGraph(readingTrajectory());
 const events = new Map(g.timeline.timeline.map(e => [e.id, e]));
 
 // The outline names every card by id, carries the informs links and the journey, and stays small.
@@ -23,29 +24,30 @@ assert(out.includes(`[[${dependency.source}]] → [[${dependency.target}]]`) && 
 assert(out.length < 40000, `outline is ${out.length} chars`);
 
 // Focus includes every preceding raw record in the selected session, including thinking.
-const focused = buildChat(g, 'a493', '为什么修复 float dispatch？', []);
+const focused = buildChat(g, 'a-fix', '为什么修复 comparator？', []);
 const sentEvents = focused.items.filter(i => i.event).map(i => i.event);
-const own = g.actions.find(a => a.id === 'a493').events;
+const own = g.actions.find(a => a.id === 'a-fix').events;
 assert(own.every(id => sentEvents.includes(id)), 'all current-card records are sent');
 const lastOwn = Math.max(...own.map(id => g.timeline.timeline.findIndex(e => e.id === id)));
 const priorMain = g.timeline.timeline.slice(0, lastOwn + 1).filter(e => e.id.startsWith('main:'));
 assert(priorMain.every(e => sentEvents.includes(e.id)), 'entire prior main session, not last six actions');
 assert.equal(sentEvents.length, new Set(sentEvents).size, 'deduplicated');
-assert(focused.items.some(i => i.node === 's3-rebase'));
-assert(focused.items.some(i => i.node === 's3'));
-assert(focused.items.some(i => i.node === 'a458'));
-assert(focused.messages.at(-1).content.endsWith('Question: 为什么修复 float dispatch？'));
+assert(focused.items.some(i => i.node === 'b-fix'));
+assert(focused.items.some(i => i.node === 's-trial'));
+assert(focused.items.some(i => i.node === 'a-observe'));
+assert(focused.messages.at(-1).content.endsWith('Question: 为什么修复 comparator？'));
 assert(focused.system.startsWith(SYSTEM));
 assert(!focused.messages.at(-1).content.includes(g.journey.text), 'prefix excludes retrospective journey');
 for (const e of priorMain) assert(focused.messages.at(-1).content.includes(e.text), `unclipped ${e.id}`);
 assert(focused.preview.estimatedTokens > 0);
 assert.equal(focused.preview.compressedCount, 0);
+assert(!focused.messages.at(-1).content.includes('LATER_RESULT'), 'later raw evidence stays outside the selected prefix');
 
 // Full-run mode deliberately includes all evidence; unscoped old chats cannot leak hindsight.
-const found = retrieve(g, 'float specialization dispatch', new Set());
+const found = retrieve(g, 'numeric comparator conversion', new Set());
 assert(found.length > 0);
 const history = [{ id: '1', role: 'user', text: '旧版全局问答', at: '' }, { id: '2', role: 'assistant', text: '未来结论', at: '' }];
-const open = buildChat(g, null, '为什么修改 float dispatch？', history);
+const open = buildChat(g, null, '为什么修改 comparator？', history);
 assert.equal(open.preview.eventCount, g.timeline.timeline.length);
 assert.equal(open.messages.length, 1);
 assert(open.messages.at(-1).content.includes(g.journey.text));
@@ -116,24 +118,24 @@ assert.equal(buildChat(fixture, 'a3', 'why', longDiscussion).preview.historyTurn
 
 // Citations: cards and events become links; an id the record lacks is marked.
 const known = id => g.actions.some(a => a.id === id) ? 'node' : events.has(id) ? 'event' : null;
-const parts = citations('精度修复 见 [[a458]] 与 [[main:E458]]，另见 [[zz9]]。', known);
-assert.deepEqual(parts.filter(p => p.id).map(p => [p.id, p.kind]), [['a458', 'node'], ['main:E458', 'event'], ['zz9', 'unknown']]);
+const parts = citations('精度修复 见 [[a-observe]] 与 [[main:E8]]，另见 [[zz9]]。', known);
+assert.deepEqual(parts.filter(p => p.id).map(p => [p.id, p.kind]), [['a-observe', 'node'], ['main:E8', 'event'], ['zz9', 'unknown']]);
 assert.equal(parts.filter(p => 'text' in p).map(p => p.text).join(''), '精度修复 见  与 ，另见 。');
-const single = citations('见 [a458] 和 [main:E458]，[1] 是脚注，[main:E99999] 不存在。', known);
-assert.deepEqual(single.filter(p => p.id).map(p => [p.id, p.kind]), [['a458', 'node'], ['main:E458', 'event']], 'single brackets count only for known ids');
+const single = citations('见 [a-observe] 和 [main:E8]，[1] 是脚注，[main:E99999] 不存在。', known);
+assert.deepEqual(single.filter(p => p.id).map(p => [p.id, p.kind]), [['a-observe', 'node'], ['main:E8', 'event']], 'single brackets count only for known ids');
 
 // Inline Markdown: emphasis nests and wraps citations; code and identifiers stay literal; streaming closes early.
 const md = parts => parts.map(p => 'text' in p ? p.text : 'code' in p ? `<code>${p.code}</code>` : 'id' in p ? `{${p.id}}`
   : 'strong' in p ? `<b>${md(p.strong)}</b>` : `<i>${md(p.em)}</i>`).join('');
-const conclusion = '**Conclusion: identity caching was abandoned because its gain depended on the caller replaying the *same* tensor objects.** See [a458].';
-assert.equal(md(inlineMarkdown(conclusion, known)), '<b>Conclusion: identity caching was abandoned because its gain depended on the caller replaying the <i>same</i> tensor objects.</b> See {a458}.');
-assert.equal(md(inlineMarkdown('**bold [a458]** and *see [[main:E458]]*.', known)), '<b>bold {a458}</b> and <i>see {main:E458}</i>.');
-assert.equal(md(inlineMarkdown('`x**2` and **`[a458]` is code**; 2 * 3, snake_case, __init__.py', known)), '<code>x**2</code> and <b><code>[a458]</code> is code</b>; 2 * 3, snake_case, __init__.py');
+const conclusion = '**Conclusion: identity caching was abandoned because its gain depended on the caller replaying the *same* tensor objects.** See [a-observe].';
+assert.equal(md(inlineMarkdown(conclusion, known)), '<b>Conclusion: identity caching was abandoned because its gain depended on the caller replaying the <i>same</i> tensor objects.</b> See {a-observe}.');
+assert.equal(md(inlineMarkdown('**bold [a-observe]** and *see [[main:E8]]*.', known)), '<b>bold {a-observe}</b> and <i>see {main:E8}</i>.');
+assert.equal(md(inlineMarkdown('`x**2` and **`[a-observe]` is code**; 2 * 3, snake_case, __init__.py', known)), '<code>x**2</code> and <b><code>[a-observe]</code> is code</b>; 2 * 3, snake_case, __init__.py');
 assert.equal(md(inlineMarkdown('***both*** and *a **b** c*', known)), '<i><b>both</b></i> and <i>a <b>b</b> c</i>');
 for (const unclosed of ['**not\n\nacross paragraphs**', '**Conclusion: replaying the *same', 'call `foo('])
   assert.equal(md(inlineMarkdown(unclosed, known)), unclosed, 'a finished answer keeps unmatched markers literal');
 assert.equal(md(inlineMarkdown('**Conclusion: replaying the *same', known, true)), '<b>Conclusion: replaying the <i>same</i></b>', 'a streaming answer applies a marker before it is closed');
-assert.equal(md(inlineMarkdown('Done *one\n\nSee [a458] and **', known, true)), 'Done *one\n\nSee {a458} and ', 'only the paragraph being written stays open; a bare marker waits for text');
+assert.equal(md(inlineMarkdown('Done *one\n\nSee [a-observe] and **', known, true)), 'Done *one\n\nSee {a-observe} and ', 'only the paragraph being written stays open; a bare marker waits for text');
 assert.equal(md(inlineMarkdown('call `foo(**x**', known, true)), 'call <code>foo(**x**</code>');
 
 // Streams: both providers, chunks split anywhere, errors surface.
