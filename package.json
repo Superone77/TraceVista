@@ -10,9 +10,14 @@
   },
   "scripts": {
     "dev": "vite --config viewer/vite.config.ts --host 127.0.0.1 --port 8875 --strictPort",
+    "dev:site": "vite --config viewer/vite.config.ts --mode showcase --host 127.0.0.1 --port 8876 --strictPort",
     "build": "tsc -p viewer/tsconfig.json && vite build --config viewer/vite.config.ts",
+    "build:site": "tsc -p viewer/tsconfig.json && vite build --config viewer/vite.config.ts --mode showcase",
     "preview": "vite preview --config viewer/vite.config.ts --host 127.0.0.1 --port 8875 --strictPort",
+    "preview:site": "vite preview --config viewer/vite.config.ts --mode showcase --host 127.0.0.1 --port 8876 --strictPort",
     "test": "node scripts/test.mjs",
+    "test:examples": "node scripts/test-examples.mjs",
+    "examples:lock": "node scripts/lock-examples.mjs",
     "setup:hooks": "git config --local core.hooksPath .githooks"
   },
   "dependencies": {

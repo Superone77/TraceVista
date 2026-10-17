@@ -26,7 +26,7 @@ pnpm dev           # http://127.0.0.1:8875/
 Run both before you open a pull request. CI runs the same commands.
 
 ```bash
-pnpm test    # skill unit tests, viewer tests, bundled examples, secret scan
+pnpm test    # skill and viewer tests using small fixed fixtures
 pnpm build   # type check and static build into dist/
 ```
 
@@ -40,7 +40,8 @@ Report what you actually ran. A conversion or UI test does not show that a model
 | `viewer/scripts/` | Viewer tests, run by `pnpm test` |
 | `skills/tracevista-skill/scripts/` | Python conversion scripts (standard library only) |
 | `skills/tracevista-skill/references/` | Export format, reading layer, and writing guide |
-| `viewer/public/examples/` | Bundled example exports and `index.json` catalog |
+| `examples.lock.json` | Pinned external example revision and file hashes |
+| `docs/EXAMPLES.md` | Example library setup and website release commands |
 
 ## Design principles
 
@@ -61,11 +62,15 @@ Report what you actually ran. A conversion or UI test does not show that a model
 Examples are public. Each one must:
 
 - come from a source whose license allows redistribution, or from a run you own and agree to publish;
-- contain no credentials, private data, or unpublished research (`pnpm test` runs a secret scan, but review the file yourself too);
+- contain no credentials, private data, or unpublished research (`pnpm test:examples` runs a secret scan, but review the file yourself too);
 - be one complete, self-contained `.agent-state.json` with English annotations;
-- have an entry in `viewer/public/examples/index.json`, a thumbnail in `viewer/public/example-thumbnails/`, and a source and license note in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- live in the separate `TraceVista-examples` repository, with an entry in its `examples/index.json`, a thumbnail in `example-thumbnails/`, and a source and license note in its `THIRD_PARTY_NOTICES.md`.
 
 Open an issue before you send a large example so we can check the source and license.
+
+Follow [the example-library workflow](docs/EXAMPLES.md) to pin the data revision, run
+`pnpm test:examples`, and build the website with `pnpm build:site`. Default builds
+and core tests work without downloading the example library.
 
 ## Pull requests
 

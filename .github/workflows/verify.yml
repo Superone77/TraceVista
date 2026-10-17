@@ -1,4 +1,4 @@
-name: Verify portable viewer and example
+name: Verify standalone viewer and skill
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read

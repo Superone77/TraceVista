@@ -21,6 +21,24 @@
   letter-spacing: -.025em;
 }
 
+.example-gallery-explore {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .25rem 0;
+  color: var(--accent);
+  font-size: .875rem;
+  line-height: 1.5;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: .25em;
+}
+
+.example-gallery-explore:hover,
+.example-gallery-explore:focus-visible {
+  text-decoration-color: currentColor;
+}
+
 .example-gallery-viewport {
   --example-card-width: 220px;
   overflow-x: auto;

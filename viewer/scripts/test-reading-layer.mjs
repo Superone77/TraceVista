@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { readingTrajectory } from './fixtures/reading-trajectory.mjs';
 async function moduleAt(path) {
   const code = stripTypeScriptTypes(readFileSync(new URL(path, import.meta.url), 'utf8'));
   return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
@@ -90,21 +91,22 @@ assert(proj.nodes.some(n => n.kind === 'fold'));
 for (const e of proj.edges) assert(proj.nodes.some(n => n.id === e.source) && proj.nodes.some(n => n.id === e.target), 'Edges end on visible cards');
 assert(proj.edges.some(e => e.kind === 'informs' && e.source === 'a5' && e.target === 'a6' && e.label === 'Informs'));
 
-// The bundled Pi Agent example carries a reading layer that says what each step adds.
-const pi = parseGraph(JSON.parse(readFileSync(new URL('../public/examples/pi-agent-lora.agent-state.json', import.meta.url), 'utf8')));
-const branchOf = new Map(pi.branches.map(b => [b.id, b]));
-assert(pi.branches.every(b => b.ladder), 'Every branch has a ladder');
-assert(pi.states.every(s => s.ladder), 'Every state has a ladder');
+// A small complete reading layer exercises the viewer without the example library.
+const fixture = parseGraph(readingTrajectory());
+assert.equal(readingCoverage(fixture).ready, true);
+const branchOf = new Map(fixture.branches.map(b => [b.id, b]));
+assert(fixture.branches.every(b => b.ladder), 'Every branch has a ladder');
+assert(fixture.states.every(s => s.ladder), 'Every state has a ladder');
 const squash = s => s.replace(/[\s，。；、,.;]/g, '');
-for (const a of pi.actions.filter(a => a.ladder)) {
+for (const a of fixture.actions.filter(a => a.ladder)) {
   const b = branchOf.get(a.branch);
   assert(!squash(a.ladder.takeaway + (a.ladder.reason ?? '')).includes(squash(b.summary)) && a.ladder.takeaway !== b.ladder.takeaway, `${a.id} repeats its branch`);
 }
-const landmarks = [...pi.branches, ...pi.actions].filter(e => landmarkMoves.includes(e.move));
-assert(landmarks.length >= 10, 'The run has visible turns');
-const t = new Map(pi.actions.map(a => [a.id, a.t_min]));
-for (const l of pi.links.filter(l => l.kind === 'informs')) assert(t.get(l.source) <= t.get(l.target), `${l.source} informs a later step`);
-const piFolded = layoutGraph(pi, 'actions', 'lineage', { fold: true });
-assert(piFolded.nodes.filter(n => n.kind === 'action').length < pi.actions.length, 'Decision view hides routine runs');
-assert(pi.journey.cites.every(id => [...pi.states, ...pi.branches, ...pi.actions].some(e => e.id === id)));
-console.log(`PASS: ladder levels and nesting, parent-free fallback, tool fingerprint, reading-layer validation, decision folds, Pi Agent reading layer (${landmarks.length} turns, ${pi.links.filter(l => l.kind === 'informs').length} informs)`);
+const landmarks = [...fixture.branches, ...fixture.actions].filter(e => landmarkMoves.includes(e.move));
+assert.deepEqual(landmarks.map(e => e.id), ['b-investigate', 'b-reject', 'a-plan', 'a-reject', 'a-decide']);
+const t = new Map(fixture.actions.map(a => [a.id, a.t_min]));
+for (const l of fixture.links.filter(l => l.kind === 'informs')) assert(t.get(l.source) <= t.get(l.target), `${l.source} informs a later step`);
+const fixtureFolded = layoutGraph(fixture, 'actions', 'lineage', { fold: true });
+assert(fixtureFolded.nodes.filter(n => n.kind === 'action').length < fixture.actions.length, 'Decision view hides routine runs');
+assert(fixture.journey.cites.every(id => [...fixture.states, ...fixture.branches, ...fixture.actions].some(e => e.id === id)));
+console.log('PASS: ladder levels and nesting, parent-free fallback, tool fingerprint, reading-layer validation and decision folds');

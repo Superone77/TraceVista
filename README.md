@@ -162,7 +162,18 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
 
-Open [localhost:8875](http://127.0.0.1:8875/). Run `pnpm build` to produce a static site in `dist/`, ready for Cloudflare Pages or another static host. Run `pnpm test` to check the viewer, skill, and bundled examples.
+Open [localhost:8875](http://127.0.0.1:8875/) and import a `.agent-state.json`. The default viewer, build, and tests work without the example library.
+
+| Command | Result |
+|---|---|
+| `pnpm dev` | Start the standalone viewer. |
+| `pnpm test` | Check the viewer and conversion skill with small test fixtures. |
+| `pnpm build` | Build the standalone viewer in `dist/`. |
+| `pnpm dev:site` | Start the showcase with the pinned external example library. |
+| `pnpm test:examples` | Check the full example exports and their source evidence. |
+| `pnpm build:site` | Build the showcase in `dist-site/`. |
+
+Browse the six examples on the [website](https://tracevista.pages.dev/). To run the showcase locally, place the separate `TraceVista-examples` repository beside this checkout or set `TRACEVISTA_EXAMPLES_DIR`. The viewer pins its data revision and asset hashes in `examples.lock.json`. See [Example library setup and updates](docs/EXAMPLES.md) for checkout, validation, and release details. Both build outputs can be served by a static host.
 
 ## Build on TraceVista
 
@@ -177,7 +188,7 @@ Have an interesting trajectory or an idea for the viewer? [Open an issue](https:
 
 ## License
 
-TraceVista's code is released under the [MIT License](LICENSE). Bundled example trajectories keep the licenses of their sources, such as Apache-2.0 and CC-BY-4.0. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for each source and its terms.
+TraceVista's code is released under the [MIT License](LICENSE). The external example library keeps its source licenses, such as Apache-2.0 and CC-BY-4.0, and its own notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for code attribution and the example notices location.
 
 ## Acknowledgements
 

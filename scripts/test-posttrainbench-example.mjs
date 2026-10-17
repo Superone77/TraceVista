@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {exampleFile} from './example-library.mjs';
 
 const root=new URL('../',import.meta.url);
 async function mod(path){
@@ -12,7 +13,7 @@ async function mod(path){
 }
 const {parseGraph}=await mod('viewer/src/trajectory/model.ts');
 const {layoutGraph,semanticProjection}=await mod('viewer/src/trajectory/semantic.ts');
-const original=JSON.parse(readFileSync(new URL('viewer/public/examples/posttrainbench-fable5-aime.agent-state.json',root),'utf8'));
+const original=JSON.parse(readFileSync(exampleFile('posttrainbench-fable5-aime.agent-state.json'),'utf8'));
 const g=parseGraph(original);
 assert.equal(original.language,'en');
 

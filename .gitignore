@@ -1,5 +1,8 @@
 node_modules/
 dist/
+dist-site/
+viewer/public/examples/
+viewer/public/example-thumbnails/
 .work/
 **/local-data/
 .env

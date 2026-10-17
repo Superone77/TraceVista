@@ -6,17 +6,17 @@
 ## 打开
 
 直接打开[云端 TraceVista](https://tracevista.pages.dev/)，点击“Import trajectory”选择完整的 `.agent-state.json`。
-原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#bring-your-own-trajectory)。首页“View examples”展开案例列表，点击名称后打开案例。
+原始日志先用 `tracevista-skill` 转换，安装与使用见 [README](../README.md#bring-your-own-trajectory)。网站首页的“Example Trajectories”展示案例卡片，点击即可打开。
 
-本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。完整复现与部署说明见 [README](../README.md)。
+本地开发时，在仓库根目录运行 `pnpm install --frozen-lockfile --ignore-scripts`，再运行 `pnpm dev`，访问 `http://127.0.0.1:8875/`。默认是无需示例库的独立查看器，可直接导入轨迹；首页提供网站示例链接。本地运行带示例的展示站使用 `pnpm dev:site`，数据获取和版本锁定见[示例库说明](EXAMPLES.md)。
 
 打开轨迹后仅显示顶部工具栏，品牌、任务标题和副标题不占用画布空间（标签页仍保留任务名称）。顶部保留四层快捷按钮、Story、Play 和 Chat；导入、导出、返回首页及其他设置位于左上角 ☰ Viewer menu。点卡片或 Chat 引用时，Story 与 Map 同步定位。界面使用深浅灰色，轨迹内部保留语义色，追问区的警告与错误用红色提示。
 
 **Play** 按状态、工作阶段和关键动作带读，支持暂停、前后跳转、调速和打开原文；退出恢复原来的视图。Chat 根据问题优先生成带证据链接的流程图或对比表。转换 skill 的说明文字采用操作、观察、决定的清晰表达，展开 Story 后可读完整解释。用法和格式见 [Explanations and playback](EXPLANATIONS-AND-PLAYBACK.md)。
 
-内置示例：`?example=pi-agent-lora`；由 `viewer/public/examples/index.json` 登记。
+展示站示例：`?example=pi-agent-lora`；由独立 `TraceVista-examples` 仓库的 `examples/index.json` 登记，通过查看器的 `examples.lock.json` 固定数据提交与文件哈希。
 普通私有输入使用导入按钮，或忽略的 `viewer/public/local-data/<name>.json`（`?data=<name>`）。
-生产构建只打包内置示例，排除 local-data。当前案例由公开案例目录统一登记。
+`pnpm build` 生成 `dist/`，不含案例；`pnpm build:site` 生成带锁定案例的 `dist-site/`。两种生产构建都排除 local-data，并包含 `tracevista-release.json` 版本记录。
 
 ## 四层缩放
 
@@ -165,8 +165,8 @@ Verify 通过、review 通过、提出方案本身不等于代码变化。分支
 ## 验证
 
 仓库根目录：`pnpm test`，`pnpm build`。
-覆盖四层投影、跨层位置保持、跨分支连接、原文完整性与顺序、旧格式兼容、无效输入、
-示例路径以及 Pi Agent 完整导出文件的原文完整性。浏览器内仍需检查真实缩放、滚动与卡片导航。
+默认检查使用小型测试数据，覆盖四层投影、跨层位置保持、跨分支连接、原文完整性与顺序、旧格式兼容、无效输入和示例路径，不依赖外部示例库。
+完整案例使用 `pnpm test:examples` 检查，展示站使用 `pnpm build:site` 构建。浏览器内仍需检查真实缩放、滚动与卡片导航。这些检查不重跑原始模型或 benchmark。
 
 ## Generic structure and evidence (optional v1 observations)
 
@@ -193,9 +193,7 @@ outcome categories. They cannot prove that an analyst's semantic interpretation 
 Source evidence remains the authority. Guide/source recognition is authored by the converter,
 not guessed from keyword mentions by the renderer. Existing v1 files without this layer work.
 
-Only the approved complete exports listed in the example catalog are bundled. Synthetic data under `viewer/scripts/fixtures/` is
-used only by tests. Ordinary real imports stay in ignored local-data. The viewer contains no
-agent/task-specific interpretation rules.
+The standalone viewer contains no example exports. Showcase builds include only the approved assets pinned from the separate example library. Synthetic data under `viewer/scripts/fixtures/` is used only by tests. Ordinary real imports stay in ignored local-data. The viewer contains no agent/task-specific interpretation rules.
 
 ## 新轨迹的阅读层检查
 
@@ -219,7 +217,7 @@ The EN / 中文 toggle in the toolbar (and on the home page) switches the interf
 
 **Interface strings.** English text is the key: components call `t('English text')`, and Chinese lives in `viewer/src/trajectory/i18n.zh.json`, so component sources stay English-only (`test-ui-language.mjs`). `viewer/scripts/i18n-keys.mjs` reads every key from the source with the TypeScript parser; `test-i18n.mjs` requires a Chinese entry with the same placeholders for each key and rejects entries no key uses.
 
-**Generated text.** A trajectory may carry `"i18n": {"zh": {"<text as written>": "<translation>"}}`. The viewer swaps each annotated string for its translation when the interface language differs from the file's own `language`; a ladder topic stays inside its translated takeaway. Export writes the file as imported, translations included; chat reads the original. All five bundled examples carry a Chinese table covering every annotation (2,178 strings). The Pi Agent test checks that every key of the table is an annotation in that file.
+**Generated text.** A trajectory may carry `"i18n": {"zh": {"<text as written>": "<translation>"}}`. The viewer swaps each annotated string for its translation when the interface language differs from the file's own `language`; a ladder topic stays inside its translated takeaway. Export writes the file as imported, translations included; chat reads the original. Translation tables travel with each external example export. The Pi Agent example test checks that every key of its table is an annotation in that file.
 
 ## Interface type scale
 
@@ -231,6 +229,8 @@ One family for everything read or clicked, one for literal text: `--font-sans` (
 
 ## Example library
 
-The landing page has one **View examples** button. Hover, focus or click opens a named list; Escape or clicking outside closes it. Entries show their title and optional agent, task and date. The small catalog is bundled with the interface; full trajectory JSON is fetched only after an entry is selected.
+The standalone landing page links to examples on the [TraceVista website](https://tracevista.pages.dev/#examples). A showcase build displays thumbnail cards under **Example Trajectories**, with the case name, agent, and task. It includes the small catalog with the interface and fetches a full trajectory JSON only after a case is selected.
 
-`viewer/public/examples/index.json` lists the approved public examples. Update the catalog and its complete JSON files together, then rebuild and deploy. Tests reject unlisted files in the public example directory. The library contains **Pi Agent · Kernel Optimization**, **PostTrainBench**, **InferenceBench**, **SWE-rebench**, and **Tongyi DeepResearch · Literature Research**, with English analyst annotations and unchanged source evidence. The homepage lists the name, agent and task without dates. Each run overview introduces its task and recorded configuration.
+The separate `TraceVista-examples` repository holds `examples/index.json`, six complete exports, thumbnails, and their source notices. The cases are **Pi Agent · Kernel Optimization**, **Claude Code · Post Training**, **Codex · Model Serving**, **OpenHands · Bug Fixing**, **Tongyi DeepResearch · Literature Research**, and **Codex · Garden Animation**. Each run overview introduces its task and recorded configuration; annotations stay separate from the unchanged source evidence. Garden Animation covers only events `continued:E853` through `continued:E1098` of its longer session.
+
+Set `TRACEVISTA_EXAMPLES_DIR` to that repository root or use the sibling `../TraceVista-examples`. `examples.lock.json` in the viewer records its data commit and asset hashes. Update and commit the data before refreshing the viewer lock. Full setup, validation, and release steps are in [EXAMPLES.md](EXAMPLES.md).
