@@ -5,8 +5,10 @@
 When the input contains images, use the user's choice of `--images keep` or `--images omit`.
 Ask if no choice was given. The CLI defaults to keep for compatibility with existing scripts;
 the skill must still resolve the choice with the user. Omission applies to embedded image
-payloads in events and source archives, with explicit image markers and an `image_policy`
-annotation. Source files are untouched. Ordinary text, IDs and call/result references remain.
+payloads in events and source archives, with explicit image markers (MIME, encoded size and
+hash) and an `image_policy.mode=omit` annotation; the archives become image-omitted
+derivatives. Source files are untouched. Ordinary text, IDs and call/result references remain.
+Keeping images does not fetch remote URLs or locate missing files.
 
 Use the user-selected run. Otherwise inspect recent candidates and their run timestamps,
 agent/model identity and first user message; ask only if the intended run remains ambiguous.

@@ -76,6 +76,7 @@ graph with the complete redacted timeline and sources. Import it directly in the
 The default format is `state`. Use explicit `--format canvas` to get a v1
 ThoughtDAG backup, whose first state's `data.stateTrajectory` holds the same graph.
 No records are deleted on collapse. Privacy/redaction rules still apply.
+Files from the skill's earlier name, `trajectory-to-thoughtdag`, use the same v1 contract and IDs.
 
 Optional `states[].lineage` records `{parent, relation, reason, events}` where relation is
 `derived`, `restored` or `retained`. Chronological `transitions` remain unchanged. A rollback
