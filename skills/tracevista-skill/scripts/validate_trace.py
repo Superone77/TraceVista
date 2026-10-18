@@ -214,6 +214,21 @@ def write_private(path, payload):
         raise
 
 
+def replace_private(path, payload):
+    """Write a private file, replacing an earlier regular file atomically."""
+    path = Path(path)
+    private_directory(path.parent)
+    if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise TraceError('invalid-output')
+    temporary = path.with_name(f'.{path.name}.{os.getpid()}.tmp')
+    write_private(temporary, payload)
+    try:
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def json_bytes(value):
     return (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8')
 
@@ -222,15 +237,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('graph', help='A .agent-state.json file (up to 64 MiB of UTF-8 JSON)')
     parser.add_argument('--require-reading-layer', action='store_true')
-    parser.add_argument('--quality-report', help='Create a new private JSON quality report')
+    parser.add_argument('--quality-report', help='Write a private JSON quality report; an earlier report at this path is replaced')
     args = parser.parse_args()
     try:
         source = Path(args.graph).resolve()
         _raw, _graph, report, counts = load_trace(source)
-        quality_path = Path(args.quality_report).resolve() if args.quality_report else None
+        quality_path = Path(os.path.abspath(args.quality_report)) if args.quality_report else None
         if quality_path:
             ensure_distinct(source, [quality_path])
-            write_private(quality_path, json_bytes(report))
+            replace_private(quality_path, json_bytes(report))
         result = {'valid': True, 'graph': str(source), 'counts': counts, 'reading': report,
                   'quality_report': str(quality_path) if quality_path else None}
         if args.require_reading_layer and not report['ready']:

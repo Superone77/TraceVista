@@ -3,7 +3,9 @@
 ## Contents
 
 - What counts as a state
+- How many states
 - Authoring contract
+- Compiler checks
 - Reading-layer authoring
 - Reader support
 - Exploration, review and measurement observations
@@ -27,6 +29,24 @@ review calls do not imply a changed implementation. A failed batch can still hav
 effects; represent a separately evidenced successful sub-action, or leave the effect unknown.
 Use actual hashes/diffs/artifacts/results. Do not invent before/after snapshots. Keep
 verification and newly learned facts attached to the state without conflating them with mutation.
+
+## How many states
+
+A state is a version of the tracked scope that a reader would want to compare with another
+or return to. Name what differs in each state in one short phrase; if you cannot, merge it
+with its neighbour.
+
+- **Create a new state** when a check, measurement, review or explicit decision happens
+  between two changes, when the agent commits, submits or selects a candidate, and when it
+  restores or later compares against a version.
+- **Keep one transition** for a run of edits toward one goal with no check between them,
+  such as several small fixes to the same function before the first test run.
+- **Do not create a state** for reads, failed or no-op writes, test runs, or edits outside
+  the declared scope. They are actions on the current state.
+
+The count follows the session, not its length. A 100-call bug fix commonly has 5 to 12
+states; a long optimization run with many measured candidates can need more. Put further
+detail in branches and actions instead of extra states.
 
 Classify intent from command arguments, results, surrounding messages, and artifact changes.
 Do not classify every shell invocation as Execute. One conceptual action can cite several
@@ -53,7 +73,8 @@ from state-transition edges. Preserve source IDs and do not invent private reaso
 
 Write `state-analysis.json` with:
 
-- `title`, `scope`, optional `subtitle`, `notes`.
+- `title`, `scope`, optional `subtitle`, `notes`, `language` (see
+  [reading-layer.md](reading-layer.md#language)).
 - `states[]`: `id`, `title`, `summary`, `events`, `snapshot` (component → value or null).
 - `branches[]`: `id`, `state`, `title`, `summary`, `events`, `status`
   (`attempted`, `retained`, `proposed`, `rejected`).
@@ -73,6 +94,27 @@ Every meaningful event needs classification or an explicit exclusion reason. Evi
 the same session-prefixed IDs/ranges as the existing analysis schema. Node IDs are globally
 unique. Temporal state occurrences form a DAG; a revert is a new occurrence that can share
 an earlier content hash, not an edge backwards in time.
+
+## Compiler checks
+
+`build_state_graph.py` stops at the first rule an analysis breaks. Besides required fields
+and known IDs, it checks:
+
+- **Branch and action placement.** An action's `state` equals the `state` of its `branch`.
+  Actions in a `proposed` or `rejected` branch have `outcome: proposed`.
+- **Transition action.** The `action` of a transition belongs to the **source** state, not
+  the target: the edit that produces S2 is filed under S1. It is an `Edit` or `Execute`
+  with `outcome: success`, in a branch that was tried.
+- **Snapshot deltas.** The compiler compares the source and target snapshots key by key; a
+  key missing from one snapshot counts as `null`. `changes[]` lists exactly the components
+  that differ, with `before` and `after` equal to the snapshot values, a `basis` and
+  `events`. Give every state the same snapshot keys and use `null` for unknown values, so
+  that an omitted key does not read as a change.
+- **Temporal order.** Transitions form a DAG and never point from a state to itself.
+- **Coverage.** Every timeline event is cited by at least one action or listed in
+  `excluded[]` with a reason, never both. Branch, state and link citations do not count.
+- **Links.** `kind` is `sequence`, `informs`, `review_request` or `review_return`; each link
+  joins two known actions and has an `evidence` explanation and `events`.
 
 ```bash
 python3 /path/to/skill/scripts/build_state_graph.py state-analysis.json \

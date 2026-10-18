@@ -11,7 +11,8 @@ Use this guide for authored titles, summaries, ladders, journey text and relatio
 It adapts the clarity principles of ASD-STE100 to trajectory reading. It is not a controlled
 dictionary or a claim of formal STE conformance. Keep established technical terms, code,
 numbers, file names and identifiers exact. Preserve raw records and quoted excerpts verbatim.
-Use the trajectory's language unless the user requests another; the same clarity goals apply
+Use the trajectory's language unless the user requests another; for a session that mixes
+languages, see [reading-layer.md](reading-layer.md#language). The same clarity goals apply
 to Chinese and other languages.
 
 ## Write the explanation before the card label

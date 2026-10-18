@@ -1,5 +1,6 @@
 import json
 import hashlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -321,5 +322,31 @@ class CanvasTests(unittest.TestCase):
         canvas,warnings=build.build(a,timeline)
         self.assertEqual(warnings,[])
         self.assertIn('S1',{n['id'] for n in canvas['nodes']})
+
+
+class ShowEventsTests(unittest.TestCase):
+    def run_show(self,timeline,*refs):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'timeline.json'
+            path.write_text(json.dumps(timeline))
+            script=Path(__file__).resolve().parents[1]/'scripts'/'show_events.py'
+            return subprocess.run([sys.executable,str(script),str(path),*refs],capture_output=True,text=True)
+
+    def test_single_session_accepts_plain_and_main_prefixed_ids(self):
+        single={'timeline':[{'id':f'E{i}','kind':'note','actor':'main','text':f'event {i}','t_min':None} for i in (1,2,3)]}
+        for refs in (('E2','E3'),('main:E2','main:E3'),('main:E2-main:E3',),('main:E2-E3',)):
+            with self.subTest(refs=refs):
+                process=self.run_show(single,*refs)
+                self.assertEqual(process.returncode,0,process.stderr)
+                self.assertIn('=== E2',process.stdout)
+                self.assertIn('=== E3',process.stdout)
+                self.assertNotIn('=== E1',process.stdout)
+        self.assertNotEqual(self.run_show(single,'review:E2').returncode,0)
+
+    def test_multi_session_keeps_namespaced_ids(self):
+        process=self.run_show(example_timeline(),'review:E1')
+        self.assertEqual(process.returncode,0,process.stderr)
+        self.assertIn('=== review:E1',process.stdout)
+        self.assertNotEqual(self.run_show(example_timeline(),'E1').returncode,0)
 
 if __name__=='__main__':unittest.main()
