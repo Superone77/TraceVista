@@ -1,5 +1,13 @@
 # State-first trajectory export
 
+## Contents
+
+- What counts as a state
+- Authoring contract
+- Reading-layer authoring
+- Reader support
+- Exploration, review and measurement observations
+
 Use when the reader wants **state changes first**, expandable exploration branches second,
 and concrete Explore / Plan / Edit / Execute / Verify / Diagnose actions third.
 Actor (for example `main`, `reviewer`, `system`, or a provider-neutral participant ID) is an independent dimension. Review is a role, not a
@@ -76,6 +84,7 @@ graph with the complete redacted timeline and sources. Import it directly in the
 The default format is `state`. Use explicit `--format canvas` to get a v1
 ThoughtDAG backup, whose first state's `data.stateTrajectory` holds the same graph.
 No records are deleted on collapse. Privacy/redaction rules still apply.
+Files from the skill's earlier name, `trajectory-to-thoughtdag`, use the same v1 contract and IDs.
 
 Optional `states[].lineage` records `{parent, relation, reason, events}` where relation is
 `derived`, `restored` or `retained`. Chronological `transitions` remain unchanged. A rollback
@@ -95,7 +104,7 @@ exploration observation with `disposition: rejected`; branch `rejected` means un
 
 ## Reading-layer authoring
 
-For a new viewer export, include `ladder` on every state/branch and important action,
+For every new export, include `ladder` on every state/branch and important action,
 `move` on evidenced turns, `informs` links and a cited graph-level `journey`. Follow
 [reading-layer.md](reading-layer.md). Use `--require-reading-layer --quality-report report.json`
 to check structural coverage; inspect its evidence gaps before delivery. Existing files

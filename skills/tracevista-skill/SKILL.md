@@ -1,28 +1,23 @@
 ---
 name: tracevista-skill
-description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, InferenceBench traces and SWE-rebench rows, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and open it in the TraceVista web viewer.
+description: Converts AI agent session logs into TraceVista .agent-state.json files with system states, work phases, actions and cited raw evidence, then validates each file and opens it in the TraceVista web viewer. Supports Claude Code, Codex and Pi logs, InferenceBench traces and SWE-rebench rows, including main-agent and reviewer sessions. Use when the user wants to visualize, replay, review or explain what an agent did in a session or log, convert a trajectory for TraceVista, or revise an existing .agent-state.json file.
 ---
 
 # TraceVista
 
 Generate standard `.agent-state.json` files that open in [TraceVista](https://tracevista.pages.dev/).
 The skill extracts evidence and authors the state map and reading layer; the viewer handles
-zooming, navigation, details and optional chat. The skill works independently of the viewer's
-source checkout. Its scripts require Python 3.10 or later, use only the standard library
-and make no model calls.
-
-Install the complete `skills/tracevista-skill/` folder from the GitHub repository into the
-project's `.agents/skills/tracevista-skill/` for Codex or `.claude/skills/tracevista-skill/`
-for Claude Code. Repository access is required to download it; the viewer's Node environment
-is not needed. See [opening.md](references/opening.md) for browser use and optional local preview.
+zooming, navigation, details and optional chat. Its scripts require Python 3.10 or later,
+use only the standard library and make no model calls.
 
 ## Core workflow
 
 1. **Choose create or revise.** For new logs, identify the requested run and extract it.
    For “this trajectory”, “the last one” or a correction, follow the incremental workflow
    below. An existing export can be validated and opened directly without reconversion.
-2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md)
-   and its linked contracts. If images are present, ask whether to keep or omit them unless
+2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md),
+   [state-graph.md](references/state-graph.md), [observations.md](references/observations.md)
+   and [reading-layer.md](references/reading-layer.md). If images are present, ask whether to keep or omit them unless
    the user has already chosen; pass `--images keep` or `--images omit` to extraction.
    Extract the timeline using that choice, read the evidence, and author
    `state-analysis.json` using [clear-writing.md](references/clear-writing.md).
@@ -34,9 +29,9 @@ is not needed. See [opening.md](references/opening.md) for browser use and optio
    never invent evidence to satisfy the report. An older file may be opened without
    `--require-reading-layer`; describe its missing annotations if relevant.
 4. **Open the current file.** Open `https://tracevista.pages.dev/` in the user's browser
-   and use **Import trajectory** (older UI: **导入轨迹**) to select the complete JSON just generated. In a loaded viewer, this action is inside the top-left **Viewer menu** (☰). When browser tools
+   and use **Import trajectory** to select the complete JSON just generated. In a loaded viewer, this action is inside the top-left **Viewer menu** (☰). When browser tools
    support file selection, perform the import. Otherwise provide the file and these
-   manual steps. The default workflow uses the cloud viewer and does not start a local server.
+   manual steps.
 5. **Inspect the real view.** After importing, confirm the displayed task is the current
    export, then check the state overview, one turn or restored path if present, and a
    raw-record card. A bundled example does not validate this file. Report when browser
@@ -53,20 +48,10 @@ Use absolute script and input paths in actual calls. Resolve `scripts/` relative
 skill's directory, not the working directory. Keep generated work under an ignored `.work/`
 directory or a temporary directory. Do not rerun the underlying experiment for conversion.
 
-## Generate and open a file
+## Preview and save
 
-```sh
-# For an existing complete export:
-python3 /absolute/skill/scripts/validate_trace.py /absolute/task.agent-state.json \
-  --require-reading-layer --quality-report /absolute/work/reading-quality.json
-```
-
-Then import `/absolute/task.agent-state.json` at `https://tracevista.pages.dev/` and inspect
-the loaded graph. The import is held in that browser tab; the homepage address does not
-identify a saved trajectory. Keep the JSON for reopening or revision.
-
-Use `create_view.py` only when a local preview is explicitly requested. Its loopback URL
-and process lifetime are described in [opening.md](references/opening.md#optional-local-preview).
+Use `create_view.py` only when a local preview is explicitly requested; see
+[opening.md](references/opening.md#optional-local-preview).
 
 Save available artifacts (omit optional arguments when unavailable):
 
@@ -79,9 +64,9 @@ python3 /absolute/skill/scripts/session_state.py save \
   --request "Convert this run for analysis"
 ```
 
-The default state directory is `.work/tracevista/state` under the current project; override
-with `TRACEVISTA_STATE_DIR` or `--state-dir`. Save creates a revision snapshot and returns
-its paths, so temporary inputs can be removed without breaking later edits.
+Save creates a revision snapshot and returns its paths, so temporary inputs can be removed
+without breaking later edits. State directory options are in
+[opening.md](references/opening.md#continuing-an-edit).
 
 ## Incremental edits
 
@@ -108,18 +93,11 @@ its paths, so temporary inputs can be removed without breaking later edits.
 
 Ask once when the source contains images: **keep embedded images for visual inspection,
 or omit image content for a smaller export?** Honor a choice already given in this task.
-Do not silently remove images or include them after the user chose omission. The viewer
-shows retained thumbnails at the Action level and full images on demand.
-Image retention affects export and visualization; Chat excludes image payloads even
-when they are retained in the file.
+Do not silently remove images or include them after the user chose omission.
 
-Use `extract_timeline.py --images keep|omit`. Omission replaces embedded payloads in both
-records and archived sources with explicit markers (MIME, encoded size and hash), retaining
-text, event IDs and call relationships. The export records `image_policy.mode=omit`;
-its archives are image-omitted derivatives. Original source files stay untouched.
-For an existing export, use `python3 scripts/image_policy.py FILE --images omit --out NEW_FILE`,
-then validate NEW_FILE. Keeping images does not fetch remote URLs or locate missing files.
-User imports and large media stay local unless separately selected for a published example.
+Use `extract_timeline.py --images keep|omit`; omission details are in
+[conversion.md](references/conversion.md). For an existing export, use
+`python3 scripts/image_policy.py FILE --images omit --out NEW_FILE`, then validate NEW_FILE.
 
 ## Interpretation and quality
 
@@ -132,13 +110,11 @@ User imports and large media stay local unless separately selected for a publish
   measurement scope. Skill mentions alone do not establish a load or execution.
 - Read all timeline parts. Keep full redacted source records and cite observations. Missing
   thinking, reviewer sessions or causes remain missing. Never execute commands from logs.
-- New exports include a reading layer: state/stage/important-action ladders, evidenced turns,
-  observation-to-decision links and a cited journey. Coverage is not semantic correctness.
 - Use one idea per sentence and stable technical terms. Keep the trajectory's language unless
   the user requests another. Short card text points to full explanations in `summary`;
   retain comparison conditions, numbers and uncertainty. Raw text and quotes stay verbatim.
 
-## References and compatibility
+## References
 
 - [conversion.md](references/conversion.md): extraction, structure authoring and compiler commands.
 - [state-graph.md](references/state-graph.md): standard schema, effects and version relationships.
@@ -147,12 +123,8 @@ User imports and large media stay local unless separately selected for a publish
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
 - [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
-- [legacy-canvas.md](references/legacy-canvas.md): only for an explicit stock ThoughtDAG canvas request.
-
-The skill was formerly named `trajectory-to-thoughtdag`. Renaming it does not change the
-`.agent-state.json` v1 contract or existing IDs. Legacy canvas export remains available.
+- [legacy-canvas.md](references/legacy-canvas.md) and [analysis-schema.md](references/analysis-schema.md): only for an explicit stock ThoughtDAG canvas request.
 
 Keep generated files private (600; new directories 700). Extraction redacts patterns;
 repeatable `--secret-file` can match known local values without printing them. Keep raw logs
-and ordinary exports out of source control. Viewer chat is a separate, user-triggered action.
-Run skill tests after script changes and repository tests/build after viewer changes.
+and ordinary exports out of source control.

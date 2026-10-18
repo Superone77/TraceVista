@@ -5,7 +5,7 @@
 After generating and validating the complete `.agent-state.json`:
 
 1. Open [TraceVista](https://tracevista.pages.dev/) in the user's browser.
-2. Click **Import trajectory** (older UI: **导入轨迹**) and select the current export.
+2. Click **Import trajectory** and select the current export.
    On the homepage the button is directly visible; in a loaded viewer, open the top-left
    **Viewer menu** (☰) first. Use browser tools to do this when they
    support local file selection. Loading a bundled example is a separate demonstration.
@@ -72,28 +72,3 @@ For changed structure, edit the analysis and rebuild against the saved timeline.
 result and import the new file in the cloud viewer. If a local preview was requested, start
 it from the new revision and return its new local URL; an older running view keeps its
 original file.
-
-## Local preview browser protocol (maintainers)
-
-The local page creates a full-viewport iframe whose URL fragment contains
-`tracevista-import=<32–128 hexadecimal characters>&source=<encoded local origin>`.
-No trace bytes appear in the URL. Register the parent's message listener before starting
-navigation. The frame receiver captures the fragment before clearing it.
-
-Messages carry `type` and `token`:
-
-1. Viewer → parent: `tracevista:ready`.
-2. Parent → viewer: `tracevista:import`, with the complete `json` string.
-3. Viewer → parent: `tracevista:loaded`, or `tracevista:error` with a fixed error code.
-
-Sender verifies `event.source === iframe.contentWindow`, exact viewer origin and token;
-JSON is sent only to the exact target origin. Receiver uses its parent when framed, otherwise
-its opener for legacy flows; it checks that peer, the declared local source origin and token.
-Only an explicit valid import fragment activates the receiver. The receiver accepts one
-matching import, runs the ordinary graph parser and then acknowledges. Pending imports
-time out after 30 seconds. Failures do not send raw exception text.
-
-Allowed source origins remain `null` for legacy local files and HTTP(S) loopback origins
-`localhost`, `127.0.0.1` and `[::1]`. A null-origin legacy peer receives only status replies
-using `*`; trajectory messages always have a fixed target origin. The embedded engine must
-allow framing by the local helper, and the helper's CSP must allow that engine origin.

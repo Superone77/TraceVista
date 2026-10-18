@@ -1,4 +1,13 @@
-# Reading layer: zoom ladders, epistemic moves, informs links, journey (compatible v1 extension; default for new viewer exports)
+# Reading layer: zoom ladders, epistemic moves, informs links, journey (compatible v1 extension; included in every new export)
+
+## Contents
+
+- Ladder on a state, branch or action
+- Epistemic move
+- informs links: observation → decision
+- Journey
+- Validation
+- Reader-ready coverage
 
 The state graph says *what happened*. This layer says *what each step established and why
 the agent turned*, at a length a reader can take in at every zoom. It is adapted from
@@ -56,7 +65,7 @@ Write like this:
 - For the abstract, prefer the agent's visible messages (`note` events) and measurement or
   error lines from tool results: they show what it saw and said. Do not quote `thinking` events;
   hidden reasoning may inform your reading, but the map cites what the agent said and observed.
-- The schema accepts old files without ladders. New viewer exports give one to every state and branch, and to every action a reader
+- The schema accepts old files without ladders. New exports give one to every state and branch, and to every action a reader
   would stop at. Routine actions may keep only their title.
 
 ## 2. Epistemic move
