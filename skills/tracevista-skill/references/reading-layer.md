@@ -2,7 +2,7 @@
 
 ## Contents
 
-- Ladder on a state, branch or action
+- Ladder on a state, branch or action (with Language)
 - Epistemic move
 - informs links: observation → decision
 - Journey
@@ -44,6 +44,20 @@ Four nested levels a reader sees in turn while zooming in:
 | abstract | 1-3 quotes | sentences copied **verbatim** from raw events this entity cites (or that its children cite) |
 
 CJK characters and Latin words count one unit each (`CUDA Graph 缓存` = 4).
+
+### Language
+
+Set the graph-level `language` to `zh` or `en`. It selects the budgets above and the viewer's
+story wording. Without it, the compiler uses `zh` when any state title contains CJK
+characters, so one Chinese file name in a title can switch an English export.
+
+For a session that mixes English and Chinese, write in the language of the user's requests,
+the person who will read the map. If the requests themselves mix both, use the language of
+most requests, or ask when it is close. A request for a specific language overrides this.
+Write every authored field in that one language. Keep code, identifiers, commands, file
+names, error messages and quotes as recorded, whatever their language. With `zh`, Latin
+words also count toward the budget; with `en`, only Latin words count, so CJK text in an
+English topic or takeaway is not measured.
 
 Write like this:
 
