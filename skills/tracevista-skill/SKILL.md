@@ -1,6 +1,6 @@
 ---
 name: tracevista-skill
-description: Create, inspect and revise coding-agent trajectory files for TraceVista. Convert Claude Code, Codex or Pi logs, InferenceBench traces and SWE-rebench rows, including main/reviewer sessions, into a self-contained .agent-state.json with system states, work stages, actions and cited raw evidence; validate it and open it in the TraceVista web viewer.
+description: Converts AI agent session logs into TraceVista .agent-state.json files with system states, work phases, actions and cited raw evidence, then validates each file and opens it in the TraceVista web viewer. Supports Claude Code, Codex and Pi logs, InferenceBench traces and SWE-rebench rows, including main-agent and reviewer sessions. Use when the user wants to visualize, replay, review or explain what an agent did in a session or log, convert a trajectory for TraceVista, or revise an existing .agent-state.json file.
 ---
 
 # TraceVista
@@ -15,8 +15,9 @@ use only the standard library and make no model calls.
 1. **Choose create or revise.** For new logs, identify the requested run and extract it.
    For “this trajectory”, “the last one” or a correction, follow the incremental workflow
    below. An existing export can be validated and opened directly without reconversion.
-2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md)
-   and its linked contracts. If images are present, ask whether to keep or omit them unless
+2. **Create the standard file.** For new logs, read [conversion.md](references/conversion.md),
+   [state-graph.md](references/state-graph.md), [observations.md](references/observations.md)
+   and [reading-layer.md](references/reading-layer.md). If images are present, ask whether to keep or omit them unless
    the user has already chosen; pass `--images keep` or `--images omit` to extraction.
    Extract the timeline using that choice, read the evidence, and author
    `state-analysis.json` using [clear-writing.md](references/clear-writing.md).
@@ -122,7 +123,7 @@ Use `extract_timeline.py --images keep|omit`; omission details are in
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
 - [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
-- [legacy-canvas.md](references/legacy-canvas.md): only for an explicit stock ThoughtDAG canvas request.
+- [legacy-canvas.md](references/legacy-canvas.md) and [analysis-schema.md](references/analysis-schema.md): only for an explicit stock ThoughtDAG canvas request.
 
 Keep generated files private (600; new directories 700). Extraction redacts patterns;
 repeatable `--secret-file` can match known local values without printing them. Keep raw logs

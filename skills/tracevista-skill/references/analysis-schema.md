@@ -1,5 +1,13 @@
 # analysis.json
 
+## Contents
+
+- Fields
+- Kinds
+- Branches: turning a linear log into a tree
+- Granularity
+- Actor identity and full-record layer
+
 The one file you write. `scripts/build_canvas.py` turns it into the canvas and rejects it with a
 list of problems when it does not fit. The example below is invented (a flaky-test fix) to show the
 shape; take every name and number in your file from the trajectory you are reading.

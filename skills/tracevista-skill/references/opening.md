@@ -5,7 +5,7 @@
 After generating and validating the complete `.agent-state.json`:
 
 1. Open [TraceVista](https://tracevista.pages.dev/) in the user's browser.
-2. Click **Import trajectory** (older UI: **导入轨迹**) and select the current export.
+2. Click **Import trajectory** and select the current export.
    On the homepage the button is directly visible; in a loaded viewer, open the top-left
    **Viewer menu** (☰) first. Use browser tools to do this when they
    support local file selection. Loading a bundled example is a separate demonstration.

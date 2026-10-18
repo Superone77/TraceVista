@@ -1,5 +1,12 @@
 # Clear technical explanations
 
+## Contents
+
+- Write the explanation before the card label
+- Before and after
+- Review the meaning
+- Primary references
+
 Use this guide for authored titles, summaries, ladders, journey text and relation explanations.
 It adapts the clarity principles of ASD-STE100 to trajectory reading. It is not a controlled
 dictionary or a claim of formal STE conformance. Keep established technical terms, code,

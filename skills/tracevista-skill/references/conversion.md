@@ -1,5 +1,11 @@
 # Converting raw sessions
 
+## Contents
+
+- Identify and extract the input
+- Author structure and the reading layer together
+- Build, inspect coverage and review meaning
+
 ## 1. Identify and extract the input
 
 When the input contains images, use the user's choice of `--images keep` or `--images omit`.
@@ -88,7 +94,7 @@ tool name. A reviewer is an actor, not a seventh behavior. Inventory exploration
 skill loading, review chains, knowledge/TODO changes, measurement scopes and status outcomes.
 Mark missing or inapplicable evidence explicitly; review PASS is not measured speedup.
 
-For the current viewer, author these reading fields by default:
+Author these reading fields by default:
 
 - Write each important entity's `summary` before shortening its ladder. State what changed
   or was tried, what the records showed, and which next decision the agent explicitly made.
@@ -124,7 +130,7 @@ python3 /absolute/skill/scripts/build_state_graph.py /absolute/work/state-analys
   --out /absolute/work/task.agent-state.json
 ```
 
-The default format is now `state`; use explicit `--format canvas` for compatibility.
+The default format is `state`; use explicit `--format canvas` for compatibility.
 The reader-ready check requires ladders on states, branches and structurally important actions,
 and a cited journey. Existing legacy files remain accepted without this opt-in check.
 The report lists missing ladders/journey plus missing reasons, quotes and decision dependencies.
