@@ -15,7 +15,7 @@ if (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd
 }
 const catalog = JSON.parse(readFileSync(resolve(library, 'examples/index.json')));
 if (!Array.isArray(catalog) || !catalog.length) throw new Error('The example catalog is empty.');
-const paths = new Set(['examples/index.json', 'THIRD_PARTY_NOTICES.md']);
+const paths = new Set(['examples/index.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md']);
 for (const item of catalog) {
   if (!/^[a-zA-Z0-9_-]+$/.test(item.id) || !/^[a-zA-Z0-9_-]+\.agent-state\.json$/.test(item.file)) throw new Error('Invalid catalog entry.');
   const thumbnail = item.thumbnail || `${item.id}.png`;

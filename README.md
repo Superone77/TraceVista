@@ -175,12 +175,12 @@ The records are never translated. Summaries written by a model tend to sound mor
 
 ## Run locally
 
-Requires **Node.js 24.x** and **pnpm 11.19.0**.
+Requires **Node.js 24 or newer** and **pnpm 11 or newer**. CI checks Node.js 24 and the latest Node.js release; `.nvmrc` provides a Node.js 24 default.
 
 ```bash
 git clone --depth 1 --branch main https://github.com/Superone77/TraceVista.git
 cd TraceVista
-npm install -g pnpm@11.19.0
+npm install -g pnpm@11
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
@@ -204,10 +204,12 @@ Browse the six examples on the [website](https://tracevista.pages.dev/). To run 
 
 TraceVista pairs a **React Flow viewer** with a **trajectory conversion skill**. A shared JSON format connects them, so new agents and tasks can bring their own adapters, annotations, and examples.
 
-- [Viewer guide](docs/VIEWER.md) — navigation, details, chat, and model connections.
+- [Viewer guide](docs/VIEWER.md) — Map, Story, playback, chat, and model connections.
 - [State graph format](skills/tracevista-skill/references/state-graph.md) — states, actions, transitions, and evidence.
 - [Reading layer](skills/tracevista-skill/references/reading-layer.md) — summaries, turning points, and decision links.
 - [Contributing](CONTRIBUTING.md) — set up, run the checks, add an adapter or example, and send a pull request.
+- [Security](SECURITY.md) — report vulnerabilities and understand how API keys and chat data are handled.
+- [Code of conduct](CODE_OF_CONDUCT.md) — community standards and reporting concerns.
 
 Have an interesting trajectory or an idea for the viewer? [Open an issue](https://github.com/Superone77/TraceVista/issues).
 

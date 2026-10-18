@@ -27,7 +27,7 @@ export function loadExampleLibrary(repoRoot: string, libraryPath?: string) {
   catch { throw new Error(`Example library not found at ${requestedPath}. Set TRACEVISTA_EXAMPLES_DIR to the pinned example repository. Use pnpm dev or pnpm build for the standalone viewer.`); }
   const assets = new Map<string, Buffer>();
   for (const [path, digest] of Object.entries(lock.files)) {
-    if (!/^(examples\/[a-zA-Z0-9_.-]+\.json|example-thumbnails\/[a-zA-Z0-9_.-]+\.(png|webp|jpg)|THIRD_PARTY_NOTICES\.md|LICENSES\/[a-zA-Z0-9_.-]+\.txt)$/.test(path)
+    if (!/^(examples\/[a-zA-Z0-9_.-]+\.json|example-thumbnails\/[a-zA-Z0-9_.-]+\.(png|webp|jpg)|LICENSE|THIRD_PARTY_NOTICES\.md|LICENSES\/[a-zA-Z0-9_.-]+\.txt)$/.test(path)
       || !/^[a-f0-9]{64}$/.test(digest)) throw new Error(`Invalid pinned asset: ${path}`);
     let realPath: string;
     try { realPath = realpathSync(resolve(libraryRoot, path)); }
@@ -36,7 +36,7 @@ export function loadExampleLibrary(repoRoot: string, libraryPath?: string) {
     if (withinLibrary.startsWith('..') || isAbsolute(withinLibrary)) throw new Error(`Example asset escapes library: ${path}`);
     const contents = readFileSync(realPath);
     if (sha256(contents) !== digest) throw new Error(`Example asset differs from examples.lock.json: ${path}`);
-    const outputPath = path === 'THIRD_PARTY_NOTICES.md' || path.startsWith('LICENSES/') ? `examples/${path}` : path;
+    const outputPath = path === 'LICENSE' || path === 'THIRD_PARTY_NOTICES.md' || path.startsWith('LICENSES/') ? `examples/${path}` : path;
     assets.set(outputPath, contents);
   }
   const index = assets.get('examples/index.json');

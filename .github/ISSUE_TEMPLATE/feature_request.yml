@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a way to make agent trajectories easier to understand.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: What are you trying to understand or do?
+      description: Describe a concrete situation and what is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Explain the behavior you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or examples
+      description: Optional. Include a public example, sketch, or workaround. Do not attach private trajectories or credentials.

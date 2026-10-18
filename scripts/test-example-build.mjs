@@ -17,6 +17,7 @@ try {
     'examples/tiny.agent-state.json': JSON.stringify({ format: 'coding-agent-state-trajectory' }),
     'example-thumbnails/tiny.png': 'fixture image',
     'THIRD_PARTY_NOTICES.md': 'Synthetic test data',
+    'LICENSE': 'Synthetic library license',
   };
   const lock = { version: 1, repository: 'test-library', revision: 'a'.repeat(40), files: {} };
   const pin = () => {
@@ -30,13 +31,20 @@ try {
   writeFileSync(join(library, 'not-for-publishing.json'), 'unlisted local data');
   const loaded = loadExampleLibrary(root, library);
   assert.equal(loaded.catalog.length, 1);
-  assert.equal(loaded.assets.size, 4);
+  assert.equal(loaded.assets.size, 5);
   assert.ok(loaded.assets.has('examples/THIRD_PARTY_NOTICES.md'));
+  assert.equal(loaded.assets.get('examples/LICENSE').toString(), assets.LICENSE);
   assert.ok(!loaded.assets.has('not-for-publishing.json'));
   assert.equal(loaded.lockHash.length, 64);
   assert.throws(() => loadExampleLibrary(root, ''), /must name/);
   assert.throws(() => loadExampleLibrary(root, '   '), /must name/);
   assert.throws(() => loadExampleLibrary(root, join(temp, 'missing')), /not found/);
+  rmSync(join(library, 'LICENSE'));
+  assert.throws(() => loadExampleLibrary(root, library), /Missing pinned/);
+  pin();
+  writeFileSync(join(library, 'LICENSE'), 'different terms');
+  assert.throws(() => loadExampleLibrary(root, library), /differs/);
+  pin();
   writeFileSync(join(library, entry.file), 'not in the catalog directory');
   writeFileSync(join(library, 'examples', entry.file), 'changed evidence');
   assert.throws(() => loadExampleLibrary(root, library), /differs/);

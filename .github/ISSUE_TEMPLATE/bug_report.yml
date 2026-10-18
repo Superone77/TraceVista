@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a problem with the viewer or conversion skill.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, use [the private reporting channel](https://github.com/Superone77/TraceVista/security/advisories/new).
+        This issue will be public. Do not include API keys, authorization headers, private trajectories, personal paths, or browser storage dumps. Share a public example or a small synthetic reproduction instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the public example URL or describe a minimal input that triggers the problem.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Deployment URL or commit, browser and version, operating system; Node and pnpm versions for local builds. For chat issues, give the provider and model name, never the key.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or error text
+      description: Optional. Remove credentials, private content, and identifying paths before attaching anything. Do not attach a full network capture or raw private log.

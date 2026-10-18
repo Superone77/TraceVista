@@ -1,10 +1,11 @@
 {
   "version": 1,
   "repository": "https://github.com/Superone77/TraceVista-examples.git",
-  "revision": "3779b114c3c5ee1828eddbaccb2ffdca56c06a67",
+  "revision": "a64edca48b7735ddf4535d279a687bae58a51eed",
   "files": {
+    "LICENSE": "98ebddf08db6a2112de8ab068c2fce20c2b79d217f41d9a49826896b8b75788e",
     "LICENSES/PostTrainBench-Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-    "THIRD_PARTY_NOTICES.md": "abc1d1a6149fc634eef853eed3192f958a344761540c21eaa05f8a758bec83ac",
+    "THIRD_PARTY_NOTICES.md": "1e3f41e76699706637d752f746c5bb42f51ed135a36cd82dd9413ff55124741d",
     "example-thumbnails/codex-garden-animation.webp": "755f04a3f9778c357c4cacbd5e814893ff2b624e342157f7d4bd9b768cf0348b",
     "example-thumbnails/inferencebench-serving-recovery.png": "313efdacbf3f5154a57b4f8a011e0b9a35c7c67737ab787d63fe31f9cc1356ae",
     "example-thumbnails/literesearcher-affiliations.png": "e3ab451065ac9661ace9ae608534a1c9f2be77a958888ef0724147a30face63b",
