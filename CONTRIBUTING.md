@@ -2,6 +2,9 @@
 
 Thanks for helping. Bug reports, new log adapters, viewer improvements, and interesting agent runs are all welcome.
 
+Please follow the [code of conduct](CODE_OF_CONDUCT.md). Report vulnerabilities through
+the private channel in [SECURITY.md](SECURITY.md).
+
 ## Before you start
 
 - **Bugs and ideas:** [open an issue](https://github.com/Superone77/TraceVista/issues). For a rendering problem, include the example or a small `.agent-state.json` that shows it, if you can share one.
@@ -10,12 +13,12 @@ Thanks for helping. Bug reports, new log adapters, viewer improvements, and inte
 
 ## Set up
 
-Requires **Node.js 24.x**, **pnpm 11.19.0**, and **Python 3.10+**.
+Requires **Node.js 24+**, **pnpm 11+**, and **Python 3.10+**. CI checks Node.js 24 and the latest Node.js release. `.nvmrc` provides a default; newer runtimes are accepted.
 
 ```bash
 git clone https://github.com/Superone77/TraceVista.git
 cd TraceVista
-npm install -g pnpm@11.19.0
+npm install -g pnpm@11
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm setup:hooks   # optional: blocks accidental pushes to main
 pnpm dev           # http://127.0.0.1:8875/

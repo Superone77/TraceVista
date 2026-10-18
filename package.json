@@ -4,9 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@11.19.0",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24",
+    "pnpm": ">=11"
   },
   "scripts": {
     "dev": "vite --config viewer/vite.config.ts --host 127.0.0.1 --port 8875 --strictPort",

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Superone77/TraceVista/security/advisories/new
+    about: Report vulnerabilities without publishing sensitive details in an issue.
+  - name: Viewer and conversion guide
+    url: https://github.com/Superone77/TraceVista/blob/main/docs/VIEWER.md
+    about: Learn how to import, explore, and chat with a trajectory.

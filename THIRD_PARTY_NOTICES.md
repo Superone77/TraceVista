@@ -1,45 +1,47 @@
-# Source and attribution
+# Third-party notices
 
-## Viewer
+TraceVista's original code and documentation are available under the [MIT License](LICENSE).
+The following components and example sources retain their own attribution and terms.
 
-The local state/trajectory viewer was developed from the ThoughtDAG codebase:
-https://github.com/chenxiachan/thoughtdag (copyright © 2026 Xia Chen, MIT).
-Its license is preserved at [LICENSES/ThoughtDAG-MIT.txt](LICENSES/ThoughtDAG-MIT.txt).
-The local source checkout had base commit `5e876d8e1e31881a8da9cf95d103e1adac0fb74a`
-plus local state-view modifications; this repository contains the actual modified source,
-not a claim that these features exist in that upstream commit.
+## ThoughtDAG
 
-This package extracts the state viewer only. It preserves the React Flow attribution and
-uses React / React Flow / Vite / bundled Inter fonts. The dependency lock records exact
-versions and package integrity. No upstream chat backend or model API proxy is included.
+The trajectory viewer and reading layer adapt code and ideas from
+[ThoughtDAG](https://github.com/chenxiachan/thoughtdag), **Copyright (c) 2026 Xia Chen**,
+under the MIT License. The complete copyright and license text is preserved in
+[LICENSES/ThoughtDAG-MIT.txt](LICENSES/ThoughtDAG-MIT.txt).
 
-The reading layer adapts further ThoughtDAG modules (same copyright and MIT license):
-`viewer/src/trajectory/ladder.ts` (from `src/lib/ladder-core.ts`), `ZoomText.tsx` (from
-`src/components/ZoomText.tsx`), `RoutedEdge.tsx` (from `src/lib/edge-path.ts`), the tool
-fingerprint in `model.ts` (from `src/lib/turn-insight.ts`), the fold rule in `semantic.ts`
-(after `src/lib/condense.ts`), and the prompts behind `references/reading-layer.md` (after
-`src/lib/ladder.ts` and `src/lib/gedankengang.ts`).
+Adapted components include:
 
-The browser provider catalog and live model discovery in `viewer/src/trajectory/providers.ts`
-follow ThoughtDAG's `src/lib/runtime-providers.ts` and streaming behavior in `src/lib/direct-llm.ts`
-(same copyright and MIT license). Vendor-specific endpoints are checked against official API
-documentation. Its proxy, OAuth and subscription bridges are not included.
+| TraceVista component | ThoughtDAG source |
+|---|---|
+| `viewer/src/trajectory/ladder.ts` | `src/lib/ladder-core.ts` |
+| `viewer/src/trajectory/ZoomText.tsx` | `src/components/ZoomText.tsx` |
+| `viewer/src/trajectory/RoutedEdge.tsx` | `src/lib/edge-path.ts` |
+| Tool fingerprints in `viewer/src/trajectory/model.ts` | `src/lib/turn-insight.ts` |
+| Fold rules in `viewer/src/trajectory/semantic.ts` | `src/lib/condense.ts` |
+| `skills/tracevista-skill/references/reading-layer.md` | Prompts in `src/lib/ladder.ts` and `src/lib/gedankengang.ts` |
+| Provider catalog and model discovery in `viewer/src/trajectory/providers.ts` | `src/lib/runtime-providers.ts` |
+| Browser streaming behavior | `src/lib/direct-llm.ts` |
 
-## Conversion skill
+The conversion skill is maintained in this repository under TraceVista's MIT License;
+the ThoughtDAG-derived reading instructions retain the attribution above.
 
-`skills/tracevista-skill` is copied from the user's local private skill repository
-(base commit `e0c1221a4d45c9c006dc7cc6d5f2805e2f3e8cde` plus local state/observation changes).
-This repository contains the complete version used by the example, including standalone-export changes. It does not depend on access to the older private repository.
+## Dependencies
 
-## External example library
+The viewer uses React, React Flow, Vite, and Inter fonts. Their packages carry their own
+licenses. The dependency versions and integrity hashes are recorded in `pnpm-lock.yaml`.
+React Flow's on-canvas attribution is preserved.
 
-The public research and creative examples live in the independent `TraceVista-examples`
-repository. Their source-specific attribution, preserved evidence, and license terms are
-recorded in that repository's `THIRD_PARTY_NOTICES.md` and `LICENSES/`. The viewer's MIT
-license does not replace those terms.
+## Example library
 
-The default viewer build includes no example trajectories. A showcase build includes the
-pinned library notices at `examples/THIRD_PARTY_NOTICES.md` and its license copies under
-`examples/LICENSES/`. See [docs/EXAMPLES.md](docs/EXAMPLES.md) for the local library layout,
-pinned version, and build commands. The library is available at
-[Superone77/TraceVista-examples](https://github.com/Superone77/TraceVista-examples).
+Example trajectories are published separately in
+[TraceVista-examples](https://github.com/Superone77/TraceVista-examples).
+Its MIT License covers TraceVista's original annotations, organization, metadata, and
+documentation. Source records, code excerpts, images, and other third-party material
+retain the terms documented in that library's
+[THIRD_PARTY_NOTICES.md](https://github.com/Superone77/TraceVista-examples/blob/main/THIRD_PARTY_NOTICES.md).
+
+The standalone viewer does not bundle examples. A showcase build publishes the pinned
+library's `LICENSE` as `examples/LICENSE`, its notices as
+`examples/THIRD_PARTY_NOTICES.md`, and license copies under `examples/LICENSES/`.
+See [docs/EXAMPLES.md](docs/EXAMPLES.md) for the library layout and build commands.

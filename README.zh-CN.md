@@ -13,7 +13,7 @@
 [![Verify](https://github.com/Superone77/TraceVista/actions/workflows/verify.yml/badge.svg)](https://github.com/Superone77/TraceVista/actions/workflows/verify.yml)
 [![Live demo](https://img.shields.io/badge/demo-tracevista.pages.dev-black.svg)](https://tracevista.pages.dev/)
 
-[**打开 TraceVista**](https://tracevista.pages.dev/) · [**浏览示例**](#浏览真实的-agent-运行) · [**转换你的轨迹**](#导入你自己的轨迹) · [文档](docs/VIEWER.md)
+[**打开 TraceVista**](https://tracevista.pages.dev/) · [**浏览示例**](#浏览真实的-agent-运行) · [**转换你的轨迹**](#导入你自己的轨迹) · [文档](docs/VIEWER.zh-CN.md)
 
 [English](README.md) · **简体中文**
 
@@ -175,12 +175,12 @@ TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#
 
 ## 本地运行
 
-需要 **Node.js 24.x** 和 **pnpm 11.19.0**。
+需要 **Node.js 24 或更新版本**、**pnpm 11 或更新版本**。CI 检查 Node.js 24 和最新版本；`.nvmrc` 提供 Node.js 24 作为默认选择。
 
 ```bash
 git clone --depth 1 --branch main https://github.com/Superone77/TraceVista.git
 cd TraceVista
-npm install -g pnpm@11.19.0
+npm install -g pnpm@11
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
@@ -204,7 +204,7 @@ pnpm dev
 
 TraceVista 由一个 **React Flow 查看器** 和一个 **轨迹转换 skill** 组成，两者通过共享的 JSON 格式连接。新的 agent 和任务可以带上自己的适配器、注释和示例。
 
-- [查看器指南](docs/VIEWER.md)：导航、详情、对话和模型连接。
+- [查看器指南](docs/VIEWER.zh-CN.md)：地图、Story、播放、对话和模型连接。
 - [状态图格式](skills/tracevista-skill/references/state-graph.md)：状态、动作、转换和证据。
 - [阅读层](skills/tracevista-skill/references/reading-layer.md)：摘要、转折点和决策关联。
 - [贡献指南](CONTRIBUTING.md)：环境搭建、运行检查、新增适配器或示例、提交 pull request。

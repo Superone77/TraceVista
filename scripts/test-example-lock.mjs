@@ -15,6 +15,7 @@ try {
   writeFileSync(join(library, 'examples/tiny.agent-state.json'), '{}');
   writeFileSync(join(library, 'example-thumbnails/tiny.png'), 'synthetic thumbnail');
   writeFileSync(join(library, 'THIRD_PARTY_NOTICES.md'), 'synthetic sources');
+  writeFileSync(join(library, 'LICENSE'), 'synthetic library license');
   writeFileSync(join(library, 'LICENSES/test.txt'), 'synthetic license');
   const git = args => execFileSync('git', args, { cwd: library, stdio: ['ignore', 'pipe', 'pipe'] });
   git(['init', '-q']); git(['add', '.']);
@@ -24,6 +25,11 @@ try {
   assert.equal(ok.status, 0, ok.stderr);
   const initial = readFileSync(join(tool, 'examples.lock.json'), 'utf8');
   assert.ok(JSON.parse(initial).files['LICENSES/test.txt']);
+  assert.ok(JSON.parse(initial).files.LICENSE);
+  rmSync(join(library, 'LICENSE'));
+  assert.notEqual(run().status, 0, 'Do not drop the library license from the published lock');
+  assert.equal(readFileSync(join(tool, 'examples.lock.json'), 'utf8'), initial);
+  git(['restore', 'LICENSE']);
   rmSync(join(library, 'LICENSES/test.txt'));
   const deletedLicense = run();
   assert.notEqual(deletedLicense.status, 0);

@@ -23,6 +23,7 @@ parent/
     ├── examples/index.json
     ├── examples/*.agent-state.json
     ├── example-thumbnails/
+    ├── LICENSE
     ├── THIRD_PARTY_NOTICES.md
     └── LICENSES/
 ```
@@ -59,7 +60,7 @@ The same variable applies to `pnpm test:examples`, `pnpm build:site`, and `pnpm 
 
 Both build outputs include `tracevista-release.json`. It records the viewer Git revision and whether the checkout had local changes. Showcase metadata also records the example revision and lock-file hash; standalone metadata has `examples: null`. A dirty checkout is recorded as dirty, and a source archive without Git metadata has no verified viewer revision.
 
-The showcase includes the library's notices at `examples/THIRD_PARTY_NOTICES.md` and license texts under `examples/LICENSES/`. Keep those files and the release metadata with the deployed output. Local imports under `viewer/public/local-data/` are excluded from production builds.
+The showcase includes the library's MIT license at `examples/LICENSE`, notices at `examples/THIRD_PARTY_NOTICES.md`, and third-party license texts under `examples/LICENSES/`. The MIT license covers TraceVista's original contributions; each source retains its own license. Keep those files and the release metadata with the deployed output. Local imports under `viewer/public/local-data/` are excluded from production builds.
 
 ## Update examples
 
@@ -76,4 +77,4 @@ Push the data commit before merging a viewer lock that references it. If a squas
 
 Keep Pi Agent first in the catalog. Preserve the original messages, IDs, call/result pairing, source attachments, and license text. Analyst annotations must remain distinct from recorded evidence.
 
-The Garden Animation case is a fixed excerpt, from `continued:E853` through `continued:E1098`, packaged as a complete export for that scope. Its full session export and later videos stay out of both repositories. Adding, replacing, or extending a public case follows the maintainer approval rule in [AGENTS.md](../AGENTS.md).
+The Garden Animation case is a fixed excerpt, from `continued:E853` through `continued:E1098`, packaged as a complete export for that scope. Its full session export and later videos stay out of both repositories. To propose a new or expanded case, follow [Adding an example](../CONTRIBUTING.md#adding-an-example).
