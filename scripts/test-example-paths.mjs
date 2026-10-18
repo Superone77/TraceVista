@@ -28,7 +28,7 @@ try{
  for(const file of ['../private.agent-state.json','/absolute.agent-state.json','https://example.com/run.agent-state.json'])assert.throws(()=>exampleFile(file,temp),/Invalid example filename/);
  const clean=scan(temp);
  assert.equal(clean.status,0,clean.stderr);
- assert.deepEqual(JSON.parse(clean.stdout),{example_files_scanned:2,files_with_credential_patterns:[]});
+ assert.deepEqual(JSON.parse(clean.stdout),{example_files_scanned:2,files_with_credential_patterns:[],local_path_findings:[],invalid_json_files:[]});
  const fakeCredential='sk-'+ 'a'.repeat(30);
  writeFileSync(join(temp,'examples','small.agent-state.json'),JSON.stringify({synthetic:fakeCredential}));
  const rejected=scan(temp);

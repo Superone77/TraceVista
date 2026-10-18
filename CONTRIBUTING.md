@@ -83,7 +83,7 @@ By contributing, you agree that your contributions are licensed under the [MIT L
 
 ## For maintainers
 
-The intended protection rules for `main` are in [.github/main-protection.json](.github/main-protection.json): pull requests only, one approving review from a code owner, stale approvals dismissed, rules enforced for admins, no force pushes or deletion. Apply and verify them with:
+The intended protection rules for `main` are in [.github/main-protection.json](.github/main-protection.json): pull requests only, one approving review from a code owner, stale approvals dismissed, no force pushes or deletion. Administrators are exempt from these rules. Apply and verify them with:
 
 ```bash
 gh api --method PUT repos/Superone77/TraceVista/branches/main/protection \

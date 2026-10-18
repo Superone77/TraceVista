@@ -2,6 +2,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const commands=[
+ ['python3',['scripts/test-example-secrets.py']],
  ['python3',['-m','unittest','discover','-s','skills/tracevista-skill/tests','-v']],
  [process.execPath,['viewer/scripts/test-state-trajectory.mjs']],
  [process.execPath,['viewer/scripts/test-semantic-trajectory.mjs']],

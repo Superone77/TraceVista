@@ -18,4 +18,4 @@ for(const [command,args]of commands){
  if(p.error)throw p.error;
  if(p.status!==0)process.exit(p.status??1);
 }
-console.log('PASS: external example catalog, complete exports, evidence checks and credential-pattern scan');
+console.log('PASS: external example catalog, complete exports, evidence checks and credential/local-path scan');
