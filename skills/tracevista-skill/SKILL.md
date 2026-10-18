@@ -1,6 +1,6 @@
 ---
 name: tracevista-skill
-description: Converts AI agent session logs into TraceVista .agent-state.json files with system states, work phases, actions and cited raw evidence, then validates each file and opens it in the TraceVista web viewer. Supports Claude Code, Codex and Pi logs, InferenceBench traces and SWE-rebench rows, including main-agent and reviewer sessions. Use when the user wants to visualize, replay, review or explain what an agent did in a session or log, convert a trajectory for TraceVista, or revise an existing .agent-state.json file.
+description: Converts AI agent session logs into TraceVista .agent-state.json files with system states, work phases, actions and cited raw evidence, then validates each file and opens it in the TraceVista web viewer. Use when the user wants to visualize, replay, review or explain what an agent did in a session or log, convert a trajectory for TraceVista, or revise an existing .agent-state.json file.
 ---
 
 # TraceVista
