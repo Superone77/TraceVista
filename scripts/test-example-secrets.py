@@ -19,6 +19,7 @@ class LocalPathTests(unittest.TestCase):
     def test_local_home_and_temp_paths(self):
         cases = {
             '/Users/synthetic-account/project/run.json': 'macos_home',
+            '/users/synthetic-account/project/run.json': 'macos_home',
             'file:///Users/synthetic-account/project/run.json': 'macos_home',
             '/var/folders/zz/synthetic-random-value/T/run.json': 'macos_temp',
             '/private/var/folders/zz/synthetic-random-value/T/run.json': 'macos_temp',
@@ -47,6 +48,7 @@ class LocalPathTests(unittest.TestCase):
     def test_explicit_placeholders_and_public_execution_paths_are_allowed(self):
         cases = [
             '/Users/<user>/project', '/Users/[redacted]/project',
+            'Home: /Users/<user>.', 'Home: /users/[redacted],',
             '/Users/${USER}/project', '/Users/your-username/project',
             '/private/var/folders/<redacted>/run.json',
             '/var/folders/[redacted]/run.json',

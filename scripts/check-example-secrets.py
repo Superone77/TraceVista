@@ -29,8 +29,8 @@ PLACEHOLDERS = {
 }
 COMPONENT = r'([^/\s\"\x27`]+)'
 WINDOWS_HOME = re.compile(r'(?i)\b[a-z]:/users/' + COMPONENT)
-MACOS_HOME = re.compile(r'/Users/' + COMPONENT)
-MACOS_TEMP = re.compile(r'/(?:private/)?var/folders/' + COMPONENT)
+MACOS_HOME = re.compile(r'/Users/' + COMPONENT, re.IGNORECASE)
+MACOS_TEMP = re.compile(r'/(?:private/)?var/folders/' + COMPONENT, re.IGNORECASE)
 UNICODE_ESCAPE = re.compile(r'\\u([0-9a-fA-F]{4})')
 
 
@@ -55,15 +55,15 @@ def local_path_types(value):
     windows = list(WINDOWS_HOME.finditer(text))
     types = set()
     for match in windows:
-        if match[1].casefold() not in PLACEHOLDERS:
+        if match[1].casefold().rstrip('.,;:!?') not in PLACEHOLDERS:
             types.add('windows_home')
     for match in MACOS_HOME.finditer(text):
         if any(start.start() <= match.start() < start.end() for start in windows):
             continue
-        if match[1].casefold() not in PLACEHOLDERS:
+        if match[1].casefold().rstrip('.,;:!?') not in PLACEHOLDERS:
             types.add('macos_home')
     for match in MACOS_TEMP.finditer(text):
-        if match[1].casefold() not in PLACEHOLDERS:
+        if match[1].casefold().rstrip('.,;:!?') not in PLACEHOLDERS:
             types.add('macos_temp')
     return sorted(types)
 
