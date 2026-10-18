@@ -81,7 +81,18 @@ assert.equal(states.get('s10').lineage.relation,'restored','Final packaging rest
 
 const selectionSource=g.timeline.sources.find(s=>s.name==='selection-evidence.json');
 assert(selectionSource,'Selection evidence accompanies the public example');
+const selectionArtifact=original.artifacts.find(a=>a.name==='selection-evidence.json');
+const selectionEvent=g.timeline.timeline.find(e=>e.id==='selection:E1');
+assert.equal(selectionArtifact.text,selectionSource.text,'Both source copies use the same redacted manifest');
+assert.equal(selectionEvent.text,selectionSource.text,'The raw record uses the same redacted manifest');
+assert.equal(selectionArtifact.sha256,textHash(selectionSource.text));
+assert.equal(selectionSource.sha256_redacted,selectionArtifact.sha256);
+assert.equal(selectionArtifact.sha256_original,selectionSource.sha256_original);
+assert.notEqual(selectionSource.sha256_original,selectionSource.sha256_redacted);
 const selection=JSON.parse(selectionSource.text);
+const collectedSources=[selection.dataset.root_listing,...Object.values(selection.sources).filter(s=>s.local_path)];
+assert.equal(collectedSources.length,12);
+assert(collectedSources.every(s=>s.local_path.startsWith('source://posttrainbench/')),'Collection paths are portable source references');
 assert.equal(selection.dataset.revision,'386b3034fa26f0f1b3ae3bfded99b791f0b254a6');
 assert.equal(selection.selection.publicly_available_agent_rank,5,'Highest available agent does not mean current global rank one');
 assert.equal(selection.selection.candidate_rank_in_clean_public_same_task,1);
