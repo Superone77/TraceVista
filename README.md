@@ -213,6 +213,19 @@ TraceVista pairs a **React Flow viewer** with a **trajectory conversion skill**.
 
 Have an interesting trajectory or an idea for the viewer? [Open an issue](https://github.com/Superone77/TraceVista/issues).
 
+## Citation
+
+If you use TraceVista in your work, please cite:
+
+```bibtex
+@misc{yang2026tracevista,
+  author = {Wanqi Yang and Xia Chen and Qilong Huang and Mei Xie and André Borrmann and Shiwei Liu},
+  title = {{TraceVista}: Understanding Agent Trajectories through Hierarchical Exploration},
+  year = {2026},
+  howpublished = {\url{https://github.com/Superone77/TraceVista}}
+}
+```
+
 ## License
 
 TraceVista's code is released under the [MIT License](LICENSE). The external example library keeps its source licenses, such as Apache-2.0 and CC-BY-4.0, and its own notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for code attribution and the example notices location.

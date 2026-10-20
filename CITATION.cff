@@ -1,0 +1,50 @@
+cff-version: 1.2.0
+message: "If you use TraceVista in your work, please cite it as below."
+type: software
+title: "TraceVista: Understanding Agent Trajectories through Hierarchical Exploration"
+authors:
+  - given-names: Wanqi
+    family-names: Yang
+    affiliation: "Max Planck Institute for Intelligent Systems; ELLIS Institute Tübingen; Tübingen AI Center"
+  - given-names: Xia
+    family-names: Chen
+    affiliation: "Georg Nemetschek Institute, Technische Universität München, Munich, Germany"
+  - given-names: Qilong
+    family-names: Huang
+    affiliation: "Independent Researcher"
+  - given-names: Mei
+    family-names: Xie
+    affiliation: "Independent Researcher"
+  - given-names: André
+    family-names: Borrmann
+    affiliation: "Georg Nemetschek Institute, Technische Universität München, Munich, Germany"
+  - given-names: Shiwei
+    family-names: Liu
+    affiliation: "Max Planck Institute for Intelligent Systems; ELLIS Institute Tübingen; Tübingen AI Center"
+repository-code: "https://github.com/Superone77/TraceVista"
+url: "https://tracevista.pages.dev/"
+license: MIT
+preferred-citation:
+  type: generic
+  title: "TraceVista: Understanding Agent Trajectories through Hierarchical Exploration"
+  authors:
+    - given-names: Wanqi
+      family-names: Yang
+      affiliation: "Max Planck Institute for Intelligent Systems; ELLIS Institute Tübingen; Tübingen AI Center"
+    - given-names: Xia
+      family-names: Chen
+      affiliation: "Georg Nemetschek Institute, Technische Universität München, Munich, Germany"
+    - given-names: Qilong
+      family-names: Huang
+      affiliation: "Independent Researcher"
+    - given-names: Mei
+      family-names: Xie
+      affiliation: "Independent Researcher"
+    - given-names: André
+      family-names: Borrmann
+      affiliation: "Georg Nemetschek Institute, Technische Universität München, Munich, Germany"
+    - given-names: Shiwei
+      family-names: Liu
+      affiliation: "Max Planck Institute for Intelligent Systems; ELLIS Institute Tübingen; Tübingen AI Center"
+  year: 2026
+  url: "https://github.com/Superone77/TraceVista"
