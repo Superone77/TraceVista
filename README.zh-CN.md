@@ -211,6 +211,19 @@ TraceVista 由一个 **React Flow 查看器** 和一个 **轨迹转换 skill** �
 
 有有趣的轨迹，或者对查看器有想法？欢迎[提 issue](https://github.com/Superone77/TraceVista/issues)。
 
+## 引用
+
+如果你在工作中使用了 TraceVista，欢迎引用：
+
+```bibtex
+@misc{yang2026tracevista,
+  author = {Wanqi Yang and Xia Chen and Qilong Huang and Mei Xie and André Borrmann and Shiwei Liu},
+  title = {{TraceVista}: Understanding Agent Trajectories through Hierarchical Exploration},
+  year = {2026},
+  howpublished = {\url{https://github.com/Superone77/TraceVista}}
+}
+```
+
 ## 许可证
 
 TraceVista 的代码以 [MIT 许可证](LICENSE) 发布。外部示例库沿用各自来源的许可证，例如 Apache-2.0 和 CC-BY-4.0，并保留独立的来源声明。代码署名与示例声明的位置见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
