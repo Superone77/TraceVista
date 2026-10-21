@@ -137,6 +137,8 @@ export function createTraceVistaHost(ctx, config = {}, dependencies = {}) {
       if (previousResultJobId) releaseJob(previousResultJobId);
     } catch (error) {
       job.output = undefined;
+      // cancel() already published the terminal state; a delayed abort must not rewrite it.
+      if (job.status === 'cancelled') return;
       const cancelled = job.abort.signal.aborted && !job.timedOut;
       update(job, { status: cancelled ? 'cancelled' : 'error',
         stage: cancelled ? 'cancelled' : 'error',
@@ -199,6 +201,7 @@ export function createTraceVistaHost(ctx, config = {}, dependencies = {}) {
   function cancel(sessionId) {
     const job = bySession.get(sessionId);
     if (!job || job.status !== 'running') return state(sessionId);
+    clearTimeout(job.timer);
     job.abort.abort(new Error('TraceVista conversion cancelled.'));
     update(job, { status: 'cancelled', stage: 'cancelled', detail: 'Conversion cancelled.',
       finishedAt: new Date().toISOString() });

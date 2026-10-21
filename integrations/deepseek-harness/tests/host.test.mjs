@@ -108,6 +108,37 @@ test('cancel aborts model work and prevents an export', async () => {
   assert.equal(host.exportRequest(new Request(`http://localhost/api/tracevista.export?jobId=${job.jobId}`)).status, 404);
 });
 
+for (const delay of [1, 1001]) {
+  test(`cancellation remains unchanged when the analyzer exits ${delay} ms later`, async t => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.UTC(2026, 0, 1) });
+    const entered = deferred();
+    const release = deferred();
+    const { agent, host } = fixture(async ({ signal }) => {
+      entered.resolve();
+      // A provider can take time to acknowledge the abort, including past the deadline.
+      await release.promise;
+      signal.throwIfAborted();
+    }, { jobTimeoutMs: 1000 });
+    try {
+      const job = host.start(agent);
+      await entered.promise;
+      const cancelled = host.cancel(agent.id);
+      assert.equal(cancelled.status, 'cancelled');
+      assert.equal(cancelled.finishedAt, '2026-01-01T00:00:00.000Z');
+
+      t.mock.timers.tick(delay);
+      release.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(host.state(agent.id), cancelled);
+      assert.deepEqual(host.cancel(agent.id), cancelled);
+      assert.equal(exported(host, job.jobId).status, 409);
+    } finally {
+      release.resolve();
+      await host.dispose();
+    }
+  });
+}
+
 test('HTTP start refuses model overrides and inactive sessions', async () => {
   const { host } = fixture(async () => ({ graph: {} }));
   try {
