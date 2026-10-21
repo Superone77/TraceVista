@@ -268,5 +268,12 @@
  "Playback depth": "播放层级",
  "Evidence": "证据",
  "Rejected": "已否决",
- "System state": "系统状态"
+ "System state": "系统状态",
+ "Connection": "连接方式",
+ "Chat connection": "聊天连接方式",
+ "Use my own API": "使用自己的 API",
+ "Connecting…": "正在连接…",
+ "Connecting to the session model…": "正在连接当前会话的模型…",
+ "Refresh session model": "刷新会话模型",
+ "Uses the model configured in this Harness session. No API key is needed here.": "使用当前 Harness 会话中配置的模型，无需在此输入 API Key。"
 }

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-async function moduleAt(name) {
-  const code = stripTypeScriptTypes(readFileSync(new URL(`../src/trajectory/${name}.ts`, import.meta.url), 'utf8'));
-  return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+const moduleUrls = new Map();
+function moduleUrl(name) {
+  if (moduleUrls.has(name)) return moduleUrls.get(name);
+  let code = stripTypeScriptTypes(readFileSync(new URL(`../src/trajectory/${name}.ts`, import.meta.url), 'utf8'));
+  for (const match of code.matchAll(/from '(\.\/([^']+))'/g)) code = code.replaceAll(`'${match[1]}'`, JSON.stringify(moduleUrl(match[2])));
+  const url = 'data:text/javascript;base64,' + Buffer.from(code).toString('base64');
+  moduleUrls.set(name, url); return url;
 }
+const moduleAt = name => import(moduleUrl(name));
 const { readHandoffRequest, startHandoff, isLocalHandoffOrigin, HANDOFF_MAX_BYTES, HANDOFF_TIMEOUT_MS } = await moduleAt('handoff');
 const { parseGraph } = await moduleAt('model');
 const token = 'a'.repeat(64);
