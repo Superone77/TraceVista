@@ -1,3 +1,6 @@
+import { createHostedChatConnection, isHostedChatOrigin } from './hosted-chat';
+import type { HostedChatConnection } from './hosted-chat';
+
 /** One local parent page or opener may hand a JSON file to this viewer, entirely in-browser. */
 export const HANDOFF_MAX_BYTES = 64 * 1024 * 1024;
 export const HANDOFF_TIMEOUT_MS = 30_000;
@@ -42,6 +45,7 @@ export function startHandoff(
   request: HandoffRequest,
   onImport: (value: unknown) => void,
   onError: (message: string) => void,
+  onChat?: (connection: HostedChatConnection | null) => void,
 ): () => void {
   // Bind one peer for the whole session; an embedded viewer always uses its parent.
   const peer: Window | null = host.parent !== host ? host.parent : host.opener;
@@ -49,16 +53,22 @@ export function startHandoff(
   const targetOrigin = request.source === 'null' ? '*' : request.source;
   let active = true;
   let timer: number | undefined;
-  function cleanup() {
+  let chat: HostedChatConnection | undefined;
+  function stopImport() {
     active = false;
     host.removeEventListener('message', receive);
     if (timer !== undefined) host.clearTimeout(timer);
+  }
+  function cleanup() {
+    stopImport();
+    chat?.dispose();
   }
   function reply(type: 'tracevista:ready' | 'tracevista:loaded' | 'tracevista:error', code?: HandoffError) {
     peer!.postMessage({ type, token: request.token, ...(code ? { code } : {}) }, targetOrigin);
   }
   function fail(code: HandoffError) {
     cleanup();
+    if (chat) { try { onChat?.(null); } catch { /* Import failure still needs its own error. */ } }
     onError(errorMessages[code]);
     try { reply('tracevista:error', code); } catch { /* A closed helper must not hide the local error. */ }
   }
@@ -66,10 +76,10 @@ export function startHandoff(
     if (!active || event.source !== peer || event.origin !== request.source) return;
     const data: unknown = event.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
-    const message = data as { type?: unknown; token?: unknown; json?: unknown };
+    const message = data as { type?: unknown; token?: unknown; json?: unknown; chat?: unknown };
     if (message.type !== 'tracevista:import' || message.token !== request.token) return;
     // Only the first message from this exact helper/session can attempt an import.
-    cleanup();
+    stopImport();
     if (typeof message.json !== 'string') { fail('invalid-json'); return; }
     // A code-unit count is only a cheap rejection; UTF-8 bytes determine the actual limit.
     if (message.json.length > HANDOFF_MAX_BYTES || new TextEncoder().encode(message.json).byteLength > HANDOFF_MAX_BYTES) {
@@ -77,7 +87,16 @@ export function startHandoff(
     }
     let value: unknown;
     try { value = JSON.parse(message.json); } catch { fail('invalid-json'); return; }
-    try { onImport(value); } catch { fail('invalid-graph'); return; }
+    try {
+      const capability = message.chat as { version?: unknown; label?: unknown } | null;
+      if (onChat && isHostedChatOrigin(request.source) && capability && typeof capability === 'object'
+        && capability.version === 1 && typeof capability.label === 'string'
+        && capability.label.trim() && capability.label.length <= 100) {
+        chat = createHostedChatConnection(host, peer!, request.source, request.token, capability.label);
+        onChat(chat);
+      }
+      onImport(value);
+    } catch { fail('invalid-graph'); return; }
     try { reply('tracevista:loaded'); } catch { /* The successfully imported graph remains usable. */ }
   }
   host.addEventListener('message', receive);

@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHarnessChatHost } from './chat.mjs';
 
 export const name = 'tracevista';
 export const inject = ['commands', 'agents', 'sessions', 'sessionQuery', 'llm', 'connection'];
@@ -266,7 +267,9 @@ export async function apply(ctx, config = {}) {
   const host = createTraceVistaHost(ctx, config, {
     analyze: analyzeSession, selectRoute: parentAgentOptionsForDelegation,
   });
+  const chat = createHarnessChatHost(ctx, config, { selectRoute: parentAgentOptionsForDelegation });
   ctx.effect(() => () => host.dispose(), 'tracevista: conversion lifecycle');
+  ctx.effect(() => () => chat.dispose(), 'tracevista: chat lifecycle');
   ctx.commands.register({
     definitionId: 'dsh-plugin-tracevista',
     name: 'tracevista',
@@ -288,5 +291,8 @@ export async function apply(ctx, config = {}) {
   ctx.connection.fetch.register({
     path: EXPORT_PATH, methods: ['GET', 'HEAD'], requestBody: 'buffered',
     fetch: async request => host.exportRequest(request),
+  });
+  ctx.connection.fetch.register({
+    path: '/api/tracevista.chat', methods: ['GET', 'POST'], requestBody: 'buffered', fetch: chat.chatRequest,
   });
 }

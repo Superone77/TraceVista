@@ -37,6 +37,10 @@ The analyzer can read timeline parts and bundled skill references and submit an 
 
 On a local loopback Harness page, the completed result opens in an embedded TraceVista viewer through the existing browser message bridge. Other hosts use JSON download and manual import. The plugin never transfers Harness credentials to the viewer.
 
+**Chat defaults to this Harness session's model.** Open Chat to ask about a node or the full trajectory without entering another API key. Ordinary questions and both rounds of Smart Context use the Harness model service. Replies stream back into TraceVista, and **Stop** cancels the request. Chat has no workspace tools and does not append questions to the original Harness session.
+
+To use a different API, open the model settings in Chat and choose **Use my own API**. Configure the provider, model and key as in the standalone viewer. Switching back to **DeepSeek Harness** preserves those custom settings. The standalone TraceVista website continues to use its own API configuration.
+
 Conversion shows its current stage, model, elapsed time and evidence-reading progress. Use **Cancel** to stop the current attempt, **Try conversion again** after a failed attempt, or **Refresh status** after a connection problem. **Expand viewer** gives the graph the whole screen; press Escape to return to Harness.
 
 Temporary conversion files are removed when conversion settles. The latest completed graph and JSON remain available while a new conversion runs, and also if that attempt fails or is cancelled. A successful conversion replaces the previous result. Results stay in host memory until session-cache eviction or plugin unload; they are not restored after a Harness restart.
@@ -80,7 +84,7 @@ do not install Harness.
 
 Tests use synthetic session data and stubbed model responses. They establish the host lifecycle and conversion contracts; they do not establish real-model analysis quality. An end-to-end model check needs an explicitly configured Harness model and incurs that provider's usage.
 
-The host registers `GET`/`POST /api/tracevista.job` for status, start, and cancel, and `GET`/`HEAD /api/tracevista.export` for completed exports. These are exact routes on Harness's authenticated connection carrier. The browser addresses them relative to the Harness document so reverse-proxy mounts continue to work.
+The host registers `GET`/`POST /api/tracevista.job` for status, start, and cancel, `GET`/`HEAD /api/tracevista.export` for completed exports, and `GET`/`POST /api/tracevista.chat` for session-model metadata and streamed chat. These are exact routes on Harness's authenticated connection carrier. The browser addresses them relative to the Harness document so reverse-proxy mounts continue to work.
 
 Upstream contracts:
 

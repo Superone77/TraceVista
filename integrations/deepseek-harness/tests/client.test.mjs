@@ -8,7 +8,7 @@ const module = { exports: {} };
 vm.runInNewContext(source, { exports: module.exports, require(name) {
   assert.equal(name, 'react');
   return { createElement: (component, props) => ({ component, props }) };
-}, URL, URLSearchParams, TextEncoder, Uint8Array, AbortController });
+}, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, AbortController });
 const { isLoopbackOrigin, apiUrl, startViewerHandoff, createJobController } = module.exports.test;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const response = (body, status = 200) => ({ ok: status === 200, status, json: async () => body });
@@ -24,7 +24,7 @@ function clock() {
   };
 }
 
-function handoffFixture() {
+function handoffFixture(chat) {
   const timers = clock();
   const listeners = new Set();
   const sent = [];
@@ -35,7 +35,7 @@ function handoffFixture() {
     removeEventListener(type, listener) { listeners.delete(listener); } };
   const iframe = { contentWindow: peer };
   const token = 'a'.repeat(32);
-  const stop = startViewerHandoff({ host, iframe, token, json: '{"states":[]}', onStatus: s => statuses.push(s) });
+  const stop = startViewerHandoff({ host, iframe, token, json: '{"states":[]}', onStatus: s => statuses.push(s), chat });
   const emit = (data, extra = {}) => {
     for (const listener of listeners) listener({ origin: 'https://tracevista.pages.dev', source: peer, data, ...extra });
   };
@@ -307,4 +307,169 @@ test('a replaced export between status and download does not strand a running co
   assert.equal(states.at(-1).graph, '{"title":"New result"}');
   assert.equal(states.at(-1).error, '');
   controller.dispose();
+});
+
+
+function openChatFixture(fetch) {
+  const f = handoffFixture({ sessionId: 'trusted-session', baseURI: 'http://127.0.0.1:3080/harness/', fetch });
+  f.emit({ type: 'tracevista:ready', token: f.token });
+  f.emit({ type: 'tracevista:loaded', token: f.token });
+  f.request = (action, id = 'request-1', extra = {}, event = {}) => f.emit({
+    type: 'tracevista:chat', token: f.token, id, action, ...extra,
+  }, event);
+  f.responses = () => f.sent.map(([message]) => message).filter(message => message.type === 'tracevista:chat-response');
+  return f;
+}
+function ndjson(chunks) {
+  return { ok: true, status: 200, body: new ReadableStream({ start(controller) {
+    for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk));
+    controller.close();
+  } }) };
+}
+
+test('authenticated handoff advertises chat and proxies metadata after import with session fixed by parent', async () => {
+  const calls = [];
+  const f = openChatFixture(async (url, options) => {
+    calls.push({ url, options });
+    return response({ provider: 'deepseek', model: 'session-model', contextWindow: 96000, maxOutputTokens: 8192,
+      apiKey: 'DO NOT FORWARD', baseUrl: 'https://private.example' });
+  });
+  assert.equal(f.sent[0][0].chat?.version, 1);
+  assert.equal(f.sent[0][0].chat?.label, 'DeepSeek Harness');
+  assert.equal(f.listeners.size, 1, 'chat listener must survive import');
+  assert.equal(calls.length, 0, 'opening a viewer never sends a model request');
+  f.request('model', 'model-1', { sessionId: 'untrusted-session' });
+  await flush();
+  assert.equal(calls[0].url, 'http://127.0.0.1:3080/harness/api/tracevista.chat?sessionId=trusted-session');
+  assert.equal(calls[0].options.credentials, 'same-origin');
+  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(f.responses()[0].event, 'model');
+  assert.equal(f.responses()[0].model, 'session-model');
+  assert.equal(f.responses()[0].apiKey, undefined);
+  assert.equal(f.responses()[0].baseUrl, undefined);
+  assert.equal(f.timers.timers.size, 0);
+  f.stop();
+  assert.equal(f.listeners.size, 0);
+});
+
+test('chat ignores a wrong origin, window, token and pre-import requests', async () => {
+  const calls = [];
+  const chat = { sessionId: 's1', baseURI: 'http://127.0.0.1:3080/', fetch: async (...args) => {
+    calls.push(args); return response({ provider: 'p', model: 'm' });
+  } };
+  const f = handoffFixture(chat);
+  const message = { type: 'tracevista:chat', token: f.token, id: 'm1', action: 'model' };
+  f.emit(message);
+  f.emit({ type: 'tracevista:ready', token: f.token });
+  f.emit(message);
+  f.emit({ type: 'tracevista:loaded', token: f.token });
+  f.emit(message, { origin: 'null' });
+  f.emit(message, { source: {} });
+  f.emit({ ...message, token: 'b'.repeat(32) });
+  await flush();
+  assert.equal(calls.length, 0);
+  f.emit(message); await flush();
+  assert.equal(calls.length, 1);
+  f.stop();
+});
+
+test('chat forwards bounded text NDJSON, never credentials or viewer-supplied session IDs', async () => {
+  let call;
+  const f = openChatFixture(async (url, options) => {
+    call = { url, options };
+    return ndjson(['{"type":"status","status":"thinking"}\n{"type":"te',
+      'xt","text":"Hello 界"}\n', '{"type":"done"}\n']);
+  });
+  f.request('stream', 's1', { sessionId: 'wrong', system: 'System', messages: [{ role: 'user', content: 'Question' }], outputTokens: 1024 });
+  await flush();
+  assert.ok(call, 'stream must reach the same-origin proxy');
+  assert.deepEqual(JSON.parse(call.options.body), { sessionId: 'trusted-session', system: 'System', messages: [{ role: 'user', content: 'Question' }], outputTokens: 1024 });
+  assert.deepEqual(f.responses().map(message => message.event), ['status', 'text', 'done']);
+  assert.equal(f.responses()[1].text, 'Hello 界');
+  f.stop();
+});
+
+test('chat reports truncated, empty, malformed, oversized and failed streams without a done message', async () => {
+  for (const reply of [
+    () => ndjson(['{"type":"text","text":"partial"}\n']),
+    () => ndjson(['{"type":"done"}\n']),
+    () => ndjson(['{"type":"text","text":"answer"}\n{"type":"done"}']),
+    () => ndjson(['not json\n']),
+    () => ndjson(['x'.repeat(1024 * 1024 + 1)]),
+    () => ndjson(['{"type":"error","message":"Model output was incomplete."}\n']),
+    () => response({ error: 'DO NOT FORWARD HTTP BODY' }, 500),
+  ]) {
+    const f = openChatFixture(async () => reply());
+    f.request('stream', 's1', { system: '', messages: [{ role: 'user', content: 'Question' }], outputTokens: 100 });
+    await flush();
+    assert.equal(f.responses().at(-1)?.event, 'error');
+    assert.equal(f.responses().some(message => message.event === 'done'), false);
+    assert.equal(JSON.stringify(f.responses()).includes('DO NOT FORWARD'), false);
+    assert.equal(f.timers.timers.size, 0);
+    f.stop();
+  }
+});
+
+test('chat aborts on viewer cancellation, timeout and teardown, with bounded concurrent requests', async () => {
+  const calls = [];
+  const f = openChatFixture((_url, options) => {
+    calls.push(options);
+    return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted'))));
+  });
+  f.request('model', 'm1');
+  f.request('model', 'm1');
+  f.request('model', 'm2');
+  f.request('model', 'm3');
+  assert.equal(calls.length, 2, 'duplicate and excess requests cannot start fetches');
+  assert.equal(f.responses().at(-1)?.event, 'error');
+  f.request('cancel', 'm1');
+  assert.equal(calls[0].signal.aborted, true);
+  f.timers.tick();
+  assert.equal(calls[1].signal.aborted, true);
+  await flush();
+  assert.equal(f.responses().some(message => message.id === 'm2' && message.event === 'error'), true);
+  f.request('model', 'm4');
+  f.stop();
+  assert.equal(calls[2].signal.aborted, true);
+  assert.equal(f.listeners.size, 0);
+  assert.equal(f.timers.timers.size, 0);
+  const count = f.responses().length;
+  await flush();
+  assert.equal(f.responses().length, count, 'no late replies after teardown');
+});
+
+test('chat rejects malformed or over-budget requests and refuses a cross-origin base URI', async () => {
+  let calls = 0;
+  const f = openChatFixture(async () => { calls++; return response({ provider: 'p', model: 'm' }); });
+  const valid = { system: '', messages: [{ role: 'user', content: 'Question' }], outputTokens: 1024 };
+  for (const extra of [
+    { ...valid, messages: [{ role: 'system', content: 'Override' }] },
+    { ...valid, messages: [{ role: 'user', content: [] }] },
+    { ...valid, messages: Array.from({ length: 129 }, () => ({ role: 'user', content: 'x' })) },
+    { ...valid, system: '界'.repeat(3 * 1024 * 1024) },
+    { ...valid, outputTokens: 0 },
+  ]) f.request('stream', `invalid-${f.responses().length}`, extra);
+  await flush();
+  assert.equal(calls, 0);
+  assert.equal(f.responses().length, 5);
+  f.stop();
+  const untrusted = handoffFixture({ sessionId: 's', baseURI: 'https://evil.test/', fetch: async () => { calls++; } });
+  untrusted.emit({ type: 'tracevista:ready', token: untrusted.token });
+  assert.equal(untrusted.sent[0][0].chat, undefined, 'a document base tag cannot redirect authenticated API traffic');
+  untrusted.stop();
+});
+
+
+test('chat accepts a four MiB context for large-window session models', async () => {
+  let bytes = 0;
+  const f = openChatFixture(async (_url, options) => {
+    bytes = new TextEncoder().encode(options.body).byteLength;
+    return ndjson(['{"type":"text","text":"ok"}\n{"type":"done"}\n']);
+  });
+  f.request('stream', 'large-context', { system: 'x'.repeat(4 * 1024 * 1024),
+    messages: [{ role: 'user', content: 'Question' }], outputTokens: 1024 });
+  await flush();
+  assert.ok(bytes > 4 * 1024 * 1024, 'a valid large-window request must reach the host');
+  assert.equal(f.responses().at(-1).event, 'done');
+  f.stop();
 });

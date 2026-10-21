@@ -7,7 +7,9 @@ import { buildChat, citations, contextLabels, type ChatTurn, type ContextOptions
 import { useLang } from './i18n';
 import ProviderPicker from './ProviderPicker';
 import { buildSmartContext, runSmartChat, type SmartStatus } from './smartContext';
-import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, streamChat, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
+import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
+import { chatTransport, hostedBudget, hostedBudgetKey, prepareHostedContext } from './chat-connection';
+import type { HostedChatConnection, HostedModelInfo } from './hosted-chat';
 import './smart-context.css';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
@@ -18,13 +20,31 @@ const store = {
 };
 const newId = () => Math.random().toString(36).slice(2, 10);
 
-export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, onCited, close }: {
+export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, onCited, close, hostedChat, connectionSource, onConnectionSource }: {
   graph: Graph; focus: Entity | null; clearFocus: () => void; jump: (id: string) => void; evidence: (eventId: string) => void;
   onCited: (ids: Set<string>) => void; close: () => void;
+  hostedChat?: HostedChatConnection | null; connectionSource: 'host' | 'custom'; onConnectionSource: (source: 'host' | 'custom') => void;
 }) {
   const historyKey = `atlas-chat:${graph.title}`;
   const { t: tr } = useLang();
   const [settings, setSettings] = useState<ChatSettings>(() => restoreSettings(store.get(SETTINGS_KEY, {})));
+  const usingHost = !!hostedChat && connectionSource === 'host';
+  const [hostModel, setHostModel] = useState<HostedModelInfo | null>(null);
+  const [hostError, setHostError] = useState('');
+  const [hostRefreshing, setHostRefreshing] = useState(false);
+  const [hostRefresh, setHostRefresh] = useState(0);
+  const transport = useMemo(() => chatTransport(usingHost ? hostedChat! : null), [usingHost, hostedChat]);
+  useEffect(() => {
+    if (!usingHost) return;
+    const controller = new AbortController();
+    setHostRefreshing(true); setHostError('');
+    hostedChat!.getModel(controller.signal).then(info => {
+      if (!controller.signal.aborted) setHostModel(info);
+    }).catch(error => {
+      if (!controller.signal.aborted) { setHostModel(null); setHostError(error instanceof Error ? error.message : 'Cannot connect to the host model.'); }
+    }).finally(() => { if (!controller.signal.aborted) setHostRefreshing(false); });
+    return () => controller.abort();
+  }, [usingHost, hostedChat, hostRefresh]);
   const [turns, setTurns] = useState<ChatTurn[]>(() => store.get<ChatTurn[]>(historyKey, []).map(t => t.role === 'assistant' && !t.text && !t.error ? { ...t, error: 'The previous request was interrupted. Ask your question again.' } : t));
   const [draft, setDraft] = useState('');
   const [openEvidence, setOpenEvidence] = useState<Set<string>>(() => new Set());
@@ -56,8 +76,8 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   const endpointKey = JSON.stringify([settings.provider, settings.baseUrl]);
   const availableModels = modelsEndpoint === endpointKey ? models : [];
   const modelInfo = availableModels.find(m => m.id === settings.model.trim());
-  const budget = modelBudget(settings, modelInfo);
-  const allowanceKey = budgetKey(settings);
+  const budget = usingHost ? hostedBudget(hostModel) : modelBudget(settings, modelInfo);
+  const allowanceKey = usingHost ? hostedBudgetKey(hostModel) : budgetKey(settings);
   const manualBudget = Object.hasOwn(inputBudgets, allowanceKey);
   const inputTokens = manualBudget ? inputBudgets[allowanceKey] : budget.inputTokens;
   function setInputTokens(value: number | null) {
@@ -71,6 +91,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
   // Once a key (or a keyless endpoint) is in place, ask the provider which models it offers.
   useEffect(() => {
     setModels([]);
+    if (usingHost) return;
     if (!canListModels(settings) || presetOf(settings).startsWith('custom') && modelsAsked === 0) {
       setModelStatus({ busy: false, text: selectedPreset(settings).manualModels ? 'Enter a model ID, then test the connection.' : presetOf(settings).startsWith('custom') ? 'Enter the base URL and key, then click ↻ to fetch models.' : 'Models are fetched automatically after you enter a key.' }); return;
     }
@@ -95,7 +116,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       }).finally(() => window.clearTimeout(timeout));
     }, 500);
     return () => { clearTimeout(timer); window.clearTimeout(timeout); controller.abort(); };
-  }, [settings.provider, settings.baseUrl, settings.apiKey, modelsAsked]);
+  }, [usingHost, settings.provider, settings.baseUrl, settings.apiKey, modelsAsked]);
   const ids = useMemo(() => new Set([...graph.states, ...graph.branches, ...graph.actions].map(e => e.id)), [graph]);
   const eventIds = useMemo(() => new Set(graph.timeline.timeline.map(e => e.id)), [graph]);
   const moves = useMemo(() => new Map([...graph.branches, ...graph.actions].filter(e => e.move).map(e => [e.id, e.move!])), [graph]);
@@ -113,7 +134,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     const timer = window.setInterval(() => setWaitSeconds(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
-  const ready = requestReady(settings);
+  const ready = usingHost ? !!hostModel && !hostRefreshing && !hostError : requestReady(settings);
   const locked = !!busy || probe.busy;
   useEffect(() => { setContextMode(mode => mode === 'current' || mode === 'nearby' ? mode : 'prefix'); }, [focus?.id]);
   // While streaming, the new pair is unfinished and cannot be replayed. Rebuild on completion,
@@ -136,42 +157,57 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
     const started = performance.now(); let text = '';
     setProbe({ busy: true, text: 'Testing the connection…' });
     try {
-      await streamChat(settings, 'Please follow the user instruction.', [{ role: 'user', content: 'Reply only with OK' }], t => { text += t; }, controller.signal,
+      await transport(settings, 'Please follow the user instruction.', [{ role: 'user', content: 'Reply only with OK' }], t => { text += t; }, controller.signal,
         state => { if (state === 'thinking') setProbe({ busy: true, text: 'Connected. The model is thinking…' }); }, budget.outputTokens);
       setProbe({ busy: false, text: `Reply received in ${((performance.now() - started) / 1000).toFixed(1)}s: ${text.slice(0, 120)}` });
     } catch (e) { setProbe({ busy: false, error: true, text: controller.signal.aborted ? String(controller.signal.reason) : safeError(e, settings) }); }
     finally { window.clearTimeout(timer); activeRequest.current = null; }
   }
   async function send() {
-    const question = draft.trim();
-    if (!question || locked || !ready || preview.blocked) return;
-    const { system, messages, items, scopeKey, mode, compression: sentCompression } = bundle;
-    const at = new Date().toISOString();
-    const scope = { scopeKey, contextMode: mode, compression: sentCompression, contextStrategy };
-    const ask: ChatTurn = { id: newId(), role: 'user', text: question, at, focus: focus?.id ?? null, ...scope };
-    const answer: ChatTurn = { id: newId(), role: 'assistant', text: '', at, focus: focus?.id ?? null, provider: selectedPreset(settings).label, model: settings.model, context: items, ...scope };
-    setTurns(t => [...t, ask, answer]); setDraft('');
+    const submittedDraft = draft, question = submittedDraft.trim();
+    if (!question || locked || !ready || preview.blocked && !usingHost) return;
     const controller = new AbortController(); activeRequest.current = controller; setBusy(controller); setWaitSeconds(0); setStatus(smartPlan ? 'selecting' : 'waiting');
     const timer = window.setTimeout(() => controller.abort(smartPlan ? 'The two-round request timed out after 6 minutes and was stopped. Narrow the question and retry.' : 'The request timed out after 3 minutes and was stopped. Narrow the question and retry.'), smartPlan ? 360_000 : 180_000);
-    let text = '';
-    const update = (patch: Partial<ChatTurn>) => setTurns(t => t.map(x => x.id === answer.id ? { ...x, ...patch } : x));
+    let text = '', answerId: string | null = null;
+    const update = (patch: Partial<ChatTurn>) => setTurns(t => t.map(x => x.id === answerId ? { ...x, ...patch } : x));
     try {
+      let sentBundle = bundle, sentPlan = smartPlan, sentBudget = budget, sentModel = hostModel;
+      if (usingHost) {
+        const prepared = await prepareHostedContext(hostedChat!, controller.signal, { graph, focus: focus?.id ?? null,
+          question, history: contextHistory, strategy: contextStrategy, mode: contextMode, compression, inputBudgets });
+        sentModel = prepared.model; sentBudget = prepared.budget; sentPlan = prepared.smartPlan; sentBundle = prepared.bundle;
+        setHostModel(sentModel); setHostError('');
+        // The updated preview explains the new limit and keeps the user's draft intact.
+        if (sentBundle.preview.blocked) return;
+      }
+      const { system, messages, items, scopeKey, mode, compression: sentCompression } = sentBundle;
+      const at = new Date().toISOString();
+      const scope = { scopeKey, contextMode: mode, compression: sentCompression, contextStrategy };
+      const ask: ChatTurn = { id: newId(), role: 'user', text: question, at, focus: focus?.id ?? null, ...scope };
+      const answer: ChatTurn = { id: newId(), role: 'assistant', text: '', at, focus: focus?.id ?? null,
+        provider: usingHost ? hostedChat!.label : selectedPreset(settings).label,
+        model: usingHost ? sentModel!.model : settings.model, context: items, ...scope };
+      answerId = answer.id;
+      setTurns(t => [...t, ask, answer]); setDraft(current => current === submittedDraft ? '' : current);
       const receive = (delta: string) => { text += delta; update({ text }); };
-      if (smartPlan) {
-        const retrieval = await runSmartChat(settings, smartPlan, receive, controller.signal, {
+      if (sentPlan) {
+        const retrieval = await runSmartChat(settings, sentPlan, receive, controller.signal, {
           onStatus: setStatus,
           onMetadata: value => update({ retrieval: value, context: value.items }),
-          outputTokens: budget.outputTokens,
+          outputTokens: sentBudget.outputTokens,
           timeoutMs: 360_000,
+          transport,
         });
         update({ retrieval, context: retrieval.items });
       } else {
-        await streamChat(settings, system, messages, receive, controller.signal, setStatus, budget.outputTokens);
+        await transport(settings, system, messages, receive, controller.signal, setStatus, sentBudget.outputTokens);
       }
       const cites = [...new Set([...citations(text, known).flatMap(p => 'id' in p && p.kind !== 'unknown' ? [p.id] : []), ...explanationReferences(text, known)])];
       update({ text, cites });
     } catch (e) {
-      update({ text, error: controller.signal.aborted ? typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped' : safeError(e, settings) });
+      const error = controller.signal.aborted ? typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped' : safeError(e, settings);
+      if (answerId) update({ text, error });
+      else if (!controller.signal.aborted) setHostError(error);
     } finally { window.clearTimeout(timer); activeRequest.current = null; setBusy(null); }
   }
   function exportChat() {
@@ -194,13 +230,22 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
 
   return <section className="chat-dialog nodrag nopan nowheel" aria-label={tr('Ask about this trajectory')}>
     <header><b>{tr('Ask about this trajectory')}</b><span>
-      <button className="chat-model-button" onClick={() => setShowSettings(v => !v)} aria-pressed={showSettings} title={tr('Model and API settings')}>{ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
+      <button className="chat-model-button" onClick={() => { setShowSettings(v => !v); if (!showSettings && usingHost) setHostRefresh(n => n + 1); }} aria-pressed={showSettings} title={tr('Model and API settings')}>{usingHost ? `Harness · ${hostModel?.model ?? tr('Connecting…')}` : ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
       <details className="chat-more"><summary aria-label={tr('More chat actions')}>⋯</summary><div>
         <button onClick={exportChat} disabled={!turns.length}>{tr('Export conversation')}</button>
         <button onClick={() => { setTurns([]); setOpenEvidence(new Set()); }} disabled={!turns.length || !!busy}>{tr('Clear conversation')}</button>
       </div></details>
       <button onClick={close} aria-label="Close chat">×</button></span></header>
     {showSettings && <fieldset className="chat-settings" disabled={locked}>
+      {hostedChat && <label>{tr('Connection')}<select aria-label={tr('Chat connection')} value={connectionSource} onChange={e => { onConnectionSource(e.target.value as 'host' | 'custom'); setProbe({ busy: false, text: '' }); }}>
+        <option value="host">{hostedChat.label}</option><option value="custom">{tr('Use my own API')}</option>
+      </select></label>}
+      {usingHost ? <div className="chat-host-model">
+        <span>{hostModel ? `${hostModel.provider} · ${hostModel.model}` : tr('Connecting to the session model…')}</span>
+        <button type="button" onClick={() => setHostRefresh(n => n + 1)} disabled={hostRefreshing} aria-label={tr('Refresh session model')}>↻</button>
+        <small>{tr('Uses the model configured in this Harness session. No API key is needed here.')}</small>
+        {hostError && <small className="chat-error">{hostError}</small>}
+      </div> : <>
       <div className="chat-provider-field"><span>{tr('Provider')}</span><ProviderPicker value={preset} disabled={locked} onChange={value => editConnection(switchPreset(settings, value))} /></div>
       <label>{tr('Base URL')}<input aria-label="API base URL" value={settings.baseUrl} placeholder="https://…/v1" onChange={e => editConnection(changeEndpoint(settings, e.target.value))} /></label>
       <label>{tr('Key')}<input aria-label="API Key" type="password" autoComplete="off" value={settings.apiKey} placeholder={selectedPreset(settings).noKey || preset === 'custom' ? tr('Optional if authentication is disabled') : tr('Enter the API key for this provider')} onChange={e => { setProbe({ busy: false, text: '' }); setSettings(s => ({ ...s, apiKey: e.target.value })); }} /></label>
@@ -217,13 +262,14 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       </span></label>
       {availableModels.length > 0 && (manualModel || !modelInfo) && <label>ID<input aria-label="Model ID" value={settings.model} placeholder="Enter a model ID" onChange={e => { autoPicked.current = null; setSettings(s => ({ ...s, model: e.target.value })); setProbe({ busy: false, text: '' }); }} /></label>}
       {modelStatus.text && <small className={`chat-model-status ${modelStatus.error ? 'error' : ''}`}>{modelStatus.text}{availableModels.length > 0 && settings.model && !modelInfo ? '; the current model ID is not listed' : ''}</small>}
-      <div className="chat-probe"><button type="button" onClick={() => void testReply()} disabled={!ready || locked}>{tr('Test connection')}</button><small>{tr('Sends a short test prompt without trajectory data. A small API charge may apply.')}</small></div>
-      {probe.text && <small className={`chat-model-status ${probe.error ? 'error' : ''}`}>{probe.text}</small>}
       <label className="chat-remember"><input type="checkbox" checked={settings.remember} onChange={e => setSettings(s => ({ ...s, remember: e.target.checked }))} />{tr('Remember the key in this browser')}</label>
       <p>{tr('Your selected trajectory context is sent directly to {host} when you ask a question. The key stays in this browser and is used to authenticate with that API.', { host: host || tr('the configured API') })}</p>
+      </>}
+      <div className="chat-probe"><button type="button" onClick={() => void testReply()} disabled={!ready || locked}>{tr('Test connection')}</button><small>{tr('Sends a short test prompt without trajectory data. A small API charge may apply.')}</small></div>
+      {probe.text && <small className={`chat-model-status ${probe.error ? 'error' : ''}`}>{probe.text}</small>}
     </fieldset>}
     <div className="chat-list" ref={list}>
-      {!ready && !showSettings && <div className="chat-connect"><p>{tr('Connect a model to ask questions. Requests go from this browser directly to the provider you choose.')}</p><button onClick={() => setShowSettings(true)}>{tr('Connect a model')}</button></div>}
+      {!ready && !showSettings && <div className="chat-connect"><p>{usingHost ? hostError || tr('Connecting to the session model…') : tr('Connect a model to ask questions. Requests go from this browser directly to the provider you choose.')}</p><button onClick={() => setShowSettings(true)}>{usingHost ? tr('Model and API settings') : tr('Connect a model')}</button></div>}
       {!turns.length && <div className="chat-empty">
         {['Why was the final version chosen?', 'Which evidence changed the agent’s direction?', 'Which conclusions are supported by independent checks?'].map(q => tr(q)).map(q => <button key={q} onClick={() => setDraft(q)}>{q}</button>)}</div>}
       {turns.map(t => <div key={t.id} className={`chat-turn ${t.role}`}>
@@ -287,7 +333,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       <div className="chat-input">
         <textarea value={draft} rows={2} placeholder={ready ? tr('Ask about this trajectory… (Enter to send, Shift+Enter for a new line)') : tr('Connect a model first')} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-        {busy ? <button onClick={() => busy.abort()}>{tr('Stop')}</button> : <button className="chat-send" onClick={() => void send()} disabled={!ready || locked || !draft.trim() || preview.blocked}>{tr('Send')}</button>}
+        {busy ? <button onClick={() => busy.abort()}>{tr('Stop')}</button> : <button className="chat-send" onClick={() => void send()} disabled={!ready || locked || !draft.trim() || preview.blocked && !usingHost}>{tr('Send')}</button>}
       </div>
     </footer>
   </section>;

@@ -15,6 +15,10 @@ Security fixes target the current `main` branch. Include your version when repor
 
 Use a provider and base URL you trust. Use HTTPS for remote endpoints; HTTP support is intended for local servers. A self-hosted deployment has its own browser storage, separate from `tracevista.pages.dev`.
 
+### Embedded Harness chat
+
+Inside the DeepSeek Harness plugin, Chat defaults to the current session's model. The embedded viewer sends text requests through a bridge bound to the parent window, its origin and the import token. The parent uses Harness's authenticated connection and model service; Harness API credentials are never sent to the viewer or saved in its browser storage. Chat receives no Harness workspace tools and does not alter the original session history. Choosing **Use my own API** switches to the direct browser behavior described above.
+
 ## Trajectories, chat, and exports
 
 Importing a local JSON file reads it in the browser. The import does not upload the file to TraceVista. Opening a bundled example downloads its public data from the site.

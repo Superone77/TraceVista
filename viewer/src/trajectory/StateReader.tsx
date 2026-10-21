@@ -27,6 +27,7 @@ import './interface.css';
 import exampleCatalog from 'virtual:tracevista-examples';
 import { datasetRequest, ExampleUnavailableError } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
+import type { HostedChatConnection } from './hosted-chat';
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
@@ -39,9 +40,10 @@ function FilePicker({ label, onImport }: { label: string; onImport: (file: File)
   return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, original, onImport, onHome }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void }) {
+function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; hostedChat: HostedChatConnection | null }) {
   const rf = useReactFlow<CardNode, Edge>();
   const { t } = useLang();
+  const [chatConnection, setChatConnection] = useState<'host' | 'custom'>(() => hostedChat ? 'host' : 'custom');
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [tier, setTier] = useState<Tier>('states');
@@ -577,7 +579,7 @@ function Reader({ graph, original, onImport, onHome }: { graph: Graph; original:
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
       {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
         <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />
-        <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={jump} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} />
+        <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={jump} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} hostedChat={hostedChat} connectionSource={chatConnection} onConnectionSource={setChatConnection} />
       </div>}</main>
   </div>;
 }
@@ -589,13 +591,14 @@ function App() {
     catch { return { request: null, invalid: true }; }
   });
   const [graph, setGraph] = useState<Graph | null>(null);
+  const [hostedChat, setHostedChat] = useState<HostedChatConnection | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
   const cancelHandoff = useRef<(() => void) | null>(null);
   const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example'); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
-    cancelHandoff.current?.(); setLoading(false);
+    cancelHandoff.current?.(); setHostedChat(null); setLoading(false);
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   useEffect(() => {
@@ -604,7 +607,7 @@ function App() {
     if (handoff.invalid) { setError(HANDOFF_LINK_ERROR); setLoading(false); return; }
     const cancel = startHandoff(window, handoff.request!, value => {
       openGraph(value); setLoading(false);
-    }, message => { setError(message); setLoading(false); });
+    }, message => { setError(message); setHostedChat(null); setLoading(false); }, setHostedChat);
     cancelHandoff.current = cancel;
     return cancel;
   }, [handoff]);
@@ -633,7 +636,7 @@ function App() {
   return <>
     {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
     {graph ? <ReactFlowProvider key={revision}>
-      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} />
+      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} hostedChat={hostedChat} />
     </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
       <div className="welcome-links"><HeaderLinks /></div>
       <div className="welcome-layout">

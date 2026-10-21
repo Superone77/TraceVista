@@ -24,42 +24,203 @@ function createToken(crypto) {
     byte.toString(16).padStart(2, '0')).join('');
 }
 
+const CHAT_MAX_BYTES = 8 * 1024 * 1024;
+const CHAT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+const CHAT_MAX_LINE_BYTES = 1024 * 1024;
+const CHAT_TIMEOUT_MS = 5 * 60 * 1000;
+
+function chatError(message) {
+  const error = new Error(message);
+  error.safeChatMessage = true;
+  return error;
+}
+
+function modelForViewer(value) {
+  if (!value || typeof value !== 'object' || typeof value.provider !== 'string' || !value.provider.trim()
+    || value.provider.length > 256 || typeof value.model !== 'string' || !value.model.trim() || value.model.length > 512) {
+    throw chatError('Harness did not return a usable session model.');
+  }
+  const model = { provider: value.provider, model: value.model };
+  for (const key of ['contextWindow', 'maxOutputTokens']) {
+    if (Number.isSafeInteger(value[key]) && value[key] > 0) model[key] = value[key];
+  }
+  return model;
+}
+
+function chatBody(data, sessionId) {
+  if (typeof data.system !== 'string' || !Array.isArray(data.messages) || !data.messages.length || data.messages.length > 128
+    || !Number.isSafeInteger(data.outputTokens) || data.outputTokens < 1 || data.outputTokens > 1000000) {
+    throw chatError('Invalid Harness chat request.');
+  }
+  const messages = data.messages.map(message => {
+    if (!message || typeof message !== 'object' || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') {
+      throw chatError('Harness chat accepts text user and assistant messages only.');
+    }
+    return { role: message.role, content: message.content };
+  });
+  const body = JSON.stringify({ sessionId, system: data.system, messages, outputTokens: data.outputTokens });
+  if (body.length > CHAT_MAX_BYTES || new TextEncoder().encode(body).byteLength > CHAT_MAX_BYTES) {
+    throw chatError('The chat request exceeds the 8 MiB limit. Narrow the question or evidence scope.');
+  }
+  return body;
+}
+
+// Relay only the documented text protocol. A clean EOF and explicit completion
+// are both required; a broken response must never become a successful answer.
+async function relayChatStream(response, send, signal) {
+  if (!response.body) throw chatError('Harness returned no chat stream.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let buffer = '', bytes = 0, complete = false, hasText = false, ended = false;
+  const onAbort = () => { void reader.cancel().catch(() => {}); };
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    while (true) {
+      if (signal.aborted) throw chatError('Harness chat was cancelled.');
+      const chunk = await reader.read();
+      if (signal.aborted) throw chatError('Harness chat was cancelled.');
+      if (chunk.done) { ended = true; buffer += decoder.decode(); break; }
+      bytes += chunk.value.byteLength;
+      if (bytes > CHAT_MAX_RESPONSE_BYTES) throw chatError('Harness chat response exceeded its size limit.');
+      buffer += decoder.decode(chunk.value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line) continue;
+        if (complete || line.length > CHAT_MAX_LINE_BYTES || new TextEncoder().encode(line).byteLength > CHAT_MAX_LINE_BYTES) {
+          throw chatError('Harness returned an invalid chat stream.');
+        }
+        let event;
+        try { event = JSON.parse(line); } catch { throw chatError('Harness returned an invalid chat stream.'); }
+        if (!event || typeof event !== 'object' || Array.isArray(event)) throw chatError('Harness returned an invalid chat stream.');
+        if (event.type === 'text' && typeof event.text === 'string') {
+          hasText ||= Boolean(event.text.trim());
+          send({ event: 'text', text: event.text });
+        } else if (event.type === 'status' && ['waiting', 'thinking', 'answering'].includes(event.status)) {
+          send({ event: 'status', status: event.status });
+        } else if (event.type === 'done') complete = true;
+        else if (event.type === 'error') {
+          throw chatError(typeof event.message === 'string' && event.message.length <= 1000
+            ? event.message : 'Harness could not complete this answer.');
+        } else throw chatError('Harness returned an invalid chat stream.');
+      }
+      if (buffer.length > CHAT_MAX_LINE_BYTES || new TextEncoder().encode(buffer).byteLength > CHAT_MAX_LINE_BYTES) {
+        throw chatError('Harness returned an oversized chat event.');
+      }
+    }
+    if (buffer.trim() || !complete) throw chatError('Harness chat ended before the answer was complete. Please try again.');
+    if (!hasText) throw chatError('Harness returned no answer text. Please try again.');
+    send({ event: 'done' });
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    if (!ended) await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
 // Install the listener before navigating the iframe, so a fast cached viewer
 // cannot send its ready message before the parent is listening.
-function startViewerHandoff({ host, iframe, token, json, onStatus }) {
+function startViewerHandoff({ host, iframe, token, json, onStatus, chat }) {
   if (!isLoopbackOrigin(host.location.origin)) throw new Error('Local viewer handoff requires a loopback origin.');
   if (!/^[a-f0-9]{32,128}$/i.test(token)) throw new Error('Invalid handoff token.');
   if (typeof json !== 'string' || new TextEncoder().encode(json).byteLength > HANDOFF_MAX_BYTES) {
     throw new Error('Use Download JSON to import this trajectory into TraceVista.');
   }
-  let active = true;
-  let sent = false;
+  const peer = iframe.contentWindow;
+  let chatUrl;
+  try {
+    const base = new URL(chat?.baseURI);
+    if (typeof chat?.sessionId === 'string' && chat.sessionId && typeof chat.fetch === 'function'
+      && base.origin === host.location.origin && !base.username && !base.password) {
+      chatUrl = apiUrl(base.href, 'chat', { sessionId: chat.sessionId });
+    }
+  } catch { /* A missing or foreign document base cannot enable authenticated chat. */ }
+  let active = true, sent = false, loaded = false;
   let timer;
+  const requests = new Map();
+  function clearHandshakeTimer() {
+    if (timer !== undefined) host.clearTimeout(timer);
+    timer = undefined;
+  }
+  function finish(id, request, abort = false) {
+    if (requests.get(id) !== request) return;
+    requests.delete(id);
+    host.clearTimeout(request.timer);
+    if (abort) request.controller.abort();
+  }
   function cleanup() {
     active = false;
     host.removeEventListener('message', receive);
-    if (timer !== undefined) host.clearTimeout(timer);
+    clearHandshakeTimer();
+    for (const [id, request] of requests) finish(id, request, true);
+  }
+  function reply(id, payload) {
+    if (!active) return;
+    try { peer.postMessage({ type: 'tracevista:chat-response', token, id, ...payload }, VIEWER_ORIGIN); }
+    catch { cleanup(); }
+  }
+  async function proxyChat(data) {
+    const id = data.id;
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9:_-]{1,128}$/.test(id)) return;
+    if (data.action === 'cancel') {
+      const request = requests.get(id);
+      if (request) finish(id, request, true);
+      return;
+    }
+    if (!['model', 'stream'].includes(data.action) || requests.has(id)) return;
+    if (requests.size >= 2) { reply(id, { event: 'error', message: 'Wait for the current Harness chat request to finish.' }); return; }
+    let body;
+    try { if (data.action === 'stream') body = chatBody(data, chat.sessionId); }
+    catch (error) { reply(id, { event: 'error', message: error.message }); return; }
+    const request = { controller: new AbortController(), timer: undefined };
+    requests.set(id, request);
+    request.timer = host.setTimeout(() => {
+      if (requests.get(id) !== request) return;
+      reply(id, { event: 'error', message: 'Harness chat timed out. Please try again.' });
+      finish(id, request, true);
+    }, data.action === 'model' ? 30000 : CHAT_TIMEOUT_MS);
+    const current = () => active && requests.get(id) === request && !request.controller.signal.aborted;
+    const send = event => { if (current()) reply(id, event); };
+    try {
+      const response = await chat.fetch(chatUrl, {
+        credentials: 'same-origin', redirect: 'error', cache: 'no-store', signal: request.controller.signal,
+        ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body } : {}),
+      });
+      if (!current()) return;
+      if (!response.ok) throw chatError(response.status === 401 || response.status === 403
+        ? 'Harness chat is not authorized. Check your Harness sign-in and session access.'
+        : `Harness chat request failed (${response.status}). Please try again.`);
+      if (data.action === 'model') send({ event: 'model', ...modelForViewer(await response.json()) });
+      else await relayChatStream(response, send, request.controller.signal);
+    } catch (error) {
+      if (current()) send({ event: 'error', message: error.safeChatMessage
+        ? error.message : 'Harness chat failed. Check the Harness session and try again.' });
+    } finally { finish(id, request); }
   }
   function receive(event) {
-    if (!active || event.origin !== VIEWER_ORIGIN || event.source !== iframe.contentWindow) return;
+    if (!active || event.origin !== VIEWER_ORIGIN || event.source !== peer) return;
     const data = event.data;
     if (!data || typeof data !== 'object' || Array.isArray(data) || data.token !== token) return;
     if (data.type === 'tracevista:ready' && !sent) {
       sent = true;
       try {
-        iframe.contentWindow.postMessage({ type: 'tracevista:import', token, json }, VIEWER_ORIGIN);
+        peer.postMessage({ type: 'tracevista:import', token, json,
+          ...(chatUrl ? { chat: { version: 1, label: 'DeepSeek Harness' } } : {}) }, VIEWER_ORIGIN);
         onStatus('Opening trajectory…');
       } catch {
         cleanup();
         onStatus('Could not open the viewer. Download JSON and import it in TraceVista.');
       }
-    } else if (sent && data.type === 'tracevista:loaded') {
-      cleanup();
+    } else if (sent && data.type === 'tracevista:loaded' && !loaded) {
+      loaded = true;
+      clearHandshakeTimer();
+      if (!chatUrl) cleanup();
       onStatus('');
-    } else if (sent && data.type === 'tracevista:error') {
+    } else if (sent && !loaded && data.type === 'tracevista:error') {
       cleanup();
       onStatus('The viewer could not import this file. Download JSON and try importing it directly.');
-    }
+    } else if (loaded && chatUrl && data.type === 'tracevista:chat') void proxyChat(data);
   }
   host.addEventListener('message', receive);
   timer = host.setTimeout(() => {
@@ -216,6 +377,7 @@ function SessionTraceVistaView({ sessionId, subscribeCommand }) {
       return startViewerHandoff({
         host: window, iframe: frame.current, token: createToken(window.crypto),
         json: state.graph, onStatus: setViewerMessage,
+        chat: { sessionId, baseURI: document.baseURI, fetch: window.fetch.bind(window) },
       });
     } catch (error) { setViewerMessage(error.message); return undefined; }
   }, [state.graph, sessionId, canEmbed]);
