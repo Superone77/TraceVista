@@ -42,6 +42,12 @@ def validate_state_assessment(state, states):
 def compile_graph(analysis, timeline):
     """Interpretations are supplied by the analyst, never guessed from exit code alone."""
     graph = copy.deepcopy(analysis)
+    notes = graph.get('notes')
+    if isinstance(notes, str):
+        graph['notes'] = [notes]
+    elif notes is not None and (not isinstance(notes, list) or
+                               not all(isinstance(note, str) for note in notes)):
+        raise ValueError('notes must be an array of strings or a single note string')
     index = {e['id']: e for e in timeline['timeline']}
     if len(index) != len(timeline['timeline']):
         raise ValueError('Duplicate evidence IDs')

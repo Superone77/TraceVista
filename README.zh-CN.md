@@ -69,6 +69,10 @@ TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#
 从 https://github.com/Superone77/TraceVista 安装 skills/tracevista-skill
 ```
 
+也可以通过 agent 的插件入口安装：[安装指南](docs/AGENT-INTEGRATIONS.md)包含
+Claude Code、Codex、Cursor、Gemini CLI、OpenCode 和 Pi。
+[DeepSeek Harness 插件](integrations/deepseek-harness/README.md)支持从会话中发起转换。
+
 ### 2. 转换并打开
 
 ```text
@@ -76,7 +80,7 @@ TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#
 然后在浏览器中打开 https://tracevista.pages.dev/ 并导入它。
 ```
 
-在 Codex 中用 `$tracevista-skill`，在 Claude Code 中用 `/tracevista-skill`。skill 会读取日志、构建状态地图和摘要、校验导出文件，再在查看器中打开。浏览过程中，你可以继续让 agent 修改同一张地图。
+在 Codex 中用 `$tracevista-skill`，在 Claude Code 中用 `/tracevista-skill`（通过插件安装时用 `/tracevista:tracevista-skill`）。skill 会读取日志、构建状态地图和摘要、校验导出文件，再在查看器中打开。浏览过程中，你可以继续让 agent 修改同一张地图。
 
 它的[写作指南](skills/tracevista-skill/references/clear-writing.md)借鉴了 ASD-STE100：用具体的动词、统一的术语，一句话只讲一件事。每段解释都把 agent 做了什么、证据显示了什么、它接下来选择了什么串起来，并保留完整的技术条件。
 

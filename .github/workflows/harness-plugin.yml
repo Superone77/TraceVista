@@ -1,0 +1,71 @@
+name: Verify optional Harness plugin
+on:
+  push:
+    paths:
+      - 'integrations/deepseek-harness/**'
+      - 'skills/tracevista-skill/**'
+      - 'LICENSE'
+      - 'LICENSES/**'
+      - 'THIRD_PARTY_NOTICES.md'
+      - '.github/workflows/harness-plugin.yml'
+  pull_request:
+    paths:
+      - 'integrations/deepseek-harness/**'
+      - 'skills/tracevista-skill/**'
+      - 'LICENSE'
+      - 'LICENSES/**'
+      - 'THIRD_PARTY_NOTICES.md'
+      - '.github/workflows/harness-plugin.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  harness-plugin:
+    name: Harness 0.2.1-rc.2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: integrations/deepseek-harness/pnpm-lock.yaml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only Harness integration dependencies
+        run: pnpm --dir integrations/deepseek-harness install --frozen-lockfile --ignore-scripts
+      - name: Require the native Harness protocol
+        working-directory: integrations/deepseek-harness
+        run: node --input-type=module -e "await import('@deepseek-ai/dsh-llm'); await import('@deepseek-ai/dsh-subagent')"
+      - run: pnpm --dir integrations/deepseek-harness test
+      - run: pnpm --dir integrations/deepseek-harness build
+      - run: pnpm --config.ignore-scripts=true --dir integrations/deepseek-harness pack
+      - name: Inspect the installable package
+        run: |
+          python3 - <<'PY'
+          import json
+          import tarfile
+          from pathlib import Path
+          packages = list(Path("integrations/deepseek-harness").glob("dsh-plugin-tracevista-*.tgz"))
+          assert len(packages) == 1, packages
+          with tarfile.open(packages[0]) as archive:
+              names = set(archive.getnames())
+              for required in [
+                  "package/lib/index.mjs",
+                  "package/lib/client.js",
+                  "package/lib/skill/SKILL.md",
+                  "package/lib/skill/scripts/extract_timeline.py",
+                  "package/lib/LICENSE",
+                  "package/lib/LICENSES/ThoughtDAG-MIT.txt",
+                  "package/cordis.patch.yml",
+              ]:
+                  assert required in names, required
+              assert not any("/node_modules/" in name or "/.work/" in name or "/tests/" in name for name in names)
+              manifest = json.load(archive.extractfile("package/package.json"))
+              assert manifest["engines"]["dsh"] == "0.2.1-rc.2"
+          PY
+      - run: git diff --exit-code -- integrations/deepseek-harness/pnpm-lock.yaml
