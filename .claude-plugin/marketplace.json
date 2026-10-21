@@ -1,0 +1,12 @@
+{
+  "name": "tracevista-plugins",
+  "description": "The TraceVista trajectory conversion skill for coding agents.",
+  "owner": { "name": "TraceVista contributors" },
+  "plugins": [
+    {
+      "name": "tracevista",
+      "source": "./",
+      "description": "Convert agent logs into an interactive TraceVista trajectory."
+    }
+  ]
+}

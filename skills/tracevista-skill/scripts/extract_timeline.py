@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from image_policy import apply_image_policy
+from deepseek_harness import snapshot_rows as harness_snapshot_rows, jsonl_rows as harness_jsonl_rows, extract_rows as extract_harness_rows
 
 BRIEF = {'user': 1500, 'note': 1500, 'thinking': 1500, 'call': 350, 'result': 350, 'status': 350}
 PART_CHARS = 50_000
@@ -132,6 +133,8 @@ def inferencebench_rows(rows):
 def load_rows(text):
     try:
         whole = json.loads(text)
+        harness = harness_snapshot_rows(whole)
+        if harness is not None: return harness
         benchmark = swe_rows(whole)
         if benchmark is not None: return benchmark
         if isinstance(whole, list):
@@ -153,10 +156,11 @@ def load_rows(text):
             # events. Plain text alone must not become a plausible agent trace.
             rows.append(dict(_source_line=line, _source_runner=body,
                              _source_timestamp=wrapped_at))
-    return rows
+    return harness_jsonl_rows(rows)
 
 
 def detect(rows):
+    if rows and all(r.get('_source_format') == 'deepseek-harness' for r in rows): return 'deepseek-harness'
     if rows and all(r.get('_source_format') == 'swe-rebench' for r in rows): return 'swe-rebench'
     if inferencebench_rows(rows): return 'inferencebench'
     for row in (r for r in rows if '_source_runner' not in r):
@@ -177,6 +181,9 @@ def extract(text, fmt=None):
         raise ValueError('Timestamp-prefixed logs require a recognized Claude Code stream')
     wrapped_claude = fmt == 'claude-code' and wrapped_records
     events, tokens, seen_usage, calls = [], None, {}, {}
+    if fmt == 'deepseek-harness':
+        events, tokens = extract_harness_rows(rows)
+        rows = []
     def add(row, kind, body, tool=None, error=False, **extra):
         e = dict(kind=kind, text=body, tool=tool, error=error, tokens_in=tokens,
                  timestamp=row.get('timestamp') if row.get('timestamp') is not None else row.get('_source_timestamp'),
@@ -406,10 +413,20 @@ def extract_review_artifacts(path):
     return events,total,sources
 
 
-def clean_metadata(value, clean):
-    if isinstance(value, str): return clean(value)
-    if isinstance(value, list): return [clean_metadata(v, clean) for v in value]
-    if isinstance(value, dict): return {k:clean_metadata(v, clean) for k,v in value.items()}
+def clean_metadata(value, clean, field=None):
+    if isinstance(value, str):
+        cleaned = clean(value)
+        if field is not None and cleaned == value:
+            # A generic credential is identifiable by its key, not its value.
+            # Probe this field in JSON context without reserializing the object,
+            # changing keys/IDs or losing nested structure. A changed probe with
+            # an unchanged standalone value means the field context matched.
+            probe = json.dumps({field: value}, ensure_ascii=False)
+            if clean(probe) != probe:
+                return '[REDACTED]'
+        return cleaned
+    if isinstance(value, list): return [clean_metadata(v, clean, field) for v in value]
+    if isinstance(value, dict): return {k:clean_metadata(v, clean, k) for k,v in value.items()}
     return value
 
 

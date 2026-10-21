@@ -122,6 +122,7 @@ Use `extract_timeline.py --images keep|omit`; omission details are in
 - [clear-writing.md](references/clear-writing.md): ASD-STE100-inspired explanations, evidence boundaries and before/after examples.
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
+- [deepseek-harness.md](references/deepseek-harness.md): Harness snapshots, versioned logs and source provenance.
 - [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
 - [legacy-canvas.md](references/legacy-canvas.md) and [analysis-schema.md](references/analysis-schema.md): only for an explicit stock ThoughtDAG canvas request.
 

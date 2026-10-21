@@ -20,6 +20,8 @@ Use the user-selected run. Otherwise inspect recent candidates and their run tim
 agent/model identity and first user message; ask only if the intended run remains ambiguous.
 Claude sessions are usually under `~/.claude/projects/`, Codex under `~/.codex/sessions/`;
 Pi accepts native session files or `pi --mode json` logs. Use recorded model IDs.
+DeepSeek Harness accepts the plugin's `deepseek-harness-session` snapshot or
+uncompressed native v4 session JSONL; see [Harness input and evidence mapping](deepseek-harness.md).
 
 ```sh
 python3 /absolute/skill/scripts/extract_timeline.py /absolute/session.jsonl --images keep --out /absolute/work/extracted

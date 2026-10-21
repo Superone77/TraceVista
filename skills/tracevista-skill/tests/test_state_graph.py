@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_state_graph import compile_graph, as_canvas
+from validate_trace import validate_wire_graph
 
 
 def fixture():
@@ -29,6 +30,16 @@ def fixture():
 
 
 class StateGraphTests(unittest.TestCase):
+    def test_single_note_compiles_to_importable_graph(self):
+        analysis, timeline = fixture()
+        analysis['notes'] = 'The check ran in memory; no file was changed.'
+        original = copy.deepcopy(analysis)
+        graph = compile_graph(analysis, timeline)
+        validate_wire_graph(graph)
+        self.assertEqual(graph['notes'], [analysis['notes']])
+        self.assertEqual(graph['timeline'], timeline)
+        self.assertEqual(analysis, original)
+
     def test_valid_assessments_keep_comparison_and_unknown_correctness(self):
         analysis, timeline = fixture()
         assessment = {'metric':'Latency','unit':'ms','value':2.5,'previous':3.0,

@@ -31,6 +31,11 @@ inspection can have no decision; a failed call can have no usable result. State 
 is supported. Cite the events through the entity's `events`, quoted `abstract`, and evidenced
 links. Use `informs` only for an observed connection to a later decision.
 
+Keep absence claims within the observed scope. A session with no file reads does not prove
+that a file is absent from the workspace. If a fix exists only in an in-memory tool script
+and the final answer, say that it was not saved during this session. Do not turn “not
+observed” into “does not exist”, including in short ladder text and state snapshots.
+
 Write one idea per sentence. Use concrete verbs such as “changed”, “measured”, “rejected”
 and “restored”. Give each paragraph one subject and put its main finding first. If a sentence
 contains several results or conditions, split it without removing those conditions. Explain

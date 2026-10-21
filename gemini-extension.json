@@ -1,0 +1,5 @@
+{
+  "name": "tracevista",
+  "version": "0.1.0",
+  "description": "Convert agent logs into interactive TraceVista trajectories with original evidence."
+}

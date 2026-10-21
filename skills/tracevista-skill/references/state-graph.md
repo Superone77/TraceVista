@@ -73,8 +73,9 @@ from state-transition edges. Preserve source IDs and do not invent private reaso
 
 Write `state-analysis.json` with:
 
-- `title`, `scope`, optional `subtitle`, `notes`, `language` (see
-  [reading-layer.md](reading-layer.md#language)).
+- `title`, `scope`, optional `subtitle`, `notes: string[]`, `language` (see
+  [reading-layer.md](reading-layer.md#language)). The compiler also accepts a
+  single note string and exports it as a one-element array without changing its text.
 - `states[]`: `id`, `title`, `summary`, `events`, `snapshot` (component → value or null).
 - `branches[]`: `id`, `state`, `title`, `summary`, `events`, `status`
   (`attempted`, `retained`, `proposed`, `rejected`).
