@@ -72,6 +72,8 @@ Install skills/tracevista-skill from https://github.com/Superone77/TraceVista
 Prefer your agent's plugin installer? See [agent integrations](docs/AGENT-INTEGRATIONS.md)
 for Claude Code, Codex, Cursor, Gemini CLI, OpenCode and Pi, or the
 [DeepSeek Harness plugin](integrations/deepseek-harness/README.md) for conversion from a session.
+The [MiniMax Code MiniApp](integrations/minimax-miniapp/README.md) bundles the viewer
+and conversion skill, with Chat through the host's configured Agent.
 
 ### 2. Convert and open
 

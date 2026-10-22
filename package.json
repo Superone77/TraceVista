@@ -20,6 +20,8 @@
     "package:agent-plugin": "node scripts/package-agent-plugin.mjs",
     "build:harness-plugin": "node integrations/deepseek-harness/scripts/build.mjs",
     "test:harness-plugin": "node --test integrations/deepseek-harness/tests/*.test.mjs",
+    "build:minimax-miniapp": "tsc -p viewer/tsconfig.json && node integrations/minimax-miniapp/scripts/build.mjs",
+    "test:minimax-miniapp": "node --test integrations/minimax-miniapp/tests/*.test.mjs && node viewer/scripts/test-minimax-chat.mjs && node viewer/scripts/test-chat-store.mjs",
     "test:examples": "node scripts/test-examples.mjs",
     "examples:lock": "node scripts/lock-examples.mjs",
     "setup:hooks": "git config --local core.hooksPath .githooks"

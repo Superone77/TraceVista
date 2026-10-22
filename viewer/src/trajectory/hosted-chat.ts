@@ -6,6 +6,8 @@ export interface HostedModelInfo {
   model: string;
   contextWindow?: number;
   maxOutputTokens?: number;
+  /** Transport request limit, distinct from the model's token context window. */
+  maxInputCharacters?: number;
 }
 export interface HostedChatConnection {
   label: string;

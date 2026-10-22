@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from image_policy import apply_image_policy
 from deepseek_harness import snapshot_rows as harness_snapshot_rows, jsonl_rows as harness_jsonl_rows, extract_rows as extract_harness_rows
+from minimax_code import identifies as minimax_rows, extract_rows as extract_minimax_rows
 
 BRIEF = {'user': 1500, 'note': 1500, 'thinking': 1500, 'call': 350, 'result': 350, 'status': 350}
 PART_CHARS = 50_000
@@ -163,6 +164,7 @@ def detect(rows):
     if rows and all(r.get('_source_format') == 'deepseek-harness' for r in rows): return 'deepseek-harness'
     if rows and all(r.get('_source_format') == 'swe-rebench' for r in rows): return 'swe-rebench'
     if inferencebench_rows(rows): return 'inferencebench'
+    if minimax_rows(rows): return 'minimax-code'
     for row in (r for r in rows if '_source_runner' not in r):
         kind = row.get('type')
         if kind in ('session_meta', 'response_item', 'event_msg', 'turn_context'): return 'codex-rollout'
@@ -183,6 +185,9 @@ def extract(text, fmt=None):
     events, tokens, seen_usage, calls = [], None, {}, {}
     if fmt == 'deepseek-harness':
         events, tokens = extract_harness_rows(rows)
+        rows = []
+    elif fmt == 'minimax-code':
+        events, tokens = extract_minimax_rows(rows)
         rows = []
     def add(row, kind, body, tool=None, error=False, **extra):
         e = dict(kind=kind, text=body, tool=tool, error=error, tokens_in=tokens,
@@ -369,6 +374,10 @@ def build_timeline(sessions, clean=redact, namespaced=False, links=()):
         models={e['model'] for e in events if e.get('model')}
         summaries.append({'id':sid,'actor':session.get('actor','main'),'model':session.get('model') or (next(iter(models)) if len(models)==1 else None),'format':fmt,
                           'events':len(events),'tokens_in':total,'minutes':max((e['t_min'] for e in events if e['t_min'] is not None),default=None)})
+        if fmt == 'minimax-code':
+            summaries[-1].update(snapshot_scope=events[0]['snapshot_scope'],
+                                 tokens_in_known=events[0]['usage_accounting']['tokens_in_known'],
+                                 tokens_complete=events[0]['usage_accounting']['tokens_complete'])
     known={e['id'] for e in timeline}
     for link in links:
         if link.get('source') not in known or link.get('target') not in known: raise ValueError('Cross-session link references an unknown event')
@@ -378,7 +387,8 @@ def build_timeline(sessions, clean=redact, namespaced=False, links=()):
     return {'format':'multi-session' if namespaced else summaries[0]['format'], 'events':len(timeline),
             'sessions':summaries,'sources':sources,'links':list(links),'timeline':timeline,
             'tokens_in':sum(totals) if all(t is not None for t in totals) else None,
-            'tokens_in_known':sum(t for t in totals if t is not None),'tokens_complete':all(t is not None for t in totals),
+            'tokens_in_known':sum(s.get('tokens_in_known', s['tokens_in'] or 0) for s in summaries),
+            'tokens_complete':all(s.get('tokens_complete', s['tokens_in'] is not None) for s in summaries),
             'minutes':summaries[0]['minutes'] if len(summaries)==1 else None,
             'tool_calls':sum(e['kind']=='call' for e in timeline)}
 

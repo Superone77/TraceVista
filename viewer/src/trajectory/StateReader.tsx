@@ -28,6 +28,11 @@ import exampleCatalog from 'virtual:tracevista-examples';
 import { datasetRequest, ExampleUnavailableError } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 import type { HostedChatConnection } from './hosted-chat';
+import { createMiniMaxChatConnection } from './minimax-chat';
+import MiniMaxAgentInteractions from './MiniMaxAgentInteractions';
+import MiniAppInstructions from './MiniAppInstructions';
+
+const miniApp = import.meta.env.VITE_TRACEVISTA_MINIAPP === '1';
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
@@ -587,18 +592,25 @@ function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Grap
 function App() {
   const { t, lang } = useLang();
   const [handoff] = useState(() => {
+    if (miniApp) return { request: null, invalid: false };
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
   });
   const [graph, setGraph] = useState<Graph | null>(null);
   const [hostedChat, setHostedChat] = useState<HostedChatConnection | null>(null);
+  useEffect(() => {
+    if (!miniApp) return;
+    const connection = createMiniMaxChatConnection();
+    setHostedChat(connection);
+    return () => connection?.dispose();
+  }, []);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
   const cancelHandoff = useRef<(() => void) | null>(null);
   const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example'); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
-    cancelHandoff.current?.(); setHostedChat(null); setLoading(false);
+    cancelHandoff.current?.(); if (!miniApp) setHostedChat(null); setLoading(false);
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   useEffect(() => {
@@ -634,9 +646,10 @@ function App() {
   const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
   useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
   return <>
+    {miniApp && <MiniMaxAgentInteractions connection={hostedChat} />}
     {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
     {graph ? <ReactFlowProvider key={revision}>
-      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} hostedChat={hostedChat} />
+      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => { if (miniApp) setGraph(null); else location.assign(import.meta.env.BASE_URL); }} hostedChat={hostedChat} />
     </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
       <div className="welcome-links"><HeaderLinks /></div>
       <div className="welcome-layout">
@@ -652,8 +665,8 @@ function App() {
           <div className="welcome-actions"><FilePicker label={t('Import Trajectory')} onImport={loadFile} /></div>
           {loading && <p className="welcome-loading" role="status">{t('Loading…')}</p>}
         </section>
-        <Instructions />
-        <ExampleGallery examples={exampleCatalog} />
+        {miniApp ? <MiniAppInstructions /> : <Instructions />}
+        {!miniApp && <ExampleGallery examples={exampleCatalog} />}
       </div>
     </div>}
   </>;

@@ -47,6 +47,9 @@ use only the standard library and make no model calls.
 Use absolute script and input paths in actual calls. Resolve `scripts/` relative to this
 skill's directory, not the working directory. Keep generated work under an ignored `.work/`
 directory or a temporary directory. Do not rerun the underlying experiment for conversion.
+For MiniMax Code, use only the user-selected raw `messages.jsonl` snapshot. Do not
+discover private logs or claim the snapshot contains earlier compacted generations;
+see [minimax-code.md](references/minimax-code.md).
 
 ## Preview and save
 
@@ -123,6 +126,7 @@ Use `extract_timeline.py --images keep|omit`; omission details are in
 - [observations.md](references/observations.md): skill usage, review, knowledge, TODOs and measurements.
 - [multi-agent.md](references/multi-agent.md): manifests and request/return evidence across sessions.
 - [deepseek-harness.md](references/deepseek-harness.md): Harness snapshots, versioned logs and source provenance.
+- [minimax-code.md](references/minimax-code.md): explicitly selected MiniMax JSONL snapshots, UTF-16 prompt ranges and history limits.
 - [opening.md](references/opening.md): cloud import, browser verification and optional local preview.
 - [legacy-canvas.md](references/legacy-canvas.md) and [analysis-schema.md](references/analysis-schema.md): only for an explicit stock ThoughtDAG canvas request.
 

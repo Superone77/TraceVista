@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "name": "tracevista",
+  "displayName": "TraceVista",
+  "version": "0.1.0",
+  "description": "Understand agent trajectories with an interactive decision map, Story, original evidence, playback and contextual Chat.",
+  "author": "superone77",
+  "icon": "icon.png",
+  "category": "Code",
+  "exampleQueries": ["Open TraceVista", "Use tracevista-skill to convert my MiniMax session log"],
+  "apps": [],
+  "mcpServers": [],
+  "skills": ["skills/tracevista-skill/SKILL.md"]
+}

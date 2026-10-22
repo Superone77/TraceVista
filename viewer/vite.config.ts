@@ -11,6 +11,7 @@ const resolvedModuleId = `\0${moduleId}`;
 
 export default defineConfig(({ mode, command }) => {
   const showcase = mode === 'showcase';
+  const miniapp = mode === 'minimax';
   const library = showcase ? loadExampleLibrary(repoRoot, process.env.TRACEVISTA_EXAMPLES_DIR) : null;
   const catalog = library?.catalog ?? [];
   const release = () => {
@@ -21,13 +22,14 @@ export default defineConfig(({ mode, command }) => {
       dirty = !!execFileSync('git', ['status', '--porcelain'], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
     } catch { /* Source archives can be built without Git metadata. */ }
     return JSON.stringify({
-      format: 'tracevista-release', edition: showcase ? 'showcase' : 'standalone',
+      format: 'tracevista-release', edition: miniapp ? 'minimax-miniapp' : showcase ? 'showcase' : 'standalone',
       viewer: { revision, dirty },
       examples: library ? { repository: library.lock.repository, revision: library.lock.revision, lockSha256: library.lockHash } : null,
     }, null, 2) + '\n';
   };
   return {
     root, base: './',
+    define: { 'import.meta.env.VITE_TRACEVISTA_MINIAPP': JSON.stringify(miniapp ? '1' : '0') },
     // Development supports local-data imports. Release assets are emitted explicitly.
     publicDir: command === 'serve' ? 'public' : false,
     plugins: [react(), {
@@ -55,7 +57,7 @@ export default defineConfig(({ mode, command }) => {
         this.emitFile({ type: 'asset', fileName: 'tracevista-release.json', source: release() });
       },
     }],
-    build: { outDir: showcase ? '../dist-site' : '../dist', emptyOutDir: true,
+    build: { outDir: miniapp ? '../integrations/minimax-miniapp/.build/viewer' : showcase ? '../dist-site' : '../dist', emptyOutDir: true,
       rollupOptions: { input: { index: resolve(root, 'index.html'), trajectory: resolve(root, 'trajectory.html') } } },
   };
 });

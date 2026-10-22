@@ -72,6 +72,8 @@ TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#
 也可以通过 agent 的插件入口安装：[安装指南](docs/AGENT-INTEGRATIONS.md)包含
 Claude Code、Codex、Cursor、Gemini CLI、OpenCode 和 Pi。
 [DeepSeek Harness 插件](integrations/deepseek-harness/README.md)支持从会话中发起转换。
+[MiniMax Code MiniApp](integrations/minimax-miniapp/README.md)内置可视化界面与转换技能，
+Chat 可以直接使用宿主配置的 Agent。
 
 ### 2. 转换并打开
 

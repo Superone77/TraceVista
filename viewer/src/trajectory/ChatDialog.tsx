@@ -10,14 +10,12 @@ import { buildSmartContext, runSmartChat, type SmartStatus } from './smartContex
 import { budgetKey, modelBudget, restoreInputBudgets, canListModels, listModels, presetOf, selectedPreset, changeEndpoint, switchPreset, restoreSettings, requestReady, safeError, type ChatSettings, type ModelInfo, type StreamStatus } from './providers';
 import { chatTransport, hostedBudget, hostedBudgetKey, prepareHostedContext } from './chat-connection';
 import type { HostedChatConnection, HostedModelInfo } from './hosted-chat';
+import { chatStore as store } from './chat-store';
+import { isMiniMaxChatConnection } from './minimax-chat';
 import './smart-context.css';
 
 const SETTINGS_KEY = 'atlas-chat-settings';
 const BUDGETS_KEY = 'tracevista-input-budgets';
-const store = {
-  get<T>(key: string, fallback: T): T { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; } },
-  set(key: string, value: unknown) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage may be unavailable; the dialog still works for this page */ } },
-};
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, onCited, close, hostedChat, connectionSource, onConnectionSource }: {
@@ -205,7 +203,11 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       const cites = [...new Set([...citations(text, known).flatMap(p => 'id' in p && p.kind !== 'unknown' ? [p.id] : []), ...explanationReferences(text, known)])];
       update({ text, cites });
     } catch (e) {
-      const error = controller.signal.aborted ? typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped' : safeError(e, settings);
+      const error = controller.signal.aborted
+        ? usingHost && isMiniMaxChatConnection(hostedChat)
+          ? tr('Cancellation requested. Check the Agent in MiniMax Code before retrying.')
+          : typeof controller.signal.reason === 'string' ? controller.signal.reason : 'Stopped'
+        : safeError(e, settings);
       if (answerId) update({ text, error });
       else if (!controller.signal.aborted) setHostError(error);
     } finally { window.clearTimeout(timer); activeRequest.current = null; setBusy(null); }
@@ -230,7 +232,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
 
   return <section className="chat-dialog nodrag nopan nowheel" aria-label={tr('Ask about this trajectory')}>
     <header><b>{tr('Ask about this trajectory')}</b><span>
-      <button className="chat-model-button" onClick={() => { setShowSettings(v => !v); if (!showSettings && usingHost) setHostRefresh(n => n + 1); }} aria-pressed={showSettings} title={tr('Model and API settings')}>{usingHost ? `Harness · ${hostModel?.model ?? tr('Connecting…')}` : ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
+      <button className="chat-model-button" onClick={() => { setShowSettings(v => !v); if (!showSettings && usingHost) setHostRefresh(n => n + 1); }} aria-pressed={showSettings} title={tr('Model and API settings')}>{usingHost ? `${hostedChat!.label} · ${hostModel?.model ?? tr('Connecting…')}` : ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
       <details className="chat-more"><summary aria-label={tr('More chat actions')}>⋯</summary><div>
         <button onClick={exportChat} disabled={!turns.length}>{tr('Export conversation')}</button>
         <button onClick={() => { setTurns([]); setOpenEvidence(new Set()); }} disabled={!turns.length || !!busy}>{tr('Clear conversation')}</button>
@@ -243,7 +245,9 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       {usingHost ? <div className="chat-host-model">
         <span>{hostModel ? `${hostModel.provider} · ${hostModel.model}` : tr('Connecting to the session model…')}</span>
         <button type="button" onClick={() => setHostRefresh(n => n + 1)} disabled={hostRefreshing} aria-label={tr('Refresh session model')}>↻</button>
-        <small>{tr('Uses the model configured in this Harness session. No API key is needed here.')}</small>
+        <small>{tr(isMiniMaxChatConnection(hostedChat)
+          ? 'Uses MiniMax Agent, including its tools and permission controls. No API key is needed here.'
+          : 'Uses the model configured in the host. No API key is needed here.')}</small>
         {hostError && <small className="chat-error">{hostError}</small>}
       </div> : <>
       <div className="chat-provider-field"><span>{tr('Provider')}</span><ProviderPicker value={preset} disabled={locked} onChange={value => editConnection(switchPreset(settings, value))} /></div>
@@ -262,8 +266,10 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       </span></label>
       {availableModels.length > 0 && (manualModel || !modelInfo) && <label>ID<input aria-label="Model ID" value={settings.model} placeholder="Enter a model ID" onChange={e => { autoPicked.current = null; setSettings(s => ({ ...s, model: e.target.value })); setProbe({ busy: false, text: '' }); }} /></label>}
       {modelStatus.text && <small className={`chat-model-status ${modelStatus.error ? 'error' : ''}`}>{modelStatus.text}{availableModels.length > 0 && settings.model && !modelInfo ? '; the current model ID is not listed' : ''}</small>}
-      <label className="chat-remember"><input type="checkbox" checked={settings.remember} onChange={e => setSettings(s => ({ ...s, remember: e.target.checked }))} />{tr('Remember the key in this browser')}</label>
-      <p>{tr('Your selected trajectory context is sent directly to {host} when you ask a question. The key stays in this browser and is used to authenticate with that API.', { host: host || tr('the configured API') })}</p>
+      <label className="chat-remember"><input type="checkbox" checked={settings.remember} onChange={e => setSettings(s => ({ ...s, remember: e.target.checked }))} />{tr(import.meta.env.VITE_TRACEVISTA_MINIAPP === '1' ? 'Remember the key in this MiniApp' : 'Remember the key in this browser')}</label>
+      <p>{tr(import.meta.env.VITE_TRACEVISTA_MINIAPP === '1'
+        ? 'Your selected trajectory context is sent directly to {host}. Custom keys stay in memory unless you choose to save them in MiniMax local plugin data.'
+        : 'Your selected trajectory context is sent directly to {host} when you ask a question. The key stays in this browser and is used to authenticate with that API.', { host: host || tr('the configured API') })}</p>
       </>}
       <div className="chat-probe"><button type="button" onClick={() => void testReply()} disabled={!ready || locked}>{tr('Test connection')}</button><small>{tr('Sends a short test prompt without trajectory data. A small API charge may apply.')}</small></div>
       {probe.text && <small className={`chat-model-status ${probe.error ? 'error' : ''}`}>{probe.text}</small>}

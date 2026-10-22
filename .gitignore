@@ -17,3 +17,4 @@ __pycache__/
 /AGENTS.md
 /integrations/deepseek-harness/lib/
 /integrations/deepseek-harness/*.tgz
+/integrations/minimax-miniapp/.build/

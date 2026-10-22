@@ -1,0 +1,8 @@
+.miniapp-instructions { width: min(42rem, 100%); margin: 1.5rem auto; text-align: left; }
+.miniapp-instructions h2 { font-size: 1.3rem; margin: 0 0 .5rem; }
+.miniapp-instructions p { color: #655f56; line-height: 1.5; }
+.miniapp-instructions form { display: grid; gap: .6rem; }
+.miniapp-instructions input { min-width: 0; padding: .7rem; border: 1px solid #d9d5cf; border-radius: .5rem; font: inherit; background: white; }
+.miniapp-instructions button { justify-self: start; padding: .7rem 1rem; font: inherit; }
+.miniapp-status { min-height: 1.5rem; font-size: .875rem; }
+.miniapp-storage-error { position: fixed; z-index: 2000; left: 1rem; right: 1rem; bottom: 1rem; padding: 1rem; background: #fff4f2; color: #9b2822; border: 1px solid #d98f89; border-radius: .5rem; }

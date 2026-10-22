@@ -21,6 +21,8 @@ const commands=[
  [process.execPath,['viewer/scripts/test-smart-context.mjs']],
  [process.execPath,['viewer/scripts/test-chat-connection.mjs']],
  [process.execPath,['viewer/scripts/test-hosted-chat.mjs']],
+ [process.execPath,['viewer/scripts/test-minimax-chat.mjs']],
+ [process.execPath,['viewer/scripts/test-chat-store.mjs']],
  [process.execPath,['viewer/scripts/test-providers.mjs']],
  [process.execPath,['viewer/scripts/test-handoff.mjs']],
  [process.execPath,['scripts/test-datasets.mjs']],

@@ -1,0 +1,34 @@
+.minimax-agent-interactions {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 250;
+  width: min(460px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  color: var(--text, #202426);
+}
+.minimax-agent-interaction {
+  padding: 18px;
+  border: 1px solid var(--line, #c9cecc);
+  border-radius: 12px;
+  background: var(--surface, #fafbf8);
+  box-shadow: 0 8px 32px #0002;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.minimax-agent-interaction p { margin: 9px 0; }
+.minimax-agent-interaction pre {
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+.minimax-agent-interaction summary { cursor: pointer; }
+.minimax-agent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.minimax-agent-actions button { padding: 6px 10px; color: inherit; background: var(--surface-2, #f1f3ef); border: 1px solid var(--line, #c9cecc); border-radius: 6px; cursor: pointer; }
+.minimax-agent-actions button:disabled { cursor: wait; opacity: .6; }
+.minimax-agent-error { font-weight: 600; }

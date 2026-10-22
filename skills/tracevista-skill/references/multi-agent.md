@@ -85,7 +85,9 @@ sources in the root attachment. Original logs are never modified.
 - Chronological wires show recorded order; they are not the model's exact context graph.
 - Input-token totals use recorded fields. Missing usage is null, with a separate known
   subtotal in multi-session output. Claude/Pi include recorded cache-input fields;
-  Codex uses recorded input_tokens. These totals are not costs or output-token totals.
+  Codex uses recorded input_tokens. MiniMax snapshots include recorded input/cache-read/
+  cache-write counters and expose a known subtotal when fields are missing or conflicting;
+  their earlier generations are not loaded. These totals are not costs or output-token totals.
 - Private or absent thinking is not reconstructed. Unparsed transport records remain
   in source attachments. Unknown plain-text console formats require another parser.
 - Pattern redaction is incomplete by nature. Use repeatable `--secret-file` for known

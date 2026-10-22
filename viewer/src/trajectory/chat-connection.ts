@@ -13,10 +13,13 @@ export function chatTransport(host: Pick<HostedChatConnection, 'stream'> | null)
 const positive = (n: unknown): number | undefined => typeof n === 'number' && Number.isSafeInteger(n) && n > 0 ? n : undefined;
 export function hostedBudget(model: HostedModelInfo | null) {
   const contextWindow = positive(model?.contextWindow);
+  const characterLimit = positive(model?.maxInputCharacters);
+  // Leave room for prompt framing and JSON escaping. The transport checks the exact character count.
+  const transportAllowance = characterLimit ? Math.max(1, Math.floor(characterLimit / 8)) : Infinity;
   const outputTokens = Math.min(4096, positive(model?.maxOutputTokens) ?? Infinity,
     contextWindow ? Math.max(1, Math.floor(contextWindow / 2)) : Infinity);
-  return { contextWindow, outputTokens, inputTokens: contextWindow ? Math.max(1, contextWindow - outputTokens) : 96000,
-    source: contextWindow ? 'Host model' : 'Local default for unknown models' };
+  return { contextWindow, outputTokens, inputTokens: Math.min(transportAllowance, contextWindow ? Math.max(1, contextWindow - outputTokens) : 96000),
+    source: characterLimit ? 'Host request limit' : contextWindow ? 'Host model' : 'Local default for unknown models' };
 }
 export const hostedBudgetKey = (model: HostedModelInfo | null) => JSON.stringify(['hosted', model?.provider ?? '', model?.model ?? '']);
 

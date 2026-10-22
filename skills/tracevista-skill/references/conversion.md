@@ -16,8 +16,12 @@ hash) and an `image_policy.mode=omit` annotation; the archives become image-omit
 derivatives. Source files are untouched. Ordinary text, IDs and call/result references remain.
 Keeping images does not fetch remote URLs or locate missing files.
 
-Use the user-selected run. Otherwise inspect recent candidates and their run timestamps,
-agent/model identity and first user message; ask only if the intended run remains ambiguous.
+Use the user-selected run. For MiniMax Code, require the user-selected raw
+`messages.jsonl` snapshot and do not discover private logs or infer the current chat.
+See [MiniMax Code input and evidence boundaries](minimax-code.md); earlier compacted
+generations are outside this input. For other supported formats without a selected run,
+inspect recent candidates and their timestamps, agent/model identity and first user
+message; ask only if the intended run remains ambiguous.
 Claude sessions are usually under `~/.claude/projects/`, Codex under `~/.codex/sessions/`;
 Pi accepts native session files or `pi --mode json` logs. Use recorded model IDs.
 DeepSeek Harness accepts the plugin's `deepseek-harness-session` snapshot or

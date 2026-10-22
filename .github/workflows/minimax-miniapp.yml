@@ -1,0 +1,34 @@
+name: Verify optional MiniMax MiniApp
+on:
+  push:
+    paths: ['integrations/minimax-miniapp/**', 'viewer/**', 'skills/tracevista-skill/**', 'package.json', 'pnpm-lock.yaml', '.github/workflows/minimax-miniapp.yml']
+  pull_request:
+    paths: ['integrations/minimax-miniapp/**', 'viewer/**', 'skills/tracevista-skill/**', 'package.json', 'pnpm-lock.yaml', '.github/workflows/minimax-miniapp.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  minimax-miniapp:
+    name: MiniApps 3.1.2 contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm test:minimax-miniapp
+      - run: pnpm build:minimax-miniapp
+      - uses: actions/checkout@v4
+        with:
+          repository: MiniMax-AI/MiniMax-Code-MiniApps
+          ref: 9269f35097fae982965e7e6e6876457de1faec73
+          path: .work/minimax-contract
+          persist-credentials: false
+      - name: Validate against the pinned official MiniApps contract
+        run: node .work/minimax-contract/scripts/validate.mjs integrations/minimax-miniapp/.build/tracevista
+      - run: git diff --exit-code

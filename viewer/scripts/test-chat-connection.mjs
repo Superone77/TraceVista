@@ -44,6 +44,9 @@ try {
 } finally { globalThis.fetch = originalFetch; }
 
 assert.equal(hostedBudget(null).inputTokens, 96000, 'unknown host limits stay conservative');
+assert.deepEqual(hostedBudget({ provider: 'MiniMax', model: 'host', maxInputCharacters: 100000 }),
+  { contextWindow: undefined, outputTokens: 4096, inputTokens: 12500, source: 'Host request limit' },
+  'transport character caps constrain context without inventing a model token window');
 assert.equal(hostedBudget({ provider: 'deepseek', model: 'deepseek-flash' }).contextWindow, undefined, 'a name does not prove the host endpoint limit');
 assert.deepEqual(hostedBudget({ provider: 'p', model: 'm', contextWindow: 8192, maxOutputTokens: 2048 }),
   { contextWindow: 8192, outputTokens: 2048, inputTokens: 6144, source: 'Host model' });

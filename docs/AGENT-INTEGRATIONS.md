@@ -24,16 +24,30 @@ cannot control your browser, open the website and choose **Import Trajectory**.
 | OpenCode | Native skill | Ask for `tracevista-skill` |
 | Pi | Pi package containing the shared skill | `/skill:tracevista-skill` |
 | DeepSeek Harness | Session analysis plugin with an embedded viewer | `/tracevista` or the session's TraceVista tab |
+| MiniMax Code | MiniApp with the bundled viewer, skill and host Agent Chat | Open **TraceVista** in MiniApps |
 
 These entries describe where the **conversion skill can run**. They do not imply
 that every agent's private session format has a parser. The extractor supports
-Claude Code, Codex, Pi, DeepSeek Harness, InferenceBench and SWE-rebench formats;
+Claude Code, Codex, Pi, DeepSeek Harness, MiniMax Code JSONL snapshots, InferenceBench and SWE-rebench formats;
 Cursor, Gemini CLI and OpenCode can convert those inputs too. For another input,
 inspect its format and add an adapter before claiming a complete conversion.
 
 The files in this branch support local installation. The GitHub installation
 commands below apply after these files reach the requested remote ref.
 TraceVista is not listed in the agents' official marketplaces.
+
+### MiniMax Code MiniApp
+
+Build the self-contained MiniApp with `pnpm build:minimax-miniapp`, then install
+the generated `integrations/minimax-miniapp/.build/tracevista` directory into
+MiniMax's plugins directory. Requires MiniMax Code 3.1.2 or later.
+The conversion skill is included; Chat defaults to the MiniMax Agent with host
+credentials. You can still choose your own API. Select a source log explicitly:
+MiniMax's public API does not expose the parent conversation history, and a
+`messages.jsonl` file may contain only the active generation after compaction.
+
+See [installation, use and validation status](../integrations/minimax-miniapp/README.md).
+This package includes the viewer; the small skill-only package below does not.
 
 ### Prepare a small local package
 

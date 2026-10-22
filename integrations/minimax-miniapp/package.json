@@ -1,0 +1,7 @@
+{
+  "name": "tracevista-minimax-miniapp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "mcode": { "schemaVersion": 2, "miniApp": "./miniapp/miniapp.json" }
+}
