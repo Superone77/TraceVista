@@ -19,7 +19,7 @@ Open [localhost:8875](http://127.0.0.1:8875/). This starts the standalone viewer
 
 Importing a file reads it in your browser. The home-page URL does not save that file: keep the JSON to reopen it later. **Export → JSON** downloads the complete graph as `agent-state-trajectory.json`, including its source records and translation tables.
 
-Hover over or click **Export** in the toolbar and select **HTML** to download a single interactive `.html` file named after the trajectory. Open it directly in a browser to explore the map, Story, playback, and original records offline. The file embeds the viewer, styles, fonts, complete trajectory, and current interface language. It opens at the overview; temporary selections, zoom, and chat conversations are not saved. Exported pages retain the Story and Play buttons, detail levels, and language switch; the viewer menu, Export, and Chat buttons are omitted. Model connections and API keys are not included.
+Hover over or click **Export** in the toolbar and select **HTML** to download a single interactive `.html` file named after the trajectory. Open it directly in a browser to explore the map, Story, playback, and original records offline. The file embeds the viewer, styles, fonts, complete trajectory, and current interface language. It opens at the overview with Story collapsed; click Story to open it. Temporary selections, zoom, and chat conversations are not saved. Exported pages retain the Story and Play buttons, detail levels, and language switch; the viewer menu, Export, and Chat buttons are omitted. Model connections and API keys are not included.
 
 ## Navigate with Map and Story
 
