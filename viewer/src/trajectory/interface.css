@@ -36,6 +36,13 @@
 .reader .map-legend span { font-size: var(--ui-caption); }
 
 .viewer-menu { position: relative; justify-self: start; }
+.export-menu { position: relative; }
+.export-menu-popover { position: absolute; top: 100%; right: 0; padding-top: .375rem; min-width: 8rem; z-index: 1; }
+.export-menu-popover[hidden] { display: none; }
+.export-menu-options { display: grid; gap: .125rem; padding: .375rem; background: var(--surface); border: 1px solid var(--line); border-radius: .625rem; box-shadow: 0 .5rem 2rem var(--shadow-md); }
+.reader .export-menu-options button { width: 100%; text-align: left; background: transparent; border-color: transparent; }
+.reader .export-menu-options button:hover,
+.reader .export-menu-options button:focus-visible { background: var(--surface-3); }
 .reader .toolbar .viewer-menu-trigger {
   display: grid;
   place-items: center;
