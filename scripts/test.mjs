@@ -23,6 +23,7 @@ const commands=[
  [process.execPath,['viewer/scripts/test-hosted-chat.mjs']],
  [process.execPath,['viewer/scripts/test-providers.mjs']],
  [process.execPath,['viewer/scripts/test-handoff.mjs']],
+ [process.execPath,['viewer/scripts/test-html-export.mjs']],
  [process.execPath,['scripts/test-datasets.mjs']],
  [process.execPath,['scripts/test-example-paths.mjs']],
  [process.execPath,['scripts/test-example-build.mjs']],

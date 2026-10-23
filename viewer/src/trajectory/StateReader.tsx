@@ -28,6 +28,8 @@ import exampleCatalog from 'virtual:tracevista-examples';
 import { datasetRequest, ExampleUnavailableError } from './dataset';
 import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff';
 import type { HostedChatConnection } from './hosted-chat';
+import { readEmbeddedExport } from './html-export';
+import { downloadHtml } from './download-html';
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
@@ -40,9 +42,10 @@ function FilePicker({ label, onImport }: { label: string; onImport: (file: File)
   return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; hostedChat: HostedChatConnection | null }) {
+function Reader({ graph, original, onImport, onHome, onError, hostedChat, exported }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; onError: (message: string) => void; hostedChat: HostedChatConnection | null; exported: boolean }) {
   const rf = useReactFlow<CardNode, Edge>();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const [exporting, setExporting] = useState(false);
   const [chatConnection, setChatConnection] = useState<'host' | 'custom'>(() => hostedChat ? 'host' : 'custom');
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -543,9 +546,15 @@ function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Grap
     const a = Object.assign(document.createElement('a'), { href: url, download: 'agent-state-trajectory.json' });
     a.click(); URL.revokeObjectURL(url);
   }
+  async function exportHtml() {
+    setExporting(true);
+    try { await downloadHtml(original, lang, import.meta.env.BASE_URL); }
+    catch { onError(t('Could not export HTML. Please try again.')); }
+    finally { setExporting(false); }
+  }
   return <div className="reader" aria-label={graph.title}>
     <div className="toolbar">
-      <div className="view-options story-controls"><ViewerMenu>{dismiss => <>
+      <div className="view-options story-controls">{!exported && <ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
           <FilePicker label={t('Import Trajectory')} onImport={onImport} />
           <button onClick={() => { download(); dismiss(); }}>{t('Export complete trace')}</button>
@@ -562,11 +571,11 @@ function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Grap
           <label className="viewer-menu-check"><input type="checkbox" checked={proposed} onChange={e => setProposed(e.target.checked)} />{t('Untried ideas')}</label>
           {hasReading && !readingStatus.ready && <p className="reading-gap-note" title={`Missing summaries: ${readingStatus.missing.join(', ') || 'none'}; missing run overview: ${readingStatus.missingJourney ? 'yes' : 'no'}`}>{t('Reading layer incomplete; showing all actions')}</p>}
         </div>
-      </>}</ViewerMenu>
+      </>}</ViewerMenu>}
       <button aria-pressed={journeyOpen} onClick={() => { playback.pause(); journeyTucked.current = false; setJourneyOpen(open => !open); }}>{t('Story')}</button>
       <button aria-label={t(playback.playing ? 'Pause playback' : 'Play story')} aria-pressed={playback.active} onClick={playback.playing ? playback.pause : playback.play} disabled={!steps.length}>{playback.playing ? 'Ⅱ' : '▶'} {t(playback.playing ? 'Pause' : 'Play')}</button></div>
       <div className="zoom-levels" aria-label={t('Story detail levels')}>{(['states', 'branches', 'actions', 'raw'] as Tier[]).map(level => <button key={level} className={tier === level ? 'active' : ''} aria-pressed={tier === level} title={t('Expand Story to the selected level')} onClick={() => showTier(level)}>{t(tierLabels[level])}</button>)}</div>
-      <div className="view-options header-controls"><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button><HeaderLinks /></div>
+      <div className="view-options header-controls">{!exported && <><button onClick={exportHtml} disabled={exporting} aria-busy={exporting} title={t('Save an interactive HTML file for offline viewing')}>{t(exporting ? 'Exporting…' : 'Export')}</button><button aria-pressed={chatOpen} onClick={() => { setChatOpen(open => !open); setCited(new Set()); }}>{t('Chat')}</button></>}<HeaderLinks /></div>
     </div>
     <main>{journeyOpen && <StoryRail graph={graph} main={main} delivered={delivered} decisionNo={decisionNo} selected={selected} focusEvent={focusEvent} focusRevision={focusRevision} expanded={storyExpanded} onExpandedChange={update => { playback.pause(); setStoryExpanded(update); }} onFly={fly}
       playbackNode={playback.step?.node} restoreScroll={storyRestore} onScrollRestored={clearStoryRestore}
@@ -577,32 +586,32 @@ function Reader({ graph, original, onImport, onHome, hostedChat }: { graph: Grap
     </ReactFlow>
       <PlaybackControls playback={playback} depth={playbackDepth} onDepthChange={changePlaybackDepth} onEvidence={evidence} onOpen={jump} />
       {legendOpen ? <div className="map-legend">{tier === 'states' ? <>{sideLine && <span><i className="legend-line" />{t('Delivered line')}</span>}<span><i style={{background:stateTones.better}} />{t('Measured gain')}</span><span><i style={{background:stateTones.worse}} />{t('Measured regression')}</span><span><i style={{background:stateTones.historical}} />{t('Final selection')}</span><span>↶ {t('Purple dashes: rollback')}</span></> : <><span><i className="legend-then" />{t(edgeLabels.flow)}</span><span><i className="legend-parallel" />{t(edgeLabels.parallel)}</span><span style={{ color: moveColors.insight }}>┄ {t(edgeLabels.because)}</span><span><i className="legend-band" />{t('Version')}</span>{behaviors.map(b => <span key={b}><i style={{ background: colors[b] }} />{t(b)}</span>)}</>}{hasReading && <>{moves.filter(m => m !== 'insight' || tier !== 'states').map(m => <span key={m} style={{ color: moveColors[m] }}>{moveGlyphs[m]} {t(moveLabels[m])}</span>)}</>}<button className="legend-close" onClick={() => setLegendOpen(false)} aria-label={t('Hide the legend')}>×</button></div> : <button className="legend-pill" onClick={() => setLegendOpen(true)}>{t('Legend')}</button>}</div>
-      {chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
+      {!exported && chatOpen && <div className="side-dock" style={{ width: chatWidth }}>
         <PanelResizeHandle label={t('Resize the chat')} width={{ now: chatWidth, ...chatLimit }} onResize={resizeChat} onResizeEnd={saveChat} />
         <ChatDialog graph={original} focus={item} clearFocus={() => setSelected(null)} jump={jump} evidence={evidence} onCited={setCited} close={() => { setChatOpen(false); setCited(new Set()); }} hostedChat={hostedChat} connectionSource={chatConnection} onConnectionSource={setChatConnection} />
       </div>}</main>
   </div>;
 }
 
-function App() {
+function App({ initialGraph }: { initialGraph?: unknown }) {
   const { t, lang } = useLang();
   const [handoff] = useState(() => {
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
   });
-  const [graph, setGraph] = useState<Graph | null>(null);
+  const [graph, setGraph] = useState<Graph | null>(() => initialGraph ? parseGraph(initialGraph) : null);
   const [hostedChat, setHostedChat] = useState<HostedChatConnection | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState('');
   const cancelHandoff = useRef<(() => void) | null>(null);
-  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example'); });
+  const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !initialGraph && (!!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example')); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
     cancelHandoff.current?.(); setHostedChat(null); setLoading(false);
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   useEffect(() => {
-    if (!handoff.request && !handoff.invalid) return;
+    if (initialGraph || !handoff.request && !handoff.invalid) return;
     history.replaceState(history.state, '', location.pathname + location.search);
     if (handoff.invalid) { setError(HANDOFF_LINK_ERROR); setLoading(false); return; }
     const cancel = startHandoff(window, handoff.request!, value => {
@@ -612,7 +621,7 @@ function App() {
     return cancel;
   }, [handoff]);
   useEffect(() => {
-    if (handoff.request || handoff.invalid) return;
+    if (initialGraph || handoff.request || handoff.invalid) return;
     let path: string | null;
     try { path = datasetRequest(location.search, exampleCatalog, import.meta.env.BASE_URL); }
     catch (e) {
@@ -636,7 +645,10 @@ function App() {
   return <>
     {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
     {graph ? <ReactFlowProvider key={revision}>
-      <Reader graph={view!} original={graph} onImport={loadFile} onHome={() => location.assign(import.meta.env.BASE_URL)} hostedChat={hostedChat} />
+      <Reader graph={view!} original={graph} exported={!!initialGraph} onImport={loadFile} onError={setError} onHome={() => {
+        if (initialGraph) { setGraph(null); setHostedChat(null); setError(''); }
+        else location.assign(import.meta.env.BASE_URL);
+      }} hostedChat={hostedChat} />
     </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
       <div className="welcome-links"><HeaderLinks /></div>
       <div className="welcome-layout">
@@ -660,5 +672,6 @@ function App() {
 }
 
 export default function StateReader() {
-  return <LangProvider><App /></LangProvider>;
+  const [embedded] = useState(() => readEmbeddedExport(document));
+  return <LangProvider initialLang={embedded?.language}><App initialGraph={embedded?.graph} /></LangProvider>;
 }
