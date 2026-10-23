@@ -65,7 +65,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
   // Decisions first (ThoughtDAG's condense): routine runs fold, turns and what informed them stay.
   const [decisionsOnly, setDecisionsOnly] = useState(readingStatus.ready);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
-  const [journeyOpen, setJourneyOpen] = useState(true);
+  const [journeyOpen, setJourneyOpen] = useState(!exported);
   const [storyExpanded, setStoryExpanded] = useState<Set<string>>(() => new Set());
   // Reading can take most of the workspace; keep a narrow map beside it rather than a fixed rail cap.
   const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
