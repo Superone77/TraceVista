@@ -222,8 +222,9 @@ TraceVista 由一个 **React Flow 查看器** 和一个 **轨迹转换 skill** �
 ```bibtex
 @misc{yang2026tracevista,
   author = {Wanqi Yang and Xia Chen and Qilong Huang and Mei Xie and André Borrmann and Shiwei Liu},
-  title = {{TraceVista}: Understanding Agent Trajectories through Hierarchical Exploration},
+  title = {{TraceVista}: Understanding Agent Trajectories Through Hierarchical Exploration and Evidence-Grounded Dialogue},
   year = {2026},
+  note = {Technical report},
   howpublished = {\url{https://github.com/Superone77/TraceVista}}
 }
 ```
