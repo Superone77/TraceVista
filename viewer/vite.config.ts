@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { loadExampleLibrary } from './example-library';
+import { htmlExportPlugin } from './html-export-plugin';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = resolve(root, '..');
 const moduleId = 'virtual:tracevista-examples';
@@ -30,7 +31,7 @@ export default defineConfig(({ mode, command }) => {
     root, base: './',
     // Development supports local-data imports. Release assets are emitted explicitly.
     publicDir: command === 'serve' ? 'public' : false,
-    plugins: [react(), {
+    plugins: [react(), htmlExportPlugin(root), {
       name: 'tracevista-example-library',
       resolveId(id) { if (id === moduleId) return resolvedModuleId; },
       load(id) { if (id === resolvedModuleId) return `export default ${JSON.stringify(catalog)};`; },

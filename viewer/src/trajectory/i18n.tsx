@@ -21,8 +21,8 @@ function storedLang(): Lang {
   try { return localStorage.getItem(STORE) === 'zh' ? 'zh' : 'en'; } catch { return 'en'; }
 }
 
-export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(storedLang);
+export function LangProvider({ children, initialLang }: { children: ReactNode; initialLang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(() => initialLang ?? storedLang());
   const setLang = useCallback((next: Lang) => {
     setLangState(next);
     try { localStorage.setItem(STORE, next); } catch { /* private mode: the choice lasts for this page */ }
