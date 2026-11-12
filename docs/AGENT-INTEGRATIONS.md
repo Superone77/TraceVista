@@ -1,5 +1,10 @@
 # Use TraceVista in your agent
 
+To continuously capture an explicitly selected local Codex, Claude Code, or
+DeepSeek Harness session, see [local session tracking](../integrations/live-session/README.md).
+This provides resumable raw-record capture; live viewer updates and automatic
+summaries are tracked separately in [Q4 Roadmap #33](https://github.com/Superone77/TraceVista/issues/33).
+
 Install the same `tracevista-skill` in your coding agent, then ask it to turn a
 session log into an interactive trajectory. All integrations use
 [`skills/tracevista-skill`](../skills/tracevista-skill/SKILL.md) as their source.
