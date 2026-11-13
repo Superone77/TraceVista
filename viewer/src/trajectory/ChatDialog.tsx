@@ -182,7 +182,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       }
       const { system, messages, items, scopeKey, mode, compression: sentCompression } = sentBundle;
       const at = new Date().toISOString();
-      const scope = { scopeKey, contextMode: mode, compression: sentCompression, contextStrategy };
+      const scope = { liveSnapshot: graph.liveCapture, scopeKey, contextMode: mode, compression: sentCompression, contextStrategy };
       const ask: ChatTurn = { id: newId(), role: 'user', text: question, at, focus: focus?.id ?? null, ...scope };
       const answer: ChatTurn = { id: newId(), role: 'assistant', text: '', at, focus: focus?.id ?? null,
         provider: usingHost ? hostedChat!.label : selectedPreset(settings).label,
@@ -230,7 +230,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
 
   return <section className="chat-dialog nodrag nopan nowheel" aria-label={tr('Ask about this trajectory')}>
     <header><b>{tr('Ask about this trajectory')}</b><span>
-      <button className="chat-model-button" onClick={() => { setShowSettings(v => !v); if (!showSettings && usingHost) setHostRefresh(n => n + 1); }} aria-pressed={showSettings} title={tr('Model and API settings')}>{usingHost ? `Harness · ${hostModel?.model ?? tr('Connecting…')}` : ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
+      <button className="chat-model-button" onClick={() => { setShowSettings(v => !v); if (!showSettings && usingHost) setHostRefresh(n => n + 1); }} aria-pressed={showSettings} title={tr('Model and API settings')}>{usingHost ? (hostedChat?.label ?? tr('Connecting…')) : ready ? settings.model.trim().slice(0, 24) || selectedPreset(settings).label : tr('Connect a model')}</button>
       <details className="chat-more"><summary aria-label={tr('More chat actions')}>⋯</summary><div>
         <button onClick={exportChat} disabled={!turns.length}>{tr('Export conversation')}</button>
         <button onClick={() => { setTurns([]); setOpenEvidence(new Set()); }} disabled={!turns.length || !!busy}>{tr('Clear conversation')}</button>
@@ -243,7 +243,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
       {usingHost ? <div className="chat-host-model">
         <span>{hostModel ? `${hostModel.provider} · ${hostModel.model}` : tr('Connecting to the session model…')}</span>
         <button type="button" onClick={() => setHostRefresh(n => n + 1)} disabled={hostRefreshing} aria-label={tr('Refresh session model')}>↻</button>
-        <small>{tr('Uses the model configured in this Harness session. No API key is needed here.')}</small>
+        <small>{tr('Uses the connected host model. No API key is needed here.')}</small>
         {hostError && <small className="chat-error">{hostError}</small>}
       </div> : <>
       <div className="chat-provider-field"><span>{tr('Provider')}</span><ProviderPicker value={preset} disabled={locked} onChange={value => editConnection(switchPreset(settings, value))} /></div>
@@ -278,6 +278,7 @@ export default function ChatDialog({ graph, focus, clearFocus, jump, evidence, o
           ? <ChatAnswer text={t.text} streaming={!!busy && t.id === turns.at(-1)?.id} known={known} jump={jump} evidence={evidence} moves={moves} />
           : <ChatText text={t.text} known={known} jump={jump} evidence={evidence} moves={moves} />}
           {t.role === 'assistant' && !t.text && !t.error && <span className="chat-wait" role="status" aria-live="polite">{progressText} {waitSeconds}s</span>}</div>
+        {t.role === 'assistant' && t.liveSnapshot && <small>{tr('Capture boundary: {bytes} bytes', { bytes: t.liveSnapshot.capturedBytes })}</small>}
         {t.error && <div className="chat-error">{t.error}</div>}
         {t.role === 'assistant' && t.context && <small>{t.model} · {t.contextStrategy === 'smart' ? 'Smart context · ' : ''}{t.contextMode ? contextLabels[t.contextMode] : 'Legacy context'} · {t.context.filter(c => c.event).length} original records sent{t.compression === 'excerpts' ? ' (historical excerpts)' : ''}{t.cites?.length ? ` · ${t.cites.length} citations` : ''}</small>}
         {t.role === 'assistant' && t.retrieval && <details className="chat-retrieval" open={openEvidence.has(t.id)} onToggle={e => toggleEvidence(t.id, e.currentTarget.open)}>

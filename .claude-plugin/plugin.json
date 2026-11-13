@@ -1,10 +1,17 @@
 {
   "name": "tracevista",
   "version": "0.1.0",
-  "description": "Understand agent trajectories with a decision map, layered summaries and original evidence.",
-  "author": { "name": "TraceVista contributors" },
+  "description": "Visualize agent trajectories and follow local sessions live with Claude Code or Codex.",
+  "author": {
+    "name": "TraceVista contributors"
+  },
   "homepage": "https://tracevista.pages.dev/",
   "repository": "https://github.com/Superone77/TraceVista",
   "license": "MIT",
-  "keywords": ["agent", "trajectory", "visualization", "skills"]
+  "keywords": [
+    "agent",
+    "trajectory",
+    "visualization",
+    "skills"
+  ]
 }

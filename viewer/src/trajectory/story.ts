@@ -5,6 +5,7 @@ import { stateConnections, type StateMode } from './semantic';
 
 /** The delivered state: where the run's chronology ends (no outgoing transition); else the last state. */
 export function deliveredState(g: Graph): string | null {
+  if (g.liveCapture) return null;
   const sources = new Set(g.transitions.map(t => t.source));
   const ends = g.states.filter(s => !sources.has(s.id));
   return (ends[ends.length - 1] ?? g.states[g.states.length - 1])?.id ?? null;
@@ -57,5 +58,6 @@ export function keyDecisions(g: Graph): KeyDecision[] {
 
 /** What a stretch of work mostly did: its two most frequent behaviors (worded by the reader's language). */
 export function workMix(actions: Action[]): Behavior[] {
+  actions = actions.filter(a => a.classification_basis !== 'pending-summary');
   return behaviors.map(b => [b, actions.filter(a => a.behavior === b).length] as [Behavior, number]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([b]) => b);
 }

@@ -1,8 +1,10 @@
 {
   "name": "tracevista",
   "version": "0.1.0",
-  "description": "Understand agent trajectories with a decision map, layered summaries and original evidence.",
-  "author": { "name": "TraceVista contributors" },
+  "description": "Visualize agent trajectories and follow local sessions live with Claude Code or Codex.",
+  "author": {
+    "name": "TraceVista contributors"
+  },
   "homepage": "https://tracevista.pages.dev/",
   "repository": "https://github.com/Superone77/TraceVista",
   "license": "MIT",
@@ -12,7 +14,8 @@
     "shortDescription": "Turn agent logs into an interactive decision map",
     "category": "Developer Tools",
     "defaultPrompt": [
-      "Use tracevista-skill to convert this agent trajectory and open it in TraceVista."
+      "Use tracevista-skill to convert this agent trajectory and open it in TraceVista.",
+      "Use tracevista-live-skill to watch my current local agent session in TraceVista."
     ]
   }
 }

@@ -107,7 +107,7 @@ class SessionFollower:
     """
 
     def __init__(self, source, journal, agent, max_batch_bytes=4 * 1024 * 1024,
-                 max_record_bytes=32 * 1024 * 1024):
+                 max_record_bytes=32 * 1024 * 1024, check_same_thread=True):
         if agent not in FORMATS:
             raise ValueError('Unsupported agent format.')
         if max_batch_bytes < 1 or max_record_bytes < 1:
@@ -124,7 +124,7 @@ class SessionFollower:
         # Create journals with private permissions without changing process umask.
         fd = os.open(self.journal, os.O_CREAT | os.O_RDWR, 0o600)
         os.close(fd)
-        self.db = sqlite3.connect(self.journal)
+        self.db = sqlite3.connect(self.journal, check_same_thread=check_same_thread)
         try:
             self.db.execute('CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
             self.db.execute('CREATE TABLE IF NOT EXISTS records '

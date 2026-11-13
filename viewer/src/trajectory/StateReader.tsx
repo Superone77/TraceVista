@@ -31,6 +31,7 @@ import { HANDOFF_LINK_ERROR, readHandoffRequest, startHandoff } from './handoff'
 import type { HostedChatConnection } from './hosted-chat';
 import { readEmbeddedExport } from './html-export';
 import { downloadHtml } from './download-html';
+import LiveSession from './LiveSession';
 
 const nodeTypes = { trajectory: MapCard };
 const RAIL_STORE = 'tracevista.storyWidth', RAIL_MIN = 280, MAP_MIN = 240;
@@ -43,10 +44,11 @@ function FilePicker({ label, onImport }: { label: string; onImport: (file: File)
   return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, original, onImport, onHome, onError, hostedChat, exported }: { graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; onError: (message: string) => void; hostedChat: HostedChatConnection | null; exported: boolean }) {
+function Reader({ graph, original, onImport, onHome, onError, hostedChat, exported, live, liveFocus }: { live?: boolean; liveFocus?: { id: string }; graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; onError: (message: string) => void; hostedChat: HostedChatConnection | null; exported: boolean }) {
   const rf = useReactFlow<CardNode, Edge>();
   const { t, lang } = useLang();
   const [exporting, setExporting] = useState(false);
+  useEffect(() => { if (live && hostedChat) setChatConnection('host'); }, [live, hostedChat]);
   const [chatConnection, setChatConnection] = useState<'host' | 'custom'>(() => hostedChat ? 'host' : 'custom');
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -59,13 +61,13 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [showLinks, setShowLinks] = useState(true);
   const [proposed, setProposed] = useState(true);
-  const [stateMode, setStateMode] = useState<StateMode>('lineage');
+  const [stateMode, setStateMode] = useState<StateMode>(live || graph.liveCapture ? 'chronology' : 'lineage');
   const hasReading = useMemo(() => [...graph.states, ...graph.branches, ...graph.actions].some(e => e.move || e.ladder), [graph]);
   const readingStatus = useMemo(() => readingCoverage(graph), [graph]);
   // Decisions first (ThoughtDAG's condense): routine runs fold, turns and what informed them stay.
   const [decisionsOnly, setDecisionsOnly] = useState(readingStatus.ready);
   const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set());
-  const [journeyOpen, setJourneyOpen] = useState(!exported);
+  const [journeyOpen, setJourneyOpen] = useState(!exported && !live);
   const [storyExpanded, setStoryExpanded] = useState<Set<string>>(() => new Set());
   // Reading can take most of the workspace; keep a narrow map beside it rather than a fixed rail cap.
   const railDefault = () => 27 * parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
@@ -90,6 +92,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     storeRail(null);
   }, []);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [now, setNow] = useState(false);
   // The card under the pointer shows its reasons (informs links) the same way a selected card does.
   const [hovered, setHovered] = useState<string | null>(null);
   const [focusEvent, setFocusEvent] = useState<string | null>(null);
@@ -254,7 +257,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
     if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < COMPACT_ZOOM);
     if (zoomReadout.current) zoomReadout.current.textContent = `${Math.round(viewport.zoom * 100)}%`;
-    if (flying.current) return;
+    if (flying.current || now) return;
     const previous = tierRef.current;
     const next = semanticTier(viewport.zoom, previous);
     if (next === previous) return;
@@ -264,7 +267,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     const e = _ as MouseEvent | null;
     const point = e && typeof e.clientX === 'number' ? { x: e.clientX - box.left, y: e.clientY - box.top } : { x: box.width / 2, y: box.height / 2 };
     setView(next, rebaseViewport(layouts[previous], layouts[next], viewport, point));
-  }, [layouts, setView]);
+  }, [layouts, setView, now]);
   const moveTo = useCallback((id: string, desired?: Tier, revealInStory = true) => {
     if (revealInStory) revealStory(id);
     const entity = layouts.raw.nodes.find(n => n.id === id);
@@ -465,7 +468,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     for (const projectedEdge of projected.edges) {
       // The projection's own label is English and unconditional; each kind below decides its label, translated.
       const { label: _plain, ...e } = projectedEdge;
-      const stateEdge = ['transition', 'lineage', 'restore'].includes(e.kind);
+      const stateEdge = ['transition', 'lineage', 'restore', 'chronology'].includes(e.kind);
       const informs = e.kind === 'informs';
       const touched = [selected, hovered].some(id => id && (e.source === id || e.target === id));
       // Reasons are drawn only for the card being looked at; elsewhere a mark on the card says they exist.
@@ -478,7 +481,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
         if (overview) {
           // The overview is the version tree: ancestry is the line the reader follows.
           out.push({ ...e, type: 'smoothstep', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
-            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : e.kind === 'chronology' ? label(t('Execution order'), color) : {}),
             markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
             style: { stroke: color, opacity: onMain ? 1 : .45, strokeWidth: onMain && sideLine ? 3.5 : 2, vectorEffect: 'non-scaling-stroke', strokeDasharray: restore ? '7 6' : undefined } } as Edge);
         } else {
@@ -486,7 +489,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
           const src = rects.get(e.source)!, tgt = rects.get(e.target)!;
           out.push({ ...e, type: 'gutter', sourceHandle: 'bottom', targetHandle: 'top', zIndex: 0,
             data: { start: { x: src.x + src.width / 2, y: src.y + src.height }, exit: 'down', srcFrame: src, tgt, frames },
-            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : {}),
+            ...(restore ? label(`↶ ${t(connectionLabels.restored)}`, color) : e.kind === 'chronology' ? label(t('Execution order'), color) : {}),
             style: { stroke: color, opacity: onMain ? .16 : .09, strokeWidth: 14, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', vectorEffect: 'non-scaling-stroke' } } as Edge);
         }
         continue;
@@ -529,6 +532,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
   function showTier(next: Tier) {
     playback.pause();
     setStoryExpanded(expandStoryToTier(graph, next));
+    if (live && now) { setView(next, rf.getViewport()); return; }
     if (next === 'states') { overview(false, true); return; }
     const p = layouts.raw.nodes.find(n => n.id === selected);
     const box = canvasRef.current?.querySelector('.react-flow')?.getBoundingClientRect();
@@ -553,9 +557,41 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     catch { onError(t('Could not export HTML. Please try again.')); }
     finally { setExporting(false); }
   }
+  useEffect(() => { if (liveFocus && !now) moveTo(liveFocus.id, 'actions', true); }, [liveFocus, now]);
+  const centerNow = useCallback(() => {
+    if (!live || !now) return;
+    const order = new Map((graph.timeline?.timeline ?? []).map((e, i) => [e.id, i]));
+    const activeTier = tierRef.current;
+    const kind = activeTier === 'states' ? 'state' : activeTier === 'branches' ? 'branch' : 'action';
+    const position = (node: typeof layouts.states.nodes[number]) => {
+      const actions = node.kind === 'state' ? graph.actions.filter(a => a.state === node.id)
+        : node.kind === 'branch' ? graph.actions.filter(a => a.branch === node.id)
+        : node.kind === 'fold' ? (node.item as FoldItem).actions : [];
+      return Math.max(-1, ...node.item.events.map(e => order.get(e) ?? -1),
+        ...actions.flatMap(a => a.events.map(e => order.get(e) ?? -1)));
+    };
+    const candidates = layouts[activeTier].nodes.filter(n => n.kind === kind || kind === 'action' && n.kind === 'fold');
+    const node = candidates.sort((a, b) => position(b) - position(a))[0];
+    const box = canvasRef.current?.getBoundingClientRect();
+    if (!node || !box) return;
+    overviewPinned.current = false;
+    const current = rf.getViewport();
+    const zoom = current.zoom; // Now follows position; the user owns magnification.
+    const view = { x: box.width / 2 - (node.x + node.width / 2) * zoom,
+      y: box.height / 2 - (node.y + node.height / 2) * zoom, zoom };
+    if (Math.abs(current.x - view.x) > 1 || Math.abs(current.y - view.y) > 1 || Math.abs(current.zoom - view.zoom) > .001)
+      setView(activeTier, view);
+  }, [live, now, graph, layouts, rf, setView, tier]);
+  useEffect(() => {
+    if (!live || !now) return;
+    centerNow();
+    const observer = new ResizeObserver(centerNow);
+    if (canvasRef.current) observer.observe(canvasRef.current);
+    return () => observer.disconnect();
+  }, [centerNow, live, now]);
   return <div className="reader" aria-label={graph.title}>
     <div className="toolbar">
-      <div className="view-options story-controls">{!exported && <ViewerMenu>{dismiss => <>
+      <div className="view-options story-controls">{live && <button aria-pressed={now} onClick={() => { playback.pause(); setNow(v => !v); }}>Now</button>}{!exported && <ViewerMenu>{dismiss => <>
         <div className="viewer-menu-section">
           <FilePicker label={t('Import Trajectory')} onImport={onImport} />
           <button onClick={onHome}>{t('Home')}</button>
@@ -581,7 +617,7 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
       playbackNode={playback.step?.node} restoreScroll={storyRestore} onScrollRestored={clearStoryRestore}
       onCite={id => { playback.pause(); graph.states.some(st => st.id === id) ? flyToState(id) : moveTo(id); }} onEvidence={evidence}
       width={{ now: railWidth, min: RAIL_MIN, max: railLimit }} onResize={resizeRail} onResizeEnd={saveRail} />}
-      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { playback.pause(); overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => { playback.pause(); moveTo(n.id); }} onPaneClick={() => { playback.pause(); setSelected(null); }} onInit={() => overview()} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
+      <div className={`canvas ${spaceHeld ? 'space-pan' : ''}`} data-tier={tier} ref={canvasRef}><ReactFlow<CardNode, Edge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} selectionOnDrag={false} panOnDrag panOnScroll={wheelPans} panOnScrollSpeed={1} zoomOnScroll={!wheelPans} zoomOnPinch zoomActivationKeyCode={['Meta', 'Control']} noPanClassName={spaceHeld ? 'pan-disabled' : 'nopan'} noWheelClassName={spaceHeld ? 'wheel-disabled' : 'nowheel'} onMoveStart={event => { if (event) { playback.pause(); overviewPinned.current = false; flying.current = false; } }} onMove={onMove} onMoveEnd={centerNow} onNodeClick={(_, n) => inspect(n.id)} onNodeMouseEnter={(_, n) => setHovered(n.id)} onNodeMouseLeave={() => setHovered(null)} onNodeDoubleClick={(_, n) => { playback.pause(); moveTo(n.id); }} onPaneClick={() => { playback.pause(); setSelected(null); }} onInit={() => { overview(); if (live) overviewPinned.current = false; }} minZoom={.04} maxZoom={2} zoomOnDoubleClick={false} onlyRenderVisibleElements>
       <Background gap={28} color="#d6d6d6" /><Controls showInteractive={false} showFitView={false} />
     </ReactFlow>
       <PlaybackControls playback={playback} depth={playbackDepth} onDepthChange={changePlaybackDepth} onEvidence={evidence} onOpen={jump} />
@@ -599,6 +635,9 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
     try { return { request: readHandoffRequest(location.hash), invalid: false }; }
     catch { return { request: null, invalid: true }; }
   });
+  const [live, setLive] = useState(() => !initialGraph && new URLSearchParams(location.search).get('live') === '1');
+  const [liveFocus, setLiveFocus] = useState<{ id: string }>();
+  const followLive = useCallback((id: string) => setLiveFocus({ id }), []);
   const [graph, setGraph] = useState<Graph | null>(() => initialGraph ? parseGraph(initialGraph) : null);
   const [hostedChat, setHostedChat] = useState<HostedChatConnection | null>(null);
   const [revision, setRevision] = useState(0);
@@ -607,7 +646,7 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
   const [loading, setLoading] = useState(() => { const p = new URLSearchParams(location.search); return !initialGraph && (!!handoff.request || p.get('demo') === '1' || p.has('data') || p.has('example')); });
   function openGraph(value: unknown) { setGraph(parseGraph(value)); setRevision(n => n + 1); setError(''); }
   async function loadFile(file: File) {
-    cancelHandoff.current?.(); setHostedChat(null); setLoading(false);
+    setLive(false); cancelHandoff.current?.(); setHostedChat(null); setLoading(false);
     try { openGraph(JSON.parse(await file.text())); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }
   useEffect(() => {
@@ -621,7 +660,7 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
     return cancel;
   }, [handoff]);
   useEffect(() => {
-    if (initialGraph || handoff.request || handoff.invalid) return;
+    if (initialGraph || live || handoff.request || handoff.invalid) return;
     let path: string | null;
     try { path = datasetRequest(location.search, exampleCatalog, import.meta.env.BASE_URL); }
     catch (e) {
@@ -642,14 +681,15 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
   // Everything an analyst or a model wrote follows the interface language when the file carries a translation.
   const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
   useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
-  return <>
+  return <div className={live ? "live-app" : undefined}>
+    {live && <LiveSession onConnection={setHostedChat} onGraph={setGraph} onFollow={followLive} />}
     {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
     {graph ? <ReactFlowProvider key={revision}>
-      <Reader graph={view!} original={graph} exported={!!initialGraph} onImport={loadFile} onError={setError} onHome={() => {
+      <Reader live={live} liveFocus={liveFocus} graph={view!} original={graph} exported={!!initialGraph} onImport={loadFile} onError={setError} onHome={() => {
         if (initialGraph) { setGraph(null); setHostedChat(null); setError(''); }
         else location.assign(import.meta.env.BASE_URL);
       }} hostedChat={hostedChat} />
-    </ReactFlowProvider> : <div className="welcome welcome-with-instructions">
+    </ReactFlowProvider> : live ? <div className="live-waiting">{t('The trajectory will appear after history is organized. Enable Automatic summaries to begin.')}</div> : <div className="welcome welcome-with-instructions">
       <div className="welcome-links"><HeaderLinks /></div>
       <div className="welcome-layout">
         <section className="welcome-hero" aria-labelledby="welcome-title">
@@ -668,7 +708,7 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
         <ExampleGallery examples={exampleCatalog} />
       </div>
     </div>}
-  </>;
+  </div>;
 }
 
 export default function StateReader() {

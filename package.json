@@ -22,7 +22,8 @@
     "test:harness-plugin": "node --test integrations/deepseek-harness/tests/*.test.mjs",
     "test:examples": "node scripts/test-examples.mjs",
     "examples:lock": "node scripts/lock-examples.mjs",
-    "setup:hooks": "git config --local core.hooksPath .githooks"
+    "setup:hooks": "git config --local core.hooksPath .githooks",
+    "package:live-plugin": "node scripts/package-live-plugin.mjs"
   },
   "dependencies": {
     "react": "19.3.0",

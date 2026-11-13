@@ -53,9 +53,8 @@ python3 skills/tracevista-skill/scripts/extract_timeline.py \
 
 Then use `tracevista-skill` to analyze the timeline and produce the standard
 `.agent-state.json`. The follower snapshot is native JSONL, **not** a viewer
-`.agent-state.json`. This PR does not automatically refresh the viewer or produce
-summaries. SSH, OpenTelemetry, incremental summaries, and live Map/Story controls
-remain in #33.
+`.agent-state.json`. The local viewer below can refresh Map/Story and summarize new records. SSH and
+OpenTelemetry remain in #33.
 
 ## Shared capture interface
 
@@ -106,3 +105,65 @@ python3 -m unittest discover -s integrations/live-session/tests -v
 Tests use synthetic native records for append, partial UTF-8, replay, tool
 call/result links, failed results, bounded reads, replacement, malformed records,
 and CLI restart. They do not claim live-agent or SSH testing.
+
+
+## Open the live viewer
+
+For agent-driven startup, session discovery, reuse and shutdown, use
+[`tracevista-live-skill`](../../skills/tracevista-live-skill/SKILL.md). It can follow
+the invoking agent by an exact session ID, or another agent by an explicit local
+log path. It launches this viewer as a background service without model calls.
+
+```sh
+pnpm build
+python3 integrations/live-session/serve_live.py \
+  --source /absolute/path/session.jsonl --agent codex \
+  --journal local-data/session.sqlite --port 3904
+```
+
+Open the localhost URL printed by the server. The URL contains a temporary
+access token in its fragment; the viewer removes it from the address bar and
+keeps it in session storage for reloads. The server binds only to 127.0.0.1,
+serves one explicitly selected file, and rejects foreign origins and unauthenticated
+record requests. It serves the built viewer; rebuild after frontend edits.
+
+For a synthetic CSV-parser replay, use `--demo` instead of `--source` and
+`--journal`. The example is labeled Synthetic demo and appends a record every
+four seconds. Restart the demo command to replay it from the beginning.
+
+The live toolbar supports Pause, Resume, Stop, Follow latest, unread counts,
+and Summary settings. Raw records arrive without a model. Select your provider,
+endpoint, model, and key, then enable Automatic summaries. Existing remembered
+Chat settings are reused; keys entered here remain in memory. Text records go
+directly from the browser to that model. Images are omitted. Each request reads
+up to 32 unprocessed semantic units plus previous summaries; long records are
+explicitly excerpted. Choose a 5–60 second interval to control request frequency.
+Requests never overlap in one viewer. Pause, Stop, disabling summaries, changing
+settings, leaving the live view, or losing the connection cancels in-flight work.
+Errors disable automatic summaries until Retry or manual re-enable.
+
+Summary IDs and evidence references are validated before publishing. Failed
+requests preserve the last usable graph. Completed summaries stay in this tab's
+session storage and are reused on reload; raw records are replayed from the local
+journal. Graph updates preserve reader state instead of remounting the reader.
+Follow latest explicitly moves both Story and Map; leave it off to read earlier
+records. The live-only **Now** toggle keeps the newest node centered at the
+selected detail level. All four levels remain selectable, and zoom stays under
+user control. Turn Now off to pan freely. Chat turns retain the capture boundary used for that answer. JSON/HTML
+exports include captured records and summary coverage in `liveCapture`.
+
+Analysis starts with the newest meaningful activity and then fills earlier history.
+New arrivals take priority over the remaining backlog. The first valid batch
+appears immediately; graph nodes remain in source chronological order. Runtime
+metadata stays in raw evidence, while related tool calls and results form one
+unit. The model groups units into conceptual actions and purpose-based phases;
+states describe evidenced artifact versions. Earlier-history patches preserve
+existing IDs and the latest-progress overview. There is no Delivered badge for a growing capture.
+The interval controls new requests, not model processing time; model latency can
+make summaries lag behind raw records. Multiple viewer tabs have separate
+summary schedulers, so enable automatic summaries in only one tab to avoid
+paying for duplicate analysis.
+
+Live views default to Execution order: adjacent states are connected by source
+record order, including when earlier history is filled in. These edges do not
+claim artifact ancestry; Version tree only shows explicitly supported relations.
