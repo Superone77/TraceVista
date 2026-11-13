@@ -2,6 +2,8 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const commands=[
+ [process.execPath,['viewer/scripts/test-live.mjs']],
+ ['python3',['-m','unittest','discover','-s','integrations/live-session/tests','-v']],
  [process.execPath,['scripts/test-agent-plugins.mjs']],
  ['python3',['scripts/test-example-secrets.py']],
  ['python3',['-m','unittest','discover','-s','skills/tracevista-skill/tests','-v']],

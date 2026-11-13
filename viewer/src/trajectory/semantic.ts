@@ -110,6 +110,13 @@ export interface Layout { nodes: MapNode[]; width: number; height: number; state
 
 /** Lineage expresses version ancestry; chronological transitions remain intact. */
 export function stateConnections(g: Graph, mode: StateMode) {
+  if (g.liveCapture && mode === 'chronology') {
+    const order = new Map((g.timeline?.timeline ?? []).map((e, i) => [e.id, i]));
+    const first = (s: State) => Math.min(Infinity, ...s.events.map(e => order.get(e) ?? Infinity),
+      ...g.actions.filter(a => a.state === s.id).flatMap(a => a.events.map(e => order.get(e) ?? Infinity)));
+    const states = [...g.states].sort((a, b) => first(a) - first(b));
+    return states.slice(1).map((s, i) => ({ source: states[i].id, target: s.id, kind: 'chronology', label: 'Execution order' }));
+  }
   return g.states.flatMap(s => {
     if (mode === 'lineage' && s.lineage) return [{ source: s.lineage.parent, target: s.id, kind: s.lineage.relation === 'restored' ? 'restore' : 'lineage', label: connectionLabels[s.lineage.relation] }];
     return g.transitions.filter(t => t.target === s.id).map(t => ({ source: t.source, target: t.target, kind: 'transition', label: t.label }));

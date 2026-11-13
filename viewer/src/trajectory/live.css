@@ -1,0 +1,18 @@
+.live-app { height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+.live-app > .reader { flex:1; height:auto; min-height:0; }
+.live-bar { flex:none; background:var(--surface,#fff); border-bottom:1px solid var(--line,#ddd); padding:10px 20px; font-size:13px; max-height:45vh; overflow:auto; }
+.live-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.live-row label { display:flex; align-items:center; gap:5px; }
+.live-bar button,.live-bar input,.live-bar select { font:inherit; }
+.live-bar button { padding:5px 10px; border:1px solid #d6d3cc; border-radius:6px; background:var(--surface,#fff); cursor:pointer; }
+.live-bar button:disabled { opacity:.45; cursor:default; }
+.live-dot:before { content:''; display:inline-block; width:8px; height:8px; border-radius:50%; background:#9b958a; margin-right:6px; }
+.live-dot.active:before { background:#17765c; }
+.live-demo { color:#a65c19; background:#f9edda; padding:3px 7px; border-radius:4px; }
+.live-error { color:#b3343c; margin-top:8px; }
+.live-settings { padding-top:8px; }
+.live-settings p { margin:5px 0; color:var(--text-2,#666); }
+.live-fields { display:flex; flex-wrap:wrap; gap:12px; margin:12px 0; }
+.live-fields label { display:flex; flex-direction:column; gap:5px; }
+.live-fields input { width:200px; border:1px solid #ccc; border-radius:5px; padding:7px; }
+.live-waiting { display:grid; place-items:center; flex:1; color:#666; }

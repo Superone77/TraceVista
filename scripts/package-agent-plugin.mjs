@@ -33,6 +33,7 @@ export async function packageAgentPlugin(outputDirectory) {
     recursive: true,
     filter: (source) => !['__pycache__', '.DS_Store'].includes(basename(source)) && !source.endsWith('.pyc'),
   });
+  await cp(join(repoRoot, 'skills/tracevista-live-skill'), join(output, 'skills/tracevista-live-skill'), { recursive: true, filter: source => !['__pycache__', '.DS_Store'].includes(basename(source)) && !source.endsWith('.pyc') });
   await writeFile(join(output, 'package.json'), JSON.stringify({
     name: 'tracevista-agent-plugin',
     version: pkg.version,

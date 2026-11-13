@@ -45,6 +45,7 @@ try {
     await readFile(join(root, 'skills/tracevista-skill/SKILL.md'), 'utf8'),
     'Installed skill must match the shared source',
   );
+  assert.ok((await stat(join(output, 'skills/tracevista-live-skill/scripts/live.py'))).isFile());
   for (const script of ['extract_timeline.py', 'build_state_graph.py', 'validate_trace.py']) {
     assert.deepEqual(
       await readFile(join(output, 'skills/tracevista-skill/scripts', script)),

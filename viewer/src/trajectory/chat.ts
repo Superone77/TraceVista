@@ -21,6 +21,7 @@ export interface SmartRetrieval {
   items: ContextItem[];
 }
 export interface ChatTurn {
+  liveSnapshot?: { lastEventId?: string; capturedBytes: number; summarizedRecords: number; demo: boolean };
   id: string; role: 'user' | 'assistant'; text: string; at: string;
   focus?: string | null; provider?: string; model?: string; context?: ContextItem[]; cites?: string[]; error?: string;
   scopeKey?: string; contextMode?: ContextMode; compression?: 'full' | 'excerpts';

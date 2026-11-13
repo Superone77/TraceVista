@@ -73,7 +73,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       {handles}
       <button className="nodrag nopan fold-open" onClick={e => { e.stopPropagation(); expand(p.id); }}>
         <b>⋯ {t('{n} routine steps', { n: fold.actions.length })}</b>
-        <span className="fold-behaviors">{behaviors.filter(b => fold.actions.some(a => a.behavior === b)).map(b => <span key={b} style={{ color: colors[b] }}>{t(b)} {fold.actions.filter(a => a.behavior === b).length}</span>)}</span>
+        <span className="fold-behaviors">{behaviors.filter(b => fold.actions.some(a => a.behavior === b && a.classification_basis !== 'pending-summary')).map(b => <span key={b} style={{ color: colors[b] }}>{t(b)} {fold.actions.filter(a => a.behavior === b && a.classification_basis !== 'pending-summary').length}</span>)}</span>
       </button>
       {outHandles}
     </div>;
@@ -106,11 +106,11 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
         {tier === 'states' && !ladder && <>{verdicts}{badges}<p>{p.item.summary}</p></>}
       </div>
     </> : p.kind === 'action' && tier === 'raw' ? <>
-      <div className="raw-action-heading"><span style={{ color }}>{t(action.behavior)}</span><MoveStamp move={move} n={decisionNo} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{t(records.length === 1 ? '{n} raw record' : '{n} raw records', { n: records.length })}</span></div>
+      <div className="raw-action-heading"><span style={{ color }}>{t(action.classification_basis === 'pending-summary' ? 'Awaiting summary' : action.behavior)}</span><MoveStamp move={move} n={decisionNo} /><button className="nodrag nopan inspect-title" onClick={() => inspect(p.id)}>{p.item.title}</button><span>{t(records.length === 1 ? '{n} raw record' : '{n} raw records', { n: records.length })}</span></div>
       {skillBadges}
       <RawRecords records={records} focusEvent={focusEvent} focusRevision={focusRevision} />
     </> : <>
-      <div className="card-top"><span>{flowNo != null && <b className="flow-no" title={t('Order in time within this state')}>{flowNo}</b>}{p.kind === 'action' && t(action.behavior)}<MoveStamp move={move} n={decisionNo} />{why && why.in > 0 && <em className="why-mark" title={t('Hover or select to see why')}>{t('because {n}', { n: why.in })}</em>}</span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
+      <div className="card-top"><span>{flowNo != null && <b className="flow-no" title={t('Order in time within this state')}>{flowNo}</b>}{p.kind === 'action' && t(action.classification_basis === 'pending-summary' ? 'Awaiting summary' : action.behavior)}<MoveStamp move={move} n={decisionNo} />{why && why.in > 0 && <em className="why-mark" title={t('Hover or select to see why')}>{t('because {n}', { n: why.in })}</em>}</span><span className={action.actor === 'reviewer' ? 'reviewer-tag' : ''}>{p.kind === 'action' ? multiActor ? label(action.actor) : '' : (p.item as Branch).status === 'attempted' ? '' : label((p.item as Branch).status)}</span></div>
       {(ladder || p.kind === 'action') && <button className="nodrag nopan card-title" onClick={() => inspect(p.id)}>{p.item.title}</button>}
       {p.kind === 'action' ? <div className="action-reading nodrag nopan nowheel"><p>{p.item.summary || (ladder ? levelText(ladder, 2) : p.item.title)}</p></div> : plaque('branch')}
       {p.kind === 'action' && <ImagePreviews records={records} />}
@@ -118,7 +118,7 @@ export default memo(function MapCard({ data, selected }: NodeProps<CardNode>) {
       {!ladder && p.kind === 'branch' && <p className="branch-description">{p.item.summary}</p>}
       {p.kind === 'action'
         ? <div className="card-foot"><span>{label(action.outcome)}{tools.length ? ` · ${tools.join(' / ')}` : ''}</span></div>
-        : <div className="card-foot branch-foot"><span className="counts">{behaviors.filter(b => actions.some(a => a.behavior === b)).map(b => <span key={b} title={t(b)} style={{ color: colors[b] }}>{t(b).slice(0, 2)} {actions.filter(a => a.behavior === b).length}</span>)}</span></div>}
+        : <div className="card-foot branch-foot"><span className="counts">{behaviors.filter(b => actions.some(a => a.behavior === b && a.classification_basis !== 'pending-summary')).map(b => <span key={b} title={t(b)} style={{ color: colors[b] }}>{t(b).slice(0, 2)} {actions.filter(a => a.behavior === b && a.classification_basis !== 'pending-summary').length}</span>)}</span></div>}
       {(p.kind === 'action' || !ladder) && badges}
     </>}
     {outHandles}

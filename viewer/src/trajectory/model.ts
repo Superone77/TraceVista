@@ -145,6 +145,7 @@ function validateObservations(g: Graph, entities: Set<string>, raw: Set<string>)
 }
 
 export interface Graph {
+  liveCapture?: { lastEventId?: string; capturedBytes: number; summarizedRecords: number; demo: boolean };
   format: 'thoughtdag-state-trajectory' | 'coding-agent-state-trajectory'; version: 1; title: string; subtitle?: string; scope: string; notes: string[];
   states: State[]; branches: Branch[]; actions: Action[]; links: Link[]; transitions: Transition[];
   coverage: { raw_events: number; classified_events: number; excluded_events: number; actions: number; behaviors: Record<string, number> };
@@ -177,7 +178,7 @@ export function toolFingerprint(records: RawEvent[]): ToolMark[] {
 export type Entity = State | Branch | Action;
 /** Shared semantic tone for a canvas card and links referring to that card. */
 export function entityColor(entity: Entity): string {
-  if ('behavior' in entity) return colors[entity.behavior];
+  if ('behavior' in entity) return entity.classification_basis === 'pending-summary' ? stateTones.none : colors[entity.behavior];
   if ('snapshot' in entity) return stateVisual(entity).color;
   return entity.move ? moveColors[entity.move] : '#94a3ac';
 }
