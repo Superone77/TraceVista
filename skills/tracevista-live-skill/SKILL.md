@@ -95,8 +95,8 @@ batches, newest first. The first semantic graph appears without waiting for all
 history. Earlier history fills in afterwards; new activity takes priority.
 Nodes remain in chronological order, with stable IDs and evidence links.
 Runtime metadata stays in raw evidence and is not shown as an invented action.
-Story starts closed in live mode. Follow latest moves to new activity; Pause freezes
-reading and cancels summary work; Resume continues. The page's Stop stops that
+Story starts closed in live mode. Now centers the newest node at the selected level; Pause freezes
+reading and cancels summary work; Resume continues. The page's Stop live stops that
 viewer's updates, not the background service or the monitored agent.
 
 Avoid refreshing a configured page: newly entered keys remain in memory. Enable

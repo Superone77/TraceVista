@@ -131,7 +131,7 @@ For a synthetic CSV-parser replay, use `--demo` instead of `--source` and
 `--journal`. The example is labeled Synthetic demo and appends a record every
 four seconds. Restart the demo command to replay it from the beginning.
 
-The live toolbar supports Pause, Resume, Stop, Follow latest, unread counts,
+The live toolbar supports Pause, Resume, Stop live, Now,
 and Summary settings. Raw records arrive without a model. Select your provider,
 endpoint, model, and key, then enable Automatic summaries. Existing remembered
 Chat settings are reused; keys entered here remain in memory. Text records go
@@ -146,8 +146,7 @@ Summary IDs and evidence references are validated before publishing. Failed
 requests preserve the last usable graph. Completed summaries stay in this tab's
 session storage and are reused on reload; raw records are replayed from the local
 journal. Graph updates preserve reader state instead of remounting the reader.
-Follow latest explicitly moves both Story and Map; leave it off to read earlier
-records. The live-only **Now** toggle keeps the newest node centered at the
+The live-only **Now** toggle keeps the newest node centered at the
 selected detail level. All four levels remain selectable, and zoom stays under
 user control. Turn Now off to pan freely. Chat turns retain the capture boundary used for that answer. JSON/HTML
 exports include captured records and summary coverage in `liveCapture`.
@@ -167,3 +166,10 @@ paying for duplicate analysis.
 Live views default to Execution order: adjacent states are connected by source
 record order, including when earlier history is filled in. These edges do not
 claim artifact ancestry; Version tree only shows explicitly supported relations.
+
+Disabling Automatic summaries stops model analysis but keeps receiving records.
+The status explicitly distinguishes receiving, waiting, summarizing, paused and
+stopped. Stop live stops this page's polling and cancels automatic analysis; it
+does not terminate the monitored agent or the local server. Start live reconnects
+with automatic summaries off. Use the skill's `stop` command to shut down the
+managed local service as well.

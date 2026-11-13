@@ -22,7 +22,7 @@ function savedSettings(): ChatSettings {
   catch { return restoreSettings({}); }
 }
 
-export default function LiveSession({ onGraph, onFollow, onConnection }: { onGraph: (g: Graph) => void; onFollow: (id: string) => void; onConnection: (c: HostedChatConnection | null) => void }) {
+export default function LiveSession({ onGraph, onConnection }: { onGraph: (g: Graph) => void; onConnection: (c: HostedChatConnection | null) => void }) {
   const { t } = useLang();
   const [token] = useState(readToken);
   const [providers, setProviders] = useState<LocalProvider[]>([]);
@@ -44,21 +44,19 @@ export default function LiveSession({ onGraph, onFollow, onConnection }: { onGra
   const [mode, setMode] = useState<'running' | 'paused' | 'stopped'>('running');
   const [count, setCount] = useState(0), [summarized, setSummarized] = useState(0);
   const [demo, setDemo] = useState(false), demoRef = useRef(false);
-  const [follow, setFollow] = useState(false), followRef = useRef(false); followRef.current = follow;
-  const [unread, setUnread] = useState(0), [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(false);
   const [error, setError] = useState(''), [summaryError, setSummaryError] = useState('');
   const [settings, setSettings] = useState(savedSettings), [config, setConfig] = useState(false);
   const [auto, setAuto] = useState(false), [seconds, setSeconds] = useState(15), [busy, setBusy] = useState(false), [calls, setCalls] = useState(0);
   const [retry, setRetry] = useState(0);
   const active = useRef<AbortController | null>(null);
-  const callbacks = useRef({ onGraph, onFollow }); callbacks.current = { onGraph, onFollow };
+  const callbacks = useRef({ onGraph }); callbacks.current = { onGraph };
   const restored = useRef(false), historyEnd = useRef<number | null>(null), historyReady = useRef(false);
   const [historyLoaded, setHistoryLoaded] = useState(false), [prepared, setPrepared] = useState(false);
   const [unitsTotal, setUnitsTotal] = useState(0);
   const updateProgress = () => {
     const p = summaryProgress(records.current, annotations.current); setSummarized(p.done); setUnitsTotal(p.total);
   };
-  const latestAction = () => [...annotations.current.actions].sort((a, b) => Math.max(...b.events.map(e => Number(e.slice(1)))) - Math.max(...a.events.map(e => Number(e.slice(1)))))[0]?.id;
 
   const cacheKey = () => `tracevista.live.semantic.v2:${records.current[0]?.id}`;
   const publish = () => {
@@ -101,8 +99,6 @@ export default function LiveSession({ onGraph, onFollow, onConnection }: { onGra
         }
         if (added) {
           setCount(records.current.length); updateProgress(); publish();
-          if (followRef.current && historyReady.current && latestAction()) callbacks.current.onFollow(latestAction()!);
-          else setUnread(n => n + added);
         }
       } catch (e) {
         if (!controller.signal.aborted) { setConnected(false); setError(e instanceof Error ? e.message : String(e)); }
@@ -137,7 +133,6 @@ export default function LiveSession({ onGraph, onFollow, onConnection }: { onGra
         }
         if (graph && historyReady.current) {
           callbacks.current.onGraph(graph);
-          if (followRef.current && latestAction()) callbacks.current.onFollow(latestAction()!);
         }
         try { sessionStorage.setItem(cacheKey(), JSON.stringify(next)); } catch { /* Session-only in-memory fallback. */ }
       } catch (e) {
@@ -153,22 +148,23 @@ export default function LiveSession({ onGraph, onFollow, onConnection }: { onGra
     return () => { disposed = true; clearInterval(timer); active.current?.abort(); active.current = null; setBusy(false); };
   }, [auto, mode, settings, seconds, retry, connected, local, historyLoaded]);
 
-  function latest() {
-    setUnread(0);
-    if (historyReady.current && latestAction()) callbacks.current.onFollow(latestAction()!);
-  }
   return <section className="live-bar" aria-label={t('Live session controls')}>
     <div className="live-row">
       <strong className={connected && mode === 'running' ? 'live-dot active' : 'live-dot'}>{t(mode === 'stopped' ? 'Stopped' : mode === 'paused' ? 'Paused' : connected ? 'Live' : 'Reconnecting')}</strong>
       {demo && <span className="live-demo">{t('Synthetic demo')}</span>}
       <span aria-live="polite">{t('{count} records · {done}/{total} evidence groups organized', { count, done: summarized, total: unitsTotal })}</span>
-      <button onClick={() => setMode(mode === 'running' ? 'paused' : 'running')}>{t(mode === 'running' ? 'Pause' : 'Resume')}</button>
-      <button disabled={mode === 'stopped'} onClick={() => { setAuto(false); setMode('stopped'); }}>{t('Stop')}</button>
-      <label><input type="checkbox" checked={follow} onChange={e => { setFollow(e.target.checked); if (e.target.checked) latest(); }} />{t('Follow latest')}</label>
-      {unread > 0 && <button onClick={latest}>{t('{count} new records', { count: unread })}</button>}
+      <button onClick={() => setMode(mode === 'running' ? 'paused' : 'running')}>{t(mode === 'running' ? 'Pause' : mode === 'stopped' ? 'Start live' : 'Resume')}</button>
+      <button disabled={mode === 'stopped'} onClick={() => { setAuto(false); setMode('stopped'); }}>{t('Stop live')}</button>
       <label><input type="checkbox" checked={auto} disabled={!(local || requestReady(settings)) || mode !== 'running'} onChange={e => setAuto(e.target.checked)} />{t('Automatic summaries')}</label>
       <button aria-expanded={config} onClick={() => setConfig(v => !v)}>{t('Summary settings')}</button>
-      <span role="status">{t(!historyLoaded ? 'Loading history…' : !prepared ? busy ? 'Organizing latest activity…' : 'History loaded · start automatic analysis to build the trajectory' : busy || summarized < unitsTotal ? 'Updating latest activity and filling earlier history…' : 'Caught up')}</span>
+      <span role="status">{t(mode === 'stopped' ? 'Live stopped · this page is no longer receiving records or summarizing'
+        : mode === 'paused' ? 'Live paused · receiving and summaries are paused'
+        : !connected ? 'Reconnecting to the local session…'
+        : !historyLoaded ? 'Loading history…'
+        : !auto ? 'Receiving records · automatic summaries off'
+        : busy ? prepared ? 'Updating latest activity and filling earlier history…' : 'Organizing latest activity…'
+        : summarized < unitsTotal ? 'Receiving records · waiting for the next summary'
+        : 'Receiving records · summaries up to date')}</span>
     </div>
     {error && <div className="live-error" role="alert">{error}</div>}
     {summaryError && <div className="live-error" role="alert">{summaryError}<button onClick={() => { setSummaryError(''); setAuto(true); setRetry(n => n + 1); }}>{t('Retry')}</button></div>}

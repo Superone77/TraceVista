@@ -44,7 +44,7 @@ function FilePicker({ label, onImport }: { label: string; onImport: (file: File)
   return <span className="file-picker"><button onClick={() => input.current?.click()}>{label}</button><input ref={input} aria-label={t('Choose a trajectory file')} type="file" accept=".json" onChange={e => { const file = e.target.files?.[0]; if (file) onImport(file); e.target.value = ''; }} /></span>;
 }
 
-function Reader({ graph, original, onImport, onHome, onError, hostedChat, exported, live, liveFocus }: { live?: boolean; liveFocus?: { id: string }; graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; onError: (message: string) => void; hostedChat: HostedChatConnection | null; exported: boolean }) {
+function Reader({ graph, original, onImport, onHome, onError, hostedChat, exported, live }: { live?: boolean; graph: Graph; original: Graph; onImport: (file: File) => void; onHome: () => void; onError: (message: string) => void; hostedChat: HostedChatConnection | null; exported: boolean }) {
   const rf = useReactFlow<CardNode, Edge>();
   const { t, lang } = useLang();
   const [exporting, setExporting] = useState(false);
@@ -252,12 +252,16 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     window.addEventListener('keydown', down); window.addEventListener('keyup', up); window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
+  const lastMoveZoom = useRef<number | null>(null);
   const onMove = useCallback((_: unknown, viewport: Viewport) => {
     // Updating one CSS variable avoids rebuilding every node and its raw records per frame.
     canvasRef.current?.style.setProperty('--map-zoom', String(viewport.zoom));
     if (canvasRef.current) canvasRef.current.dataset.compactOverview = String(viewport.zoom < COMPACT_ZOOM);
     if (zoomReadout.current) zoomReadout.current.textContent = `${Math.round(viewport.zoom * 100)}%`;
-    if (flying.current || now) return;
+    const zoomChanged = lastMoveZoom.current === null || Math.abs(lastMoveZoom.current - viewport.zoom) > .00001;
+    lastMoveZoom.current = viewport.zoom;
+    // Following changes position only. Actual zoom uses the same semantic tiers as ordinary viewing.
+    if (flying.current || now && !zoomChanged) return;
     const previous = tierRef.current;
     const next = semanticTier(viewport.zoom, previous);
     if (next === previous) return;
@@ -557,7 +561,6 @@ function Reader({ graph, original, onImport, onHome, onError, hostedChat, export
     catch { onError(t('Could not export HTML. Please try again.')); }
     finally { setExporting(false); }
   }
-  useEffect(() => { if (liveFocus && !now) moveTo(liveFocus.id, 'actions', true); }, [liveFocus, now]);
   const centerNow = useCallback(() => {
     if (!live || !now) return;
     const order = new Map((graph.timeline?.timeline ?? []).map((e, i) => [e.id, i]));
@@ -636,8 +639,6 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
     catch { return { request: null, invalid: true }; }
   });
   const [live, setLive] = useState(() => !initialGraph && new URLSearchParams(location.search).get('live') === '1');
-  const [liveFocus, setLiveFocus] = useState<{ id: string }>();
-  const followLive = useCallback((id: string) => setLiveFocus({ id }), []);
   const [graph, setGraph] = useState<Graph | null>(() => initialGraph ? parseGraph(initialGraph) : null);
   const [hostedChat, setHostedChat] = useState<HostedChatConnection | null>(null);
   const [revision, setRevision] = useState(0);
@@ -682,10 +683,10 @@ function App({ initialGraph }: { initialGraph?: unknown }) {
   const view = useMemo(() => graph && localizeGraph(graph, lang), [graph, lang]);
   useEffect(() => { document.title = view ? `${view.title} · TraceVista` : 'TraceVista'; }, [view]);
   return <div className={live ? "live-app" : undefined}>
-    {live && <LiveSession onConnection={setHostedChat} onGraph={setGraph} onFollow={followLive} />}
+    {live && <LiveSession onConnection={setHostedChat} onGraph={setGraph} />}
     {error && <div className="error" role="alert">{error}<button onClick={() => setError('')}>{t('Close')}</button></div>}
     {graph ? <ReactFlowProvider key={revision}>
-      <Reader live={live} liveFocus={liveFocus} graph={view!} original={graph} exported={!!initialGraph} onImport={loadFile} onError={setError} onHome={() => {
+      <Reader live={live} graph={view!} original={graph} exported={!!initialGraph} onImport={loadFile} onError={setError} onHome={() => {
         if (initialGraph) { setGraph(null); setHostedChat(null); setError(''); }
         else location.assign(import.meta.env.BASE_URL);
       }} hostedChat={hostedChat} />
