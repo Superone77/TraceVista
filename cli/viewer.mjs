@@ -15,7 +15,10 @@ async function assetsUnder(directory, prefix = '/viewer/') {
   return assets;
 }
 const types = { html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', woff2: 'font/woff2', svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon' };
-export async function startViewer(input) {
+export const DEFAULT_VIEWER_PORT = 8877;
+export async function startViewer(input, { port = DEFAULT_VIEWER_PORT } = {}) {
+  // Port 0 is reserved for isolated integration tests. The CLI requires a stable port.
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid viewer port.');
   const { file, raw } = await readGraph(input);
   const assets = await assetsUnder(join(root, 'dist'));
   if (!assets.has('/viewer/index.html')) throw new Error('Full viewer runtime is missing. Run pnpm build or reinstall the toolkit.');
@@ -38,7 +41,12 @@ export async function startViewer(input) {
       return respond(request, response, 200, await readFile(asset), types[asset.split('.').at(-1)] || 'application/octet-stream');
     } catch { if (!response.headersSent) respond(request, response, 500, 'Viewer asset unavailable', 'text/plain'); else response.destroy(); }
   });
-  await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
+  await new Promise((done, reject) => {
+    server.once('error', error => reject(error.code === 'EADDRINUSE'
+      ? new Error(`Port ${port} is already in use. Stop the earlier viewer or choose --port NUMBER. Reuse that port to retain browser settings and chats.`)
+      : error));
+    server.listen(port, '127.0.0.1', done);
+  });
   try {
     host = `127.0.0.1:${server.address().port}`;
     page = runPython([join(root, 'cli/render_handoff.py'), file, `http://${host}/viewer/`], raw);

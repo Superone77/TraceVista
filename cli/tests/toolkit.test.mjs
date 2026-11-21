@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createExportTemplate } from '../../viewer/src/trajectory/html-export.ts';
+import { parseSinglePackResult } from '../../scripts/npm-pack-result.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 let temp, runtime, source, graph;
@@ -125,4 +126,22 @@ test('symlink destinations are not followed or replaced', async () => {
   const link = join(temp, 'linked-output');
   await symlink(join(temp, 'built'), link);
   assert.match(cli('build', source, '--out', link).stderr, /already exists/);
+});
+
+test('npm pack metadata supports both npm 11 arrays and npm 12 keyed objects', () => {
+  const result = { name: 'tracevista-toolkit', filename: 'tracevista-toolkit-0.1.0.tgz', files: [] };
+  for (const output of [[result], { 'tracevista-toolkit': result }]) {
+    assert.deepEqual(parseSinglePackResult(JSON.stringify(output), result.name), result);
+  }
+  for (const output of [null, [], {}, [result, result], { error: { message: 'failed' } }, [{ ...result, files: null }]]) {
+    assert.throws(() => parseSinglePackResult(JSON.stringify(output), result.name), /Expected one/);
+  }
+});
+
+test('open requires a stable valid port and rejects it for offline snapshots', () => {
+  for (const port of ['0', '-1', '65536', 'NaN', '1.5']) {
+    assert.match(cli('open', `--port=${port}`, '--no-open').stderr, /--port must be an integer/);
+  }
+  assert.match(cli('open', '--offline', '--port', '8877', '--no-open').stderr, /does not apply/);
+  assert.match(cli('open', 'trace.html', '--port', '8877', '--no-open').stderr, /does not apply/);
 });

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { root, inputFile, readGraph, runPython, json } from './core.mjs';
 import { build, prepare, query, inspect } from './workspace.mjs';
 import { install } from './install.mjs';
-import { startViewer } from './viewer.mjs';
+import { startViewer, DEFAULT_VIEWER_PORT } from './viewer.mjs';
 
 const help = `TraceVista — install, prepare, build, browse and query agent trajectories
 
@@ -15,7 +15,7 @@ const help = `TraceVista — install, prepare, build, browse and query agent tra
   tracevista run INPUT [--out DIR] [--images keep|omit] [--manifest]
   tracevista prepare LOG [--out DIR] --images keep|omit [--manifest]
   tracevista build EXPORT.agent-state.json [--out DIR] [--language en|zh]
-  tracevista open [WORKSPACE | EXPORT.agent-state.json] [--offline]
+  tracevista open [WORKSPACE | EXPORT.agent-state.json] [--port NUMBER | --offline]
   tracevista info [WORKSPACE | EXPORT.agent-state.json]
   tracevista query TEXT [--in WORKSPACE] [--limit 20]
   tracevista inspect ID [--in WORKSPACE]
@@ -27,14 +27,15 @@ query: literal keyword search, not an LLM answer. inspect returns full evidence.
 Defaults: tracevista-work (prepare), tracevista-out (build/open/query/inspect).
 Existing output/skill directories are never replaced. Use a fresh --out for revisions.
 --secret-file FILE can be repeated during extraction; --no-open prints the URL without launching a browser.
-open serves the full viewer on loopback until Ctrl+C; --offline opens trace.html.
+open uses 127.0.0.1:${DEFAULT_VIEWER_PORT} until Ctrl+C; reuse the same --port for saved chats/settings.
+An occupied port is an error, never a silent port change. --offline opens trace.html.
 `;
 const optionTypes = { agent: 'string', project: 'string', user: 'boolean', out: 'string', images: 'string', manifest: 'boolean',
-  language: 'string', in: 'string', limit: 'string', help: 'boolean', version: 'boolean', 'no-open': 'boolean', offline: 'boolean', 'secret-file': 'string' };
+  language: 'string', in: 'string', limit: 'string', port: 'string', help: 'boolean', version: 'boolean', 'no-open': 'boolean', offline: 'boolean', 'secret-file': 'string' };
 const allowed = {
   install: ['agent', 'project', 'user'], prepare: ['out', 'images', 'manifest', 'secret-file'],
   run: ['out', 'images', 'manifest', 'secret-file', 'language'], build: ['out', 'language'],
-  open: ['no-open', 'offline'], info: [], query: ['in', 'limit'], inspect: ['in'], doctor: [],
+  open: ['no-open', 'offline', 'port'], info: [], query: ['in', 'limit'], inspect: ['in'], doctor: [],
 };
 async function main() {
   const { values: options, positionals } = parseArgs({ allowPositionals: true,
@@ -80,11 +81,14 @@ async function main() {
   if (command === 'open') {
     let target = resolve(argument || 'tracevista-out');
     let url, running;
+    const port = options.port === undefined ? DEFAULT_VIEWER_PORT : Number(options.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('--port must be an integer between 1 and 65535.');
     if (options.offline || target.endsWith('.html')) {
+      if (options.port !== undefined) throw new Error('--port does not apply to offline HTML.');
       if (!target.endsWith('.html')) target = join(target, 'trace.html');
       await access(target); url = pathToFileURL(target).href;
     } else {
-      running = await startViewer(target); url = running.url;
+      running = await startViewer(target, { port }); url = running.url;
       console.error('Full local viewer is running. Keep this terminal open; Ctrl+C stops it.');
     }
     if (!options['no-open']) {

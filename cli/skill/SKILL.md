@@ -30,6 +30,9 @@ trajectories are interpreted. Resolve reference paths relative to this SKILL.md.
    full existing viewer, including Chat and view controls. The additional trace.html
    file is an offline reading snapshot; use --offline to open it. Existing cloud import
    remains available.
+   Reuse the default port (8877) to retain browser settings and chats. If it is busy,
+   report that conflict; do not switch ports silently or stop an unrelated service.
+   An explicitly chosen --port must be reused on later opens for the same browser data.
 6. Use `tracevista query "terms" --in OUTPUT` for literal search and
    `tracevista inspect ID --in OUTPUT` for full records and relationships. These are
    evidence retrieval commands, not model-generated answers. Cite IDs in explanations.

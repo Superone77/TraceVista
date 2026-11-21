@@ -69,7 +69,8 @@ skill and viewer into a reusable workflow:
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 pnpm package:toolkit
-npm install -g ./.work/tracevista-toolkit
+(cd .work/tracevista-toolkit && npm pack --ignore-scripts)
+npm install -g ./.work/tracevista-toolkit/tracevista-toolkit-0.1.0.tgz
 
 # Inside the project you want to analyze
 tracevista install --agent codex     # or --agent claude / --agent pi

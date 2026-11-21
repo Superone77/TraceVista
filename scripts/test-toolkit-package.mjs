@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, lstat } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { packageToolkit } from './package-toolkit.mjs';
 import { pythonExecutable } from '../cli/core.mjs';
+import { parseSinglePackResult } from './npm-pack-result.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temp = await mkdtemp(join(tmpdir(), 'tracevista-package-'));
 const npm = process.env.TRACEVISTA_NPM_CLI ? process.execPath : process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -24,7 +25,7 @@ try {
   assert.equal(pkg.scripts, undefined);
   assert.equal(pkg.private, true);
   await assert.rejects(() => packageToolkit(output), { code: 'EEXIST' });
-  const packed = JSON.parse(run(npm, ['pack', '--json', '--ignore-scripts', '--cache', join(temp, 'cache')], output))[0];
+  const packed = parseSinglePackResult(run(npm, ['pack', '--json', '--ignore-scripts', '--cache', join(temp, 'cache')], output), pkg.name);
   for (const entry of packed.files) {
     assert.ok(!/(^|\/)(node_modules|tests|\.git|\.env|local-data|examples|auth\.json|credentials\.json)(\/|$)/.test(entry.path), entry.path);
     assert.ok(!entry.path.endsWith('.agent-state.json'), entry.path);
@@ -32,6 +33,9 @@ try {
   run(npm, ['install', '--global', '--prefix', join(temp, 'prefix'), '--offline', '--ignore-scripts', '--no-audit', '--no-fund',
     '--cache', join(temp, 'cache'), join(output, packed.filename)]);
   const installed = process.platform === 'win32' ? join(temp, 'prefix/node_modules/tracevista-toolkit') : join(temp, 'prefix/lib/node_modules/tracevista-toolkit');
+  assert.equal((await lstat(installed)).isSymbolicLink(), false, 'The documented tarball install must be independent of the package directory.');
+  // Remove both source package and tarball before running any installed commands.
+  await rm(output, { recursive: true });
   const binary = join(installed, 'cli/tracevista.mjs');
   const doctor = JSON.parse(run(process.execPath, [binary, 'doctor']));
   assert.equal(doctor.viewer, 'ready');
@@ -43,8 +47,10 @@ try {
   assert.equal(await readFile(join(result.directory, 'trace.agent-state.json'), 'utf8'), fixture);
   const inspected = JSON.parse(run(process.execPath, [binary, 'inspect', 'a', '--in', result.directory]));
   assert.deepEqual(inspected.evidence.map(event => event.id), ['E1', 'E2']);
-  const { startViewer } = await import(pathToFileURL(join(installed, 'cli/viewer.mjs')));
-  const { server, url } = await startViewer(result.directory);
+  const { startViewer, DEFAULT_VIEWER_PORT } = await import(pathToFileURL(join(installed, 'cli/viewer.mjs')));
+  assert.equal(DEFAULT_VIEWER_PORT, 8877);
+  const { server, url } = await startViewer(result.directory, { port: 0 });
+  const port = Number(new URL(url).port);
   try {
     const handoff = await fetch(url);
     assert.equal(handoff.status, 200);
@@ -64,8 +70,16 @@ try {
     });
     assert.equal(wrongHost, 403);
     assert.equal((await fetch(url, { method: 'POST' })).status, 405);
+    await assert.rejects(() => startViewer(result.directory, { port }), /already in use/);
   } finally { server.closeAllConnections(); await new Promise(done => server.close(done)); }
+  const reopened = await startViewer(result.directory, { port });
+  try {
+    assert.equal(new URL(reopened.url).origin, new URL(url).origin, 'Restart must retain the browser storage origin.');
+    assert.notEqual(new URL(reopened.url).pathname, new URL(url).pathname, 'Keep per-launch trace routes unguessable.');
+    assert.equal((await fetch(url)).status, 404, 'The previous private route must expire.');
+    assert.equal((await fetch(reopened.url)).status, 200);
+  } finally { reopened.server.closeAllConnections(); await new Promise(done => reopened.server.close(done)); }
   const installedSkill = JSON.parse(run(process.execPath, [binary, 'install', '--agent', 'codex', '--project', join(temp, 'project')]));
   assert.match(await readFile(join(installedSkill.directory, 'SKILL.md'), 'utf8'), /name: tracevista/);
-  console.log(`PASS: packed install, doctor, offline build, full local viewer, evidence lookup and skill installation (${packed.files.length} files, ${packed.size} bytes compressed)`);
+  console.log(`PASS: source-independent tarball install, doctor, build, viewer restart/origin, port conflict, evidence lookup and skill installation (${packed.files.length} files, ${packed.size} bytes compressed)`);
 } finally { await rm(temp, { recursive: true, force: true }); }

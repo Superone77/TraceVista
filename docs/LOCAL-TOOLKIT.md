@@ -15,14 +15,16 @@ cd TraceVista
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 pnpm package:toolkit
-npm install -g ./.work/tracevista-toolkit
+(cd .work/tracevista-toolkit && npm pack --ignore-scripts)
+npm install -g ./.work/tracevista-toolkit/tracevista-toolkit-0.1.0.tgz
 tracevista doctor
 ```
 
-The clone command applies once this branch has been pushed. In an existing local
-checkout, start with pnpm install. The generated package contains the built offline
-viewer and skill, with no npm runtime dependencies or installation hooks. You can
-also run `npm pack` inside the generated package and install the resulting `.tgz`.
+In an existing local checkout, start with pnpm install. Install the generated `.tgz`,
+not the package directory: npm links local directories, whereas the tarball is copied
+into the installation. After tarball installation, the source checkout and generated
+package can be moved or removed. The package includes the viewer and skill, with no
+npm runtime dependencies or installation hooks.
 For development, `pnpm tracevista --help` runs the same CLI without global installation.
 Set `TRACEVISTA_PYTHON` if Python is installed under another executable name.
 
@@ -74,8 +76,14 @@ tracevista-out/
 └── workspace.json           schema version, producer, counts and source checksum
 ```
 
-`tracevista open` starts the complete existing viewer on a random loopback port and
-loads this trajectory automatically. Keep the terminal running; Ctrl+C stops it.
+`tracevista open` starts the complete existing viewer at `http://127.0.0.1:8877`
+and loads this trajectory automatically through a private per-launch URL. Keep the
+terminal running; Ctrl+C stops it. Reopening uses the same browser origin so the
+existing model settings, chat history and language preferences remain available.
+If the port is occupied, the command reports an error instead of silently choosing
+another. Stop the earlier viewer, or choose `--port 8878` and reuse that port for
+subsequent visits. Different ports have separate browser settings and chat histories;
+settings from the old random-port implementation are not automatically migrated.
 This mode includes the existing Chat and execution-order/version-tree controls.
 It serves only built viewer assets and the selected trace, not your project directory.
 Chat still uses user-configured endpoints and existing browser cross-origin constraints.

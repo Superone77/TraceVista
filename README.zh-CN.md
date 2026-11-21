@@ -56,7 +56,8 @@ TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
 pnpm package:toolkit
-npm install -g ./.work/tracevista-toolkit
+(cd .work/tracevista-toolkit && npm pack --ignore-scripts)
+npm install -g ./.work/tracevista-toolkit/tracevista-toolkit-0.1.0.tgz
 
 # 在需要分析的项目目录中安装 Skill
 tracevista install --agent codex     # 也支持 claude、pi
