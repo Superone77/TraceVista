@@ -22,7 +22,11 @@
     "test:harness-plugin": "node --test integrations/deepseek-harness/tests/*.test.mjs",
     "test:examples": "node scripts/test-examples.mjs",
     "examples:lock": "node scripts/lock-examples.mjs",
-    "setup:hooks": "git config --local core.hooksPath .githooks"
+    "setup:hooks": "git config --local core.hooksPath .githooks",
+    "tracevista": "node cli/tracevista.mjs",
+    "test:toolkit": "node --test cli/tests/*.test.mjs",
+    "package:toolkit": "node scripts/package-toolkit.mjs",
+    "test:toolkit-package": "node scripts/test-toolkit-package.mjs"
   },
   "dependencies": {
     "react": "19.3.0",

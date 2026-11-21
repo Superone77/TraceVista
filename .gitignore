@@ -17,3 +17,8 @@ __pycache__/
 /AGENTS.md
 /integrations/deepseek-harness/lib/
 /integrations/deepseek-harness/*.tgz
+
+# Local toolkit workspaces and packages
+tracevista-out*/
+tracevista-work*/
+*.tgz
