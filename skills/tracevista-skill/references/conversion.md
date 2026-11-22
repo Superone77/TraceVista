@@ -89,7 +89,12 @@ reusing citations. Record which structure was reused and which interpretations w
 
 ## 2. Author structure and the reading layer together
 
-Read all timeline parts, then write `state-analysis.json` following [state-graph.md](state-graph.md), [observations.md](observations.md), [reading-layer.md](reading-layer.md) and [clear-writing.md](clear-writing.md).
+For long trajectories, use [parallel-conversion.md](parallel-conversion.md) to assign
+coherent parts to up to four subagents, or process the same parts serially when
+delegation is unavailable. Extract once and keep event IDs and source archives shared
+and immutable. Collect coverage from every part and reconcile boundaries before compiling.
+
+Read all timeline parts (across workers when parallel), then write `state-analysis.json` following [state-graph.md](state-graph.md), [observations.md](observations.md), [reading-layer.md](reading-layer.md) and [clear-writing.md](clear-writing.md).
 Declare the tracked state scope. Only evidenced successful Edit/Execute effects in that scope
 create states; tests and new knowledge attach to the existing state. Code ancestry, observed
 chronology and informational dependencies are independent relationships. Serial attempts can
