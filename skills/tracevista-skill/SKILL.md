@@ -19,11 +19,16 @@ use only the standard library and make no model calls.
    [state-graph.md](references/state-graph.md), [observations.md](references/observations.md)
    and [reading-layer.md](references/reading-layer.md). If images are present, ask whether to keep or omit them unless
    the user has already chosen; pass `--images keep` or `--images omit` to extraction.
-   Extract the timeline using that choice, read the evidence, and author
-   `state-analysis.json` using [clear-writing.md](references/clear-writing.md).
+   Extract the timeline once using that choice. For long trajectories (at least 200
+   events, 120,000 event-text characters, or substantial context pressure), follow
+   [parallel-conversion.md](references/parallel-conversion.md): the parent owns the
+   skeleton and final merge; up to four subagents analyze coherent parts in parallel.
+   Without host subagent support, run the same assignments serially. Short runs stay
+   serial. Read the evidence and author `state-analysis.json` using
+   [clear-writing.md](references/clear-writing.md).
    Explain the operation, observed result and supported next decision, then run
    `build_state_graph.py --require-reading-layer`.
-   The invoking agent writes the interpretation; the compiler checks it.
+   The invoking agent owns the final interpretation and reconciliation; the compiler checks it.
 3. **Validate.** Run `scripts/validate_trace.py FILE --require-reading-layer
    --quality-report REPORT`. Review gaps in causes, quotes and decision dependencies;
    never invent evidence to satisfy the report. An older file may be opened without
@@ -73,7 +78,9 @@ without breaking later edits. State directory options are in
 1. Prefer the file the user names. Otherwise run `scripts/session_state.py show` in the
    same project or with the previous `--state-dir`. Check its identity and checksum.
    If no saved file exists, locate the user-selected input; do not silently switch runs.
-2. Read the existing graph and cited records. For a reading-only edit, author a patch and
+2. Read the existing graph and cited records. For a substantial long-trajectory revision,
+   use the same [parallel workflow](references/parallel-conversion.md), preserving existing
+   IDs and assigning each entity to one worker. For a reading-only edit, author a patch and
    use `ladder.py --patch PATCH --out NEW_FILE`; patches accept `summary`, `ladder` and
    `move` per entity. Use the same clear-writing rules when revising an existing export.
    For a structure correction, edit a copy
@@ -115,6 +122,8 @@ Use `extract_timeline.py --images keep|omit`; omission details are in
   retain comparison conditions, numbers and uncertainty. Raw text and quotes stay verbatim.
 
 ## References
+
+- [parallel-conversion.md](references/parallel-conversion.md): long-trajectory delegation, serial fallback, worker ownership and final reconciliation.
 
 - [conversion.md](references/conversion.md): extraction, structure authoring and compiler commands.
 - [state-graph.md](references/state-graph.md): standard schema, effects and version relationships.
