@@ -59,6 +59,42 @@ Open an example and follow its decisions from the overview down to the original 
 | [**Tongyi DeepResearch · Literature Research**](https://tracevista.pages.dev/?example=literesearcher-affiliations) | A teacher trajectory from LiteResearcher SFT data compares two journal articles to identify the authors’ shared institution. Follow an empty PDF, a switch to journal author blocks, and a broader search after zero results. |
 | [**Codex · Garden Animation**](https://tracevista.pages.dev/?example=codex-garden-animation) | GPT-6 Astra turns a ruined hall into a Three.js garden of flowers that sway in the breeze. Follow screenshot checks, a recording timeout and a different save path, and the check of a ten-second MP4. A short excerpt of a longer session. |
 
+## Local toolkit
+
+**Install → invoke → browse → query.** The local CLI packages the same conversion
+skill and viewer into a reusable workflow:
+
+```sh
+# From a checkout of this branch (Node 24+, pnpm 11+, Python 3.10+)
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm build
+pnpm package:toolkit
+(cd .work/tracevista-toolkit && npm pack --ignore-scripts)
+npm install -g ./.work/tracevista-toolkit/tracevista-toolkit-0.1.0.tgz
+
+# Inside the project you want to analyze
+tracevista install --agent codex     # or --agent claude / --agent pi
+```
+
+Then ask your agent: `$tracevista /path/to/session.jsonl` (Claude Code: `/tracevista`).
+It prepares the records, authors the hierarchy with the shared skill, and builds:
+
+```text
+tracevista-out/
+├── trace.html               interactive offline viewer
+├── trace.agent-state.json   complete trajectory and original evidence
+├── TRACE_REPORT.md          state and work-phase summaries
+├── reading-quality.json    reading-layer checks
+└── workspace.json          output metadata and checksum
+```
+
+Already have an export? Run `tracevista build /path/to/task.agent-state.json`, then
+`tracevista open`. Use `tracevista query "latency"` to find matching IDs and
+`tracevista inspect ID` to read their full evidence. These retrieval commands make
+no model calls. The viewer and existing plugin/cloud workflows are unchanged.
+
+[Local toolkit guide](docs/LOCAL-TOOLKIT.md) · [Existing plugin installations](docs/AGENT-INTEGRATIONS.md)
+
 ## Bring your own trajectory
 
 **Two prompts. A complete map.** Copy these into your coding agent.

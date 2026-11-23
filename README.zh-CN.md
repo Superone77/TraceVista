@@ -46,6 +46,34 @@ Andrej Karpathy 提出，我们会花更多时间理解模型的输出。但在�
 
 TraceVista 已开源。欢迎[探索真实会话](https://tracevista.pages.dev/#examples)、[导入自己的轨迹](#导入你自己的轨迹)，并[告诉我们还有什么难以理解](https://github.com/Superone77/TraceVista/issues)。
 
+## 本地工具包
+
+**安装 → 调用 Skill → 生成 → 浏览和查询。** 工具包复用现有转换脚本和查看器，
+把完整轨迹整理为一个可以反复打开、查询和继续修改的本地工作目录。
+
+```sh
+# 在此分支的源码目录中；需要 Node 24+、pnpm 11+、Python 3.10+
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm build
+pnpm package:toolkit
+(cd .work/tracevista-toolkit && npm pack --ignore-scripts)
+npm install -g ./.work/tracevista-toolkit/tracevista-toolkit-0.1.0.tgz
+
+# 在需要分析的项目目录中安装 Skill
+tracevista install --agent codex     # 也支持 claude、pi
+```
+
+在 Codex 中调用 `$tracevista /path/to/session.jsonl`，Claude Code 中调用 `/tracevista`。
+Agent 使用现有 Skill 阅读原始记录、编写分层总结，再生成 `tracevista-out/`：
+完整 JSON、可离线打开的 `trace.html`、`TRACE_REPORT.md` 和校验报告。
+
+已有完整导出时，运行 `tracevista build /path/to/task.agent-state.json` 和 `tracevista open`。
+`tracevista query "关键词"` 查找节点，`tracevista inspect ID` 返回完整证据。
+CLI 本身不调用模型；原始日志的分层解释仍由调用 Skill 的 Agent 完成。
+现有网页导入、插件安装、缩放、Story/Map、播放和对话功能继续保留。
+
+[本地工具包完整说明](docs/LOCAL-TOOLKIT.md)
+
 ## 浏览真实的 agent 运行
 
 打开一个示例，从总览一路看到原始记录。无需注册，也不需要模型 key。
