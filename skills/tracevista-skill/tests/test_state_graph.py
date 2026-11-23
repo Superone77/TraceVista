@@ -40,6 +40,18 @@ class StateGraphTests(unittest.TestCase):
         self.assertEqual(graph['timeline'], timeline)
         self.assertEqual(analysis, original)
 
+    def test_lineage_evidence_ranges_are_expanded_for_the_viewer(self):
+        analysis, timeline = fixture()
+        analysis['states'][1]['lineage'] = {'parent': 's0', 'relation': 'derived', 'reason': 'Patched from s0', 'events': ['E1-E2']}
+        graph = compile_graph(analysis, timeline)
+        validate_wire_graph(graph)
+        self.assertEqual(graph['states'][1]['lineage']['events'], ['E1', 'E2'])
+        for bad in ({'parent': 'nowhere'}, {'parent': 's1'}, {'relation': 'copied'}, {'reason': ' '}, {'events': []}, {'events': ['E9']}):
+            analysis, timeline = fixture()
+            analysis['states'][1]['lineage'] = {'parent': 's0', 'relation': 'derived', 'reason': 'Patched', 'events': ['E1'], **bad}
+            with self.assertRaises(ValueError, msg=bad):
+                compile_graph(analysis, timeline)
+
     def test_valid_assessments_keep_comparison_and_unknown_correctness(self):
         analysis, timeline = fixture()
         assessment = {'metric':'Latency','unit':'ms','value':2.5,'previous':3.0,

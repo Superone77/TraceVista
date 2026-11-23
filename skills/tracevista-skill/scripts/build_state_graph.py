@@ -74,6 +74,18 @@ def compile_graph(analysis, timeline):
         if not state.get('snapshot'):
             raise ValueError(f"{state['id']}: missing tracked snapshot")
         validate_state_assessment(state, states)
+        lineage = state.get('lineage')
+        if lineage is not None:
+            if not isinstance(lineage, dict) or lineage.get('parent') not in states or lineage['parent'] == state['id']:
+                raise ValueError(f"{state['id']}: lineage parent must name another state")
+            if lineage.get('relation') not in ('derived', 'restored', 'retained'):
+                raise ValueError(f"{state['id']}: lineage relation must be derived, restored or retained")
+            if not isinstance(lineage.get('reason'), str) or not lineage['reason'].strip():
+                raise ValueError(f"{state['id']}: lineage needs a reason")
+            # ranges such as E12-E20 are expanded here, as everywhere else; the viewer takes single IDs
+            lineage['events'] = [e['id'] for e in expand(lineage.get('events'), index)]
+            if not lineage['events']:
+                raise ValueError(f"{state['id']}: lineage needs evidence events")
     for branch in branches.values():
         if branch.get('state') not in states:
             raise ValueError(f"{branch['id']}: unknown state")
