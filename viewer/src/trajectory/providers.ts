@@ -162,7 +162,7 @@ export function readSSE(buffer: string, provider: ChatProvider, onText: (t: stri
     const delta = provider === 'anthropic' ? json.delta : json.choices?.[0]?.delta;
     const text = provider === 'anthropic' ? (json.type === 'content_block_delta' && delta?.type === 'text_delta' ? delta.text : '') : delta?.content;
     if (typeof text === 'string' && text) { onStatus?.('answering'); onText(text); }
-    else if (delta?.reasoning_content || delta?.reasoning || delta?.type === 'thinking_delta') onStatus?.('thinking');
+    else if (delta?.reasoning_content || delta?.reasoning || delta?.reasoning_details || delta?.type === 'thinking_delta') onStatus?.('thinking');
     const stop = provider === 'anthropic' ? delta?.stop_reason : json.choices?.[0]?.finish_reason;
     if (stop === 'length' || stop === 'max_tokens') throw new Error('The model reached its output limit. The answer is incomplete; narrow the question or ask a follow-up.');
     if (stop === 'content_filter' || stop === 'refusal') throw new Error('The model refused the request or content filtering was triggered.');
@@ -177,7 +177,9 @@ export async function streamChat(s: ChatSettings, system: string, messages: Chat
   const body = s.provider === 'anthropic'
     ? { model: s.model.trim(), max_tokens: outputTokens, system, messages, stream: true }
     : { model: s.model.trim(), messages: [{ role: 'system', content: system }, ...messages], stream: true,
-      ...(presetOf(s) === 'openai' ? { max_completion_tokens: outputTokens } : { max_tokens: outputTokens }) };
+      ...(presetOf(s) === 'openai' ? { max_completion_tokens: outputTokens } : { max_tokens: outputTokens }),
+      // MiniMax otherwise writes its reasoning into the answer inside <think> tags.
+      ...(presetOf(s).startsWith('minimax') ? { reasoning_split: true } : {}) };
   let hasText = false;
   const append = (t: string) => { if (t.trim()) hasText = true; onText(t); };
   try {

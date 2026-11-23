@@ -99,6 +99,8 @@ try {
     assert.equal(body.model, 'test-model'); assert.equal(body.stream, true);
     assert.equal(body.max_completion_tokens ?? body.max_tokens, modelBudget(s).outputTokens, 'Request must reserve the output used by the budget');
     assert(!init.body.includes(s.apiKey)); assert(!('thinking' in body), 'No vendor-only options sent to other providers');
+    // MiniMax keeps its reasoning out of the answer only when asked; nobody else gets the option.
+    assert.equal(body.reasoning_split, id.startsWith('minimax') ? true : undefined, id);
     if (preset.provider === 'anthropic') {
       assert.equal(body.system, 'system instruction'); assert.equal(init.headers['x-api-key'], s.apiKey);
       assert(!init.headers.authorization); assert.equal(body.messages[0].role, 'user');
